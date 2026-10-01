@@ -1,0 +1,2 @@
+# Supabase CLI settings — used by the GitHub Action that applies supabase/migrations
+project_id = "Coach-PGC-RSME-Dashboard"

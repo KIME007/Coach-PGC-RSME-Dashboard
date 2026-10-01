@@ -546,7 +546,7 @@ function yrSaveAll(o){try{localStorage.setItem(LSY,JSON.stringify(o))}catch(e){c
 /* ================= CLOUD + FILE BACKUP ================= */
 const SB_CFG_KEY="rsd_supabase_cfg_v1", SB_OFF_KEY="rsd_supabase_off_v1";
 /* built-in cloud: every browser that opens this file connects here automatically (anon public key only — never service_role) */
-const SB_BUILTIN={url:"", key:""};
+const SB_BUILTIN={url:"https://wcypqogvzbknzbuymoms.supabase.co", key:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjeXBxb2d2emJrbnpidXltb21zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzExMTYsImV4cCI6MjEwNDk0NzExNn0.dNGuMWXM2W4INQgAJmEelS-z1kWnLN9QVeB3tvgYepE"};
 const DAILY_EKEY="ktmb_report_sharing_v3", DAILY_RKEY="ktmb_report_records_v1";
 let _cloudTimer=null;
 /* accept whatever gets pasted: https://ref.supabase.co/rest/v1/…, the supabase.com/dashboard/project/ref link, or no https:// */
