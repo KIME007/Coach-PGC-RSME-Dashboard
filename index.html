@@ -381,12 +381,15 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Import Excel</button>
     <button class="hbtn save clean" id="btnSave" onclick="saveDashboard()" title="Save the current dashboard changes (Ctrl+S)">
       <span class="emo">💾</span><span id="btnSaveLabel">Save</span></button>
+    <button class="hbtn" onclick="openCloudModal()" title="Download a backup file or connect Supabase so data is kept in the cloud">
+      <span class="emo">☁</span>Backup</button>
     <button class="hbtn" id="btnDownload" onclick="downloadExcel()" title="Download the latest saved data as an Excel workbook (original formatting preserved)">
       <span class="emo">📥</span><span id="btnDownloadLabel">Download Excel</span></button>
     <button class="hbtn accent" onclick="generatePpt()" title="Generate a PowerPoint for the current section from live data">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4m-4 0h8M8 12l2.5-3 2 2L16 7.5"/></svg>Generate Presentation</button>
   </div>
   <input type="file" id="fileIn" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+  <input type="file" id="fileBackupIn" accept="application/json,.json" style="display:none" onchange="restoreDataBackupFile(this)">
 </header>
 
 <div class="strip">
@@ -395,7 +398,8 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
   <span id="editInfo"></span>
   <span style="flex:1"></span>
   <span id="saveInfo">No changes saved yet this session.</span>
-  <span>&nbsp;|&nbsp;<b>💾 Save</b> stores your changes · <b>📥 Download Excel</b> exports the saved data.</span>
+  <span class="chip" id="cloudChip" onclick="openCloudModal()" style="cursor:pointer">Cloud: off</span>
+  <span>&nbsp;|&nbsp;<b>💾 Save</b> stores your changes · <b>Backup</b> keeps a JSON/cloud copy · <b>📥 Download Excel</b> exports the saved data.</span>
   <button class="linkbtn" onclick="resetAll()">Reset to file data</button>
 </div>
 
@@ -481,7 +485,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
     <div class="fld"><label>Coach Unit</label><input id="fUnit" type="text" list="unitList"><datalist id="unitList"></datalist></div>
     <div class="fld full"><label>Failure in Services</label><textarea id="fFailure"></textarea></div>
     <div class="fld"><label>Date Reported</label><input id="fDate" type="date"></div>
-    <div class="fld"><label>System</label><select id="fSystem"></select></div>
+    <div class="fld"><label>System</label><input id="fSystem" list="sysList"><datalist id="sysList"></datalist></div>
     <div class="fld"><label>6M Element</label><select id="fElement"><option>Material</option><option>Method</option><option>Manpower</option><option>Machine</option><option>Measurement</option><option>Mother Nature</option></select></div>
     <div class="fld"><label>Is it Root Cause?</label><select id="fRoot"><option>Yes</option><option>No</option></select></div>
     <div class="fld full"><label>Causes</label><textarea id="fCauses"></textarea></div>
@@ -492,6 +496,33 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
   <div class="mfoot"><button class="btn ghost" onclick="closeOv('ovInc')">Cancel</button><button class="btn primary" onclick="saveIncident()">Save Incident</button></div>
 </div></div>
 
+<div class="overlay" id="ovCloud"><div class="modal" style="max-width:640px">
+  <div class="mhead"><h3>Keep your dashboard data</h3><button class="iconb" onclick="closeCloudModal()">✕</button></div>
+  <div class="mbody">
+    <p class="note" style="margin-top:0">Save still writes to this browser. Use a backup file and/or Supabase so you do not lose work when you switch computers or clear site data.</p>
+    <h3 style="margin:14px 0 8px;font-size:.92rem">1. Backup file (works immediately)</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn primary" type="button" onclick="downloadDataBackup()">Download JSON backup</button>
+      <button class="btn ghost" type="button" onclick="document.getElementById('fileBackupIn').click()">Restore from JSON…</button>
+    </div>
+    <h3 style="margin:18px 0 8px;font-size:.92rem">2. Cloud (Supabase)</h3>
+    <ol style="margin:0 0 10px 18px;color:var(--mut);font-size:.84rem;line-height:1.45">
+      <li>Create a project at supabase.com</li>
+      <li>SQL Editor → paste and run <code>supabase/schema.sql</code> from this folder</li>
+      <li>Settings → API → copy Project URL and the <b>anon public</b> key (not service_role)</li>
+    </ol>
+    <p class="note" style="margin:0 0 10px">Your data then shows up in Supabase <b>Table Editor</b>: failure_summary, failure_4m, monthly_failures, availability, pm_compliance, incidents and daily_reports. Changes you make there load into the dashboard next time it opens.</p>
+    <div class="fgrid">
+      <div class="fld full"><label>Project URL</label><input id="sbUrl" type="url" placeholder="https://xxxx.supabase.co"></div>
+      <div class="fld full"><label>anon public key</label><textarea id="sbKey" placeholder="eyJ..." style="min-height:72px"></textarea></div>
+    </div>
+  </div>
+  <div class="mfoot">
+    <button class="btn ghost" type="button" onclick="disconnectSupabase()">Disconnect</button>
+    <button class="btn ghost" type="button" onclick="closeCloudModal()">Close</button>
+    <button class="btn primary" type="button" onclick="connectSupabase()">Connect &amp; upload</button>
+  </div>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -511,11 +542,376 @@ const BASE_YEAR=2026;
 let RS_YEAR=BASE_YEAR;
 function yrLoadAll(){try{return JSON.parse(localStorage.getItem(LSY)||"{}")||{}}catch(e){return{}}}
 function yrSaveAll(o){try{localStorage.setItem(LSY,JSON.stringify(o))}catch(e){console.warn("year store full",e)}}
-/* System Failures list only genuine system failures — "Accident" is not a system category */
-function isSystemFailure(s){return !!s&&!/^\s*ACCIDENTS?\s*$/i.test(String(s.system||''));}
-function onlySystemFailures(st){
-  if(st)["coachSummary","pgcSummary"].forEach(k=>{if(Array.isArray(st[k]))st[k]=st[k].filter(isSystemFailure);});
-  return st;}
+
+/* ================= CLOUD + FILE BACKUP ================= */
+const SB_CFG_KEY="rsd_supabase_cfg_v1", SB_OFF_KEY="rsd_supabase_off_v1";
+/* built-in cloud: every browser that opens this file connects here automatically (anon public key only — never service_role) */
+const SB_BUILTIN={url:"", key:""};
+const DAILY_EKEY="ktmb_report_sharing_v3", DAILY_RKEY="ktmb_report_records_v1";
+let _cloudTimer=null;
+/* accept whatever gets pasted: https://ref.supabase.co/rest/v1/…, the supabase.com/dashboard/project/ref link, or no https:// */
+function sbCleanUrl(u){
+  u=String(u||"").trim().replace(/\s+/g,"");
+  const dash=u.match(/supabase\.com\/dashboard\/project\/([a-z0-9]+)/i);
+  if(dash)return "https://"+dash[1].toLowerCase()+".supabase.co";
+  if(u&&!/^https?:\/\//i.test(u))u="https://"+u;
+  const m=u.match(/^(https?:\/\/[^\/?#]+)/i);
+  return m?m[1].toLowerCase():u;
+}
+function sbCfg(){
+  try{const c=JSON.parse(localStorage.getItem(SB_CFG_KEY)||"null");if(c&&c.url){c.url=sbCleanUrl(c.url);return c;}}catch(e){}
+  return sbUsingBuiltin()?{url:sbCleanUrl(SB_BUILTIN.url),key:SB_BUILTIN.key,builtin:true}:null;
+}
+function sbUsingBuiltin(){
+  if(!SB_BUILTIN.url||!SB_BUILTIN.key)return false;
+  try{if(localStorage.getItem(SB_CFG_KEY)||localStorage.getItem(SB_OFF_KEY))return false}catch(e){}
+  return true;
+}
+function sbSetCfg(c){try{
+  if(!c||!c.url){localStorage.removeItem(SB_CFG_KEY);localStorage.setItem(SB_OFF_KEY,"1");}
+  else{localStorage.removeItem(SB_OFF_KEY);localStorage.setItem(SB_CFG_KEY,JSON.stringify({url:sbCleanUrl(c.url),key:String(c.key||"").trim()}));}
+}catch(e){}}
+function sbEnabled(){const c=sbCfg();return !!(c&&c.url&&c.key)}
+function updateCloudChip(ok,msg){
+  const el=document.getElementById("cloudChip");if(!el)return;
+  if(!sbEnabled()){el.textContent="Cloud: off";el.title="Data is only on this browser until you connect Supabase";el.className="chip";return;}
+  el.textContent=ok===false?"Cloud: error":"Cloud: on";
+  el.title=msg||(ok===false?"Could not reach Supabase":"Saved copies go to Supabase");
+  el.className="chip"+(ok===false?" bad":"");
+}
+async function sbFetch(path, opts){
+  const c=sbCfg();if(!c||!c.url||!c.key)return {skip:true};
+  opts=opts||{};
+  const res=await fetch(c.url+"/rest/v1/"+path,{
+    method:opts.method||"GET",
+    headers:{
+      apikey:c.key,
+      Authorization:"Bearer "+c.key,
+      "Content-Type":"application/json",
+      Prefer:opts.prefer||"return=representation"
+    },
+    body:opts.body
+  });
+  const raw=await res.text();
+  let body=null;try{body=raw?JSON.parse(raw):null}catch(e){body=raw}
+  if(!res.ok){
+    const m=(body&&(body.message||body.error||body.hint))||(raw||"").slice(0,200)||("HTTP "+res.status);
+    throw new Error(m);
+  }
+  return body;
+}
+function packBackup(){
+  let dailyEntry=null,dailyRecs={},availOv={},auto=null,rptSeq={};
+  try{dailyEntry=JSON.parse(localStorage.getItem(DAILY_EKEY)||"null")}catch(e){}
+  try{dailyRecs=JSON.parse(localStorage.getItem(DAILY_RKEY)||"{}")||{}}catch(e){}
+  try{availOv=JSON.parse(localStorage.getItem("rsd_avail_manual_v1")||"{}")||{}}catch(e){}
+  try{auto=localStorage.getItem("rsd_avail_autosync_v1")}catch(e){}
+  try{rptSeq=JSON.parse(localStorage.getItem("rptDocSeq_v1")||"{}")||{}}catch(e){}
+  try{yrStash()}catch(e){}
+  return{
+    v:1,
+    exported:new Date().toISOString(),
+    years:yrLoadAll(),
+    yearSel:RS_YEAR,
+    lastSaved:lastSaved||null,
+    src:yrSrcLabel||null,
+    dailyEntry:dailyEntry,
+    dailyRecs:dailyRecs,
+    availOv:availOv,
+    auto:auto,
+    rptSeq:rptSeq,
+    by:deviceId()
+  };
+}
+/* random id per browser, so a cloud save can tell "this computer" from "another computer" */
+function deviceId(){
+  try{let id=localStorage.getItem("rsd_device_v1");
+    if(!id){id=Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.setItem("rsd_device_v1",id);}
+    return id;}catch(e){return "unknown"}
+}
+/* true when this browser holds data someone typed in (not just the built-in starting data) */
+function localHasData(){
+  try{
+    if(dirty||lastSaved)return true;
+    if(Object.values(yrLoadAll()).some(r=>r&&(r.saved||r.dirty)))return true;
+    return Object.keys(JSON.parse(localStorage.getItem(DAILY_RKEY)||"{}")||{}).length>0;
+  }catch(e){return false}
+}
+function applyBackupPack(pack, fromCloud){
+  if(!pack||typeof pack!=="object")throw new Error("Invalid backup");
+  if(pack.years&&typeof pack.years==="object")yrSaveAll(pack.years);
+  const y=+(pack.yearSel||RS_YEAR);
+  if(isFinite(y)&&y>=2000&&y<=2100){
+    RS_YEAR=y;
+    try{localStorage.setItem(LSYSEL,String(y))}catch(e){}
+  }
+  if(pack.lastSaved)lastSaved=pack.lastSaved;
+  if(pack.src)yrSrcLabel=pack.src;
+  try{if(pack.dailyEntry!=null)localStorage.setItem(DAILY_EKEY,JSON.stringify(pack.dailyEntry))}catch(e){}
+  try{if(pack.dailyRecs!=null)localStorage.setItem(DAILY_RKEY,JSON.stringify(pack.dailyRecs))}catch(e){}
+  try{if(pack.availOv!=null)localStorage.setItem("rsd_avail_manual_v1",JSON.stringify(pack.availOv))}catch(e){}
+  try{if(pack.auto!=null)localStorage.setItem("rsd_avail_autosync_v1",String(pack.auto))}catch(e){}
+  try{if(pack.rptSeq!=null)localStorage.setItem("rptDocSeq_v1",JSON.stringify(pack.rptSeq))}catch(e){}
+  const rec=yrLoadAll()[String(RS_YEAR)];
+  if(rec&&rec.data){S=rec.data;lastSaved=rec.saved||lastSaved||null;yrSrcLabel=rec.src||yrSrcLabel||null;setDirty(!!rec.dirty);}
+  try{window.dispatchEvent(new CustomEvent("rsd-backup-applied",{detail:{fromCloud:!!fromCloud}}))}catch(e){}
+}
+function downloadDataBackup(name){
+  try{
+    const pack=packBackup();
+    const blob=new Blob([JSON.stringify(pack)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=(typeof name==="string"&&name?name:"coach-pgc-backup")+"-"+new Date().toISOString().slice(0,10)+".json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+    if(!name)toast("Backup file downloaded ✔ keep this file somewhere safe");
+    return true;
+  }catch(e){toast("Backup failed: "+e.message);return false}
+}
+function restoreDataBackupFile(inp){
+  const f=inp.files&&inp.files[0];inp.value="";
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=function(){
+    try{
+      const pack=JSON.parse(rd.result);
+      if(!confirm("Replace the data on this computer with the backup file? This cannot be undone."))return;
+      applyBackupPack(pack,false);
+      persist();
+      if(typeof applyYear==="function")applyYear();
+      toast("Backup restored ✔");
+      if(sbEnabled())cloudPushAll({force:true}).catch(e=>toast("Restored locally, cloud update failed: "+e.message));
+    }catch(e){toast("Could not restore: "+e.message)}
+  };
+  rd.readAsText(f);
+}
+/* ---- readable Supabase tables (failure_summary, availability, incidents, daily_reports …) ---- */
+let _sbTables=null;          // null = not tried yet, true = working, false = schema.sql not run yet
+const SB_TABLES_HINT="readable tables not set up — run the latest supabase/schema.sql";
+function sbMissingFn(e){return /PGRST202|could not find the function|does not exist/i.test(String(e&&e.message||e))}
+function cloudChipNote(base){return base+(_sbTables===false?" · "+SB_TABLES_HINT:"")}
+async function cloudPushTables(pack){
+  if(_sbTables===false)return;
+  try{
+    for(const y of Object.keys(pack.years||{})){
+      const rec=pack.years[y];
+      if(!rec||!rec.data||!isFinite(+y))continue;
+      await sbFetch("rpc/rsd_sync_year",{method:"POST",prefer:"return=minimal",
+        body:JSON.stringify({p_year:+y,p_data:rec.data,p_source:rec.src||null})});
+    }
+    await sbFetch("rpc/rsd_sync_daily",{method:"POST",prefer:"return=minimal",
+      body:JSON.stringify({p_recs:pack.dailyRecs||{}})});
+    _sbTables=true;
+  }catch(e){
+    if(sbMissingFn(e)){_sbTables=false;console.warn(SB_TABLES_HINT,e);return;}
+    throw e;
+  }
+}
+async function cloudLoadTables(){
+  try{
+    const t=await sbFetch("rpc/rsd_load_all",{method:"POST",body:"{}"});
+    _sbTables=true;
+    return t&&typeof t==="object"?t:null;
+  }catch(e){
+    if(sbMissingFn(e))_sbTables=false;
+    console.warn("cloud tables load",e);
+    return null;
+  }
+}
+/* write the table rows of year y over dataset b (same shape as DATA) */
+function tablesIntoYear(b,y,t){
+  const K={coach:{sum:"coachSummary",f4:"coach4m",av:"coachAvail",inc:"coachIncidents"},
+           pgc:{sum:"pgcSummary",f4:"pgc4m",av:"pgcAvail",inc:"pgcIncidents"}};
+  const of=a=>(Array.isArray(a)?a:[]).filter(r=>+r.year===y&&K[r.section]);
+  const n0=v=>v==null?0:+v, nn=v=>v==null?null:+v;
+  const z12=()=>Array(12).fill(0);
+  /* failure summary */
+  ["coach","pgc"].forEach(s=>{const k=K[s].sum;b[k]=b[k]||[];
+    b[k].forEach(x=>{for(const c in x.classes)x.classes[c]=x.classes[c].map(()=>0)});});
+  of(t.summary).forEach(r=>{const list=b[K[r.section].sum];
+    let s=list.find(x=>x.system===r.system);
+    if(!s){s={system:r.system,classes:{}};list.push(s);}
+    if(!s.classes[r.coach_class])s.classes[r.coach_class]=z12();
+    s.classes[r.coach_class][r.month-1]=n0(r.failures);});
+  /* 4M */
+  ["coach","pgc"].forEach(s=>{const f=b[K[s].f4]=b[K[s].f4]||{};
+    for(const e in f){f[e].usw=z12();f[e].fis=z12();}});
+  of(t.f4m).forEach(r=>{const f=b[K[r.section].f4];
+    const e=f[r.element]||(f[r.element]={usw:z12(),fis:z12()});
+    e.usw[r.month-1]=n0(r.usw);e.fis[r.month-1]=n0(r.fis);});
+  /* monthly failures */
+  b.monthlyFailures=b.monthlyFailures||{};
+  ["coach","pgc"].forEach(s=>{b.monthlyFailures[s]={usw:z12(),fis:z12()}});
+  of(t.mf).forEach(r=>{const o=b.monthlyFailures[r.section];o.usw[r.month-1]=n0(r.usw);o.fis[r.month-1]=n0(r.fis);});
+  /* availability */
+  ["coach","pgc"].forEach(s=>{b[K[s].av]=Array.from({length:12},()=>({actual:Array(31).fill(null),target:Array(31).fill(null)}))});
+  of(t.avail).forEach(r=>{if(r.day<1||r.day>31)return;const mo=b[K[r.section].av][r.month-1];
+    mo.actual[r.day-1]=nn(r.actual);mo.target[r.day-1]=nn(r.target);});
+  /* preventive maintenance */
+  b.pm=b.pm||{};
+  ["coach","pgc"].forEach(s=>{b.pm[s+"Target"]=Array(12).fill(null);b.pm[s+"Actual"]=Array(12).fill(null)});
+  of(t.pm).forEach(r=>{b.pm[r.section+"Target"][r.month-1]=nn(r.target);b.pm[r.section+"Actual"][r.month-1]=nn(r.actual);});
+  /* incidents */
+  ["coach","pgc"].forEach(s=>{b[K[s].inc]=[]});
+  of(t.inc).sort((p,q)=>(p.row_order-q.row_order)||(p.id-q.id)).forEach(r=>{
+    const sv=v=>v==null?"":v, ex=r.extra&&typeof r.extra==="object"?r.extra:{};
+    const o={no:/^\d+$/.test(String(r.no))?+r.no:sv(r.no),failure:sv(r.failure),unit:sv(r.unit),
+      date:r.incident_date||sv(ex.date),system:sv(r.system),element:sv(r.element),causes:sv(r.causes),
+      root:sv(r.root),evidence:sv(r.evidence),action:sv(r.action),rectifiable:sv(r.rectifiable)};
+    for(const k in ex)if(k!=="date")o[k]=ex[k];
+    b[K[r.section].inc].push(o);});
+}
+/* tables win over the JSON bundle, so edits made in Supabase Table Editor reach the dashboard */
+function overlayTables(pack,t){
+  const yrs=Array.isArray(t.years)?t.years:[], daily=Array.isArray(t.daily)?t.daily:[];
+  if(!yrs.length&&!daily.length)return false;
+  pack.years=pack.years||{};
+  yrs.forEach(row=>{
+    const y=+row.year;if(!isFinite(y))return;
+    const key=String(y);
+    const rec=pack.years[key]||{dirty:false};
+    if(!rec.data)rec.data=(y===BASE_YEAR?deep(DATA):blankYear());
+    tablesIntoYear(rec.data,y,t);
+    if(!rec.src&&row.source)rec.src=row.source;
+    pack.years[key]=rec;
+  });
+  pack.dailyRecs={};
+  daily.forEach(r=>{if(!r.report_date)return;
+    pack.dailyRecs[r.report_date]={data:r.data||{},ts:r.saved_at?Date.parse(r.saved_at):Date.now()};});
+  return true;
+}
+/* ---- overwrite protection: remember the cloud copy we last loaded or saved ---- */
+let _cloudSeen;              // undefined = unknown, null = cloud had no copy, number = its updated_at (ms)
+async function cloudRemoteStamp(){
+  const r=await sbFetch("dashboard_store?select=updated_at,by:value->>by&key=eq.bundle");
+  const row=Array.isArray(r)&&r[0];
+  return row?{ts:Date.parse(row.updated_at),by:row.by||null}:{ts:null,by:null};
+}
+function cloudConflictText(c){
+  const who=c.by&&c.by===deviceId()?"another window on this computer":"another computer";
+  return "Someone saved newer data to the cloud from "+who+(c.ts?" at "+new Date(c.ts).toLocaleString():"")+".";
+}
+function cloudConflictNotice(){
+  updateCloudChip(false,"Newer data is in the cloud — reload the page to get it");
+  toast("Not uploaded: newer data is in the cloud from someone else. Reload the page to get it.");
+}
+/* opts.force skips the "did someone else save meanwhile?" check */
+async function cloudPushAll(opts){
+  if(!sbEnabled())return {skipped:true};
+  opts=opts||{};
+  if(!opts.force){
+    const c=await cloudRemoteStamp();
+    if(c.ts!==_cloudSeen){const e=new Error(cloudConflictText(c));e.conflict=c;throw e;}
+  }
+  const pack=packBackup();
+  await cloudPushTables(pack);
+  const now=new Date(), iso=now.toISOString();
+  const rows=[
+    {key:"bundle",value:pack,updated_at:iso},
+    {key:"years",value:pack.years,updated_at:iso}
+  ];
+  await sbFetch("dashboard_store?on_conflict=key",{
+    method:"POST",
+    prefer:"resolution=merge-duplicates,return=minimal",
+    body:JSON.stringify(rows)
+  });
+  _cloudSeen=now.getTime();
+  updateCloudChip(true,cloudChipNote("Last cloud save "+now.toLocaleString()));
+  return {ok:true};
+}
+async function cloudHydrate(){
+  if(!sbEnabled()){updateCloudChip();return false;}
+  try{
+    const rows=await sbFetch("dashboard_store?select=key,value,updated_at");
+    const map={};
+    (rows||[]).forEach(r=>{map[r.key]=r.value});
+    const b=(rows||[]).find(r=>r.key==="bundle");
+    _cloudSeen=b?Date.parse(b.updated_at):null;
+    let pack=null;
+    if(map.bundle&&map.bundle.years){
+      pack=map.bundle;
+    }else if(map.years&&typeof map.years==="object"&&Object.keys(map.years).length){
+      pack={years:map.years,yearSel:RS_YEAR};
+    }
+    const t=await cloudLoadTables();
+    if(t){
+      const base=pack||{years:yrLoadAll(),yearSel:RS_YEAR};
+      if(overlayTables(base,t))pack=base;
+    }
+    if(pack){
+      applyBackupPack(pack,true);
+    }else{
+      await cloudPushAll();
+    }
+    updateCloudChip(true,cloudChipNote("Saved copies go to Supabase"));
+    return true;
+  }catch(e){
+    console.warn("cloud hydrate",e);
+    updateCloudChip(false,String(e.message||e));
+    return false;
+  }
+}
+/* background uploads never overwrite someone else's newer save */
+function cloudPushQuiet(){
+  return cloudPushAll().catch(err=>{if(err&&err.conflict)cloudConflictNotice();else console.warn(err);});
+}
+function scheduleCloudPush(){
+  if(!sbEnabled())return;
+  clearTimeout(_cloudTimer);
+  _cloudTimer=setTimeout(cloudPushQuiet,1200);
+}
+function openCloudModal(){
+  const ov=document.getElementById("ovCloud");if(!ov)return;
+  const c=sbCfg()||{};
+  const u=document.getElementById("sbUrl");const k=document.getElementById("sbKey");
+  if(u)u.value=c.url||"";if(k)k.value=c.key||"";
+  ov.classList.add("show");
+}
+function closeCloudModal(){const ov=document.getElementById("ovCloud");if(ov)ov.classList.remove("show")}
+async function connectSupabase(){
+  const url=sbCleanUrl(document.getElementById("sbUrl").value);
+  document.getElementById("sbUrl").value=url;
+  const key=(document.getElementById("sbKey").value||"").trim();
+  if(!url||!key){toast("Paste both the Project URL and the anon public key");return;}
+  if(!/^https:\/\//i.test(url)){
+    toast("URL should look like https://xxxx.supabase.co");return;
+  }
+  sbSetCfg({url,key});
+  _sbTables=null;_cloudSeen=undefined;
+  try{
+    await sbFetch("dashboard_store?select=key&limit=1");
+    /* cloud already has data → load it here; never upload this computer's copy over it */
+    let cloudHasData=!!(await cloudRemoteStamp()).ts;
+    if(!cloudHasData){
+      const t=await cloudLoadTables();
+      cloudHasData=!!(t&&((t.years||[]).length||(t.daily||[]).length));
+    }
+    if(cloudHasData){
+      const kept=localHasData()&&downloadDataBackup("coach-pgc-this-computer-before-cloud");
+      if(!(await cloudHydrate()))throw new Error("could not load the cloud data");
+      applyYear();
+      closeCloudModal();
+      toast("Connected — loaded the dashboard data from Supabase ✔"
+        +(kept?" (this computer's old data was downloaded as a backup file)":""));
+      return;
+    }
+    await cloudPushAll({force:true});
+    updateCloudChip(true,cloudChipNote("Saved copies go to Supabase"));
+    closeCloudModal();
+    toast(_sbTables===false
+      ?"Connected (JSON backup only) — "+SB_TABLES_HINT
+      :"Cloud backup connected — this computer's data is now in Supabase tables");
+  }catch(e){
+    toast("Key saved, but tables failed: "+e.message+" — run supabase/schema.sql in the SQL Editor");
+    updateCloudChip(false,e.message);
+  }
+}
+function disconnectSupabase(){
+  if(!confirm("Stop cloud backup? Data already in Supabase stays there. This browser will keep using local saves only."))return;
+  sbSetCfg(null);updateCloudChip();closeCloudModal();toast("Cloud backup disconnected");
+}
+window.rsdAfterDailyStore=function(){scheduleCloudPush()};
 /* a fresh year keeps the exact same structure — every figure simply starts empty */
 function blankYear(){
   const b=deep(DATA);
@@ -525,7 +921,7 @@ function blankYear(){
   [b.coachAvail,b.pgcAvail].forEach(av=>av.forEach(mo=>{mo.actual=mo.actual.map(()=>null);mo.target=mo.target.map(()=>null);}));
   for(const k in b.pm)if(Array.isArray(b.pm[k]))b.pm[k]=b.pm[k].map(()=>0);
   b.coachIncidents=[];b.pgcIncidents=[];
-  return onlySystemFailures(b);
+  return b;
 }
 function yrList(){
   const now=new Date().getFullYear();
@@ -555,8 +951,8 @@ function setYear(y){
   RS_YEAR=y;
   try{localStorage.setItem(LSYSEL,String(y))}catch(e){}
   const rec=yrLoadAll()[String(y)];
-  if(rec&&rec.data){S=onlySystemFailures(rec.data);lastSaved=rec.saved||null;yrSrcLabel=rec.src||null;setDirty(!!rec.dirty);}
-  else{S=onlySystemFailures(y===BASE_YEAR?deep(DATA):blankYear());lastSaved=null;yrSrcLabel=null;setDirty(false);}
+  if(rec&&rec.data){S=rec.data;lastSaved=rec.saved||null;yrSrcLabel=rec.src||null;setDirty(!!rec.dirty);}
+  else{S=(y===BASE_YEAR?deep(DATA):blankYear());lastSaved=null;yrSrcLabel=null;setDirty(false);}
   applyYear();
 }
 /* propagate the selected year to every module that prints or filters by year */
@@ -590,8 +986,8 @@ function initState(){
   }catch(e){console.warn(e)}
   try{const sel=+localStorage.getItem(LSYSEL);if(isFinite(sel)&&sel>=2000&&sel<=2100)RS_YEAR=sel;}catch(e){}
   const rec=all[String(RS_YEAR)];
-  if(rec&&rec.data){S=onlySystemFailures(rec.data);lastSaved=rec.saved||null;yrSrcLabel=rec.src||null;setDirty(!!rec.dirty);}
-  else{S=onlySystemFailures(RS_YEAR===BASE_YEAR?deep(DATA):blankYear());lastSaved=null;yrSrcLabel=null;setDirty(false);}
+  if(rec&&rec.data){S=rec.data;lastSaved=rec.saved||null;yrSrcLabel=rec.src||null;setDirty(!!rec.dirty);}
+  else{S=(RS_YEAR===BASE_YEAR?deep(DATA):blankYear());lastSaved=null;yrSrcLabel=null;setDirty(false);}
   AV_YEAR=RS_YEAR;avSel=avToday();
   if(window.RPT&&RPT.setYear)RPT.setYear(RS_YEAR);
 }
@@ -611,9 +1007,10 @@ function setDirty(d){dirty=d;const el=document.getElementById('dirtyDot');if(el)
 function touched(){setDirty(true);persist();}
 function resetAll(){if(!confirm("Discard the edits for "+RS_YEAR+" and restore that year to its starting data?"))return;
   const all=yrLoadAll();delete all[String(RS_YEAR)];yrSaveAll(all);
-  if(RS_YEAR===BASE_YEAR){localStorage.removeItem(LSK);localStorage.removeItem(LSB);wbB64=ORIG_B64;S=onlySystemFailures(deep(DATA));}
+  if(RS_YEAR===BASE_YEAR){localStorage.removeItem(LSK);localStorage.removeItem(LSB);wbB64=ORIG_B64;S=deep(DATA);}
   else S=blankYear();
-  lastSaved=null;yrSrcLabel=null;setDirty(false);applyYear();toast("Reporting year "+RS_YEAR+" reset");}
+  lastSaved=null;yrSrcLabel=null;setDirty(false);applyYear();toast("Reporting year "+RS_YEAR+" reset");
+  if(sbEnabled())cloudPushQuiet();}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ================= ACCESSORS / DERIVED ================= */
@@ -717,12 +1114,6 @@ function renderInsights(){const _il=document.getElementById('insightList');if(!_
 /* ================= CHARTS ================= */
 const PAL=["#0b2a5b","#d7263d","#f4a91f","#0e8a7d","#1d4f9c","#8c3fa8","#e07b39","#4a6572","#b3223a","#2a9d8f","#6d597a","#c9a227","#355070","#e56b6f","#7f9c56","#5f6caf"];
 Chart.defaults.font.family='"Segoe UI",system-ui,sans-serif';Chart.defaults.color="#5d6b83";
-/* Whole numbers on every chart: plotted values, value labels and tooltips drop their decimals (87.5 → 87),
-   axis ticks step in whole units. The tiny pre-round stops float noise (28.999999… → 29) from losing a unit. */
-const wholeNum=v=>typeof v==='number'&&isFinite(v)?Math.trunc(Math.round(v*1e6)/1e6):v;
-Chart.register({id:'wholeNumbers',beforeUpdate(c){
-  c.data.datasets.forEach(ds=>{if(Array.isArray(ds.data)&&ds.data.some(v=>typeof v==='number'&&v%1))ds.data=ds.data.map(wholeNum);});}});
-Chart.defaults.scales.linear.ticks.precision=0;
 function mkChart(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);return charts[id];}
 function renderOverview(){renderKpis();
   const r=monRange(),cls=activeClasses(),labels=monthsIn(r).map(m=>MONTHS[m]);
@@ -747,14 +1138,14 @@ function renderOverview(){renderKpis();
   // availability
   const am=availMonthly();
   mkChart('chAvail',{type:'line',data:{labels,datasets:[
-    {label:'Actual',data:monthsIn(r).map(m=>am[m].actual!=null?am[m].actual:null),borderColor:'#0e8a7d',backgroundColor:'rgba(14,138,125,.1)',fill:true,tension:.3,pointRadius:3},
-    {label:'Target',data:monthsIn(r).map(m=>am[m].target!=null?am[m].target:null),borderColor:'#d7263d',borderDash:[6,4],pointRadius:0,fill:false}]},
+    {label:'Actual',data:monthsIn(r).map(m=>am[m].actual!=null?+am[m].actual.toFixed(2):null),borderColor:'#0e8a7d',backgroundColor:'rgba(14,138,125,.1)',fill:true,tension:.3,pointRadius:3},
+    {label:'Target',data:monthsIn(r).map(m=>am[m].target!=null?+am[m].target.toFixed(2):null),borderColor:'#d7263d',borderDash:[6,4],pointRadius:0,fill:false}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{title:{display:true,text:'units/day (avg)'}}}}});
   // PM
   mkChart('chPm',{data:{labels,datasets:[
     {type:'bar',label:'Target',data:monthsIn(r).map(m=>sec().pmT[m]),backgroundColor:'#c6d2e6',borderRadius:4},
     {type:'bar',label:'Actual',data:monthsIn(r).map(m=>sec().pmA[m]),backgroundColor:'#0b2a5b',borderRadius:4},
-    {type:'line',label:'Completion %',yAxisID:'y1',data:monthsIn(r).map(m=>sec().pmT[m]?nz(sec().pmA[m])/sec().pmT[m]*100:null),borderColor:'#d7263d',tension:.3,pointRadius:3}]},
+    {type:'line',label:'Completion %',yAxisID:'y1',data:monthsIn(r).map(m=>sec().pmT[m]?+(nz(sec().pmA[m])/sec().pmT[m]*100).toFixed(1):null),borderColor:'#d7263d',tension:.3,pointRadius:3}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},
       scales:{y:{beginAtZero:true,ticks:{precision:0}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});}
 
@@ -983,24 +1374,15 @@ function openIncForm(idx){editIdx=idx;const i=idx>=0?sec().inc[idx]:null;
   document.getElementById('incFormTitle').textContent=(i?'Edit':'New')+` ${sec().name} Incident`;
   const uSet=[...new Set(sec().inc.map(x=>x.unit).filter(Boolean))];
   document.getElementById('unitList').innerHTML=uSet.map(u=>`<option value="${esc(u)}">`).join('');
-  buildSystemOptions(i?i.system:'');
+  const sSet=[...new Set([...sec().inc.map(x=>x.system).filter(Boolean),...sec().summary.map(s=>titleCase(s.system))])];
+  document.getElementById('sysList').innerHTML=sSet.map(u=>`<option value="${esc(u)}">`).join('');
   const nums=sec().inc.map(x=>parseInt(x.no)).filter(n=>!isNaN(n));
   setV('fNo',i?i.no:(nums.length?Math.max(...nums)+1:1));setV('fFailure',i?i.failure:'');setV('fUnit',i?i.unit:'');
-  setV('fDate',i?i.date:new Date().toISOString().slice(0,10));setV('fElement',i?i.element||'Material':'Material');
+  setV('fDate',i?i.date:new Date().toISOString().slice(0,10));setV('fSystem',i?i.system:'');setV('fElement',i?i.element||'Material':'Material');
   setV('fCauses',i?i.causes:'');setV('fRoot',i?(/^n/i.test(i.root)?'No':'Yes'):'Yes');setV('fEvidence',i?i.evidence:'');
   setV('fAction',i?i.action:'');setV('fRect',i?(/^n/i.test(i.rectifiable)?'No':'Yes'):'Yes');
   document.getElementById('ovInc').classList.add('show');}
 function setV(id,v){document.getElementById(id).value=v??'';}
-/* System dropdown: every system in this section's failure list (A–Z).
-   A value already on the record that is not in the list stays selectable, so editing never loses it. */
-function buildSystemOptions(cur){
-  const sel=document.getElementById('fSystem');
-  const list=[...new Set(sec().summary.map(s=>titleCase(s.system)))].sort((a,b)=>a.localeCompare(b));
-  cur=String(cur??'').trim();
-  const hit=cur?list.find(u=>u.toLowerCase()===cur.toLowerCase()):'';
-  let h='<option value="">Select a system…</option>'+list.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join('');
-  if(cur&&!hit)h+=`<optgroup label="As recorded"><option value="${esc(cur)}">${esc(cur)}</option></optgroup>`;
-  sel.innerHTML=h;sel.value=hit||cur;}
 function titleCase(s){return s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
 function saveIncident(){const g=id=>document.getElementById(id).value.trim();
   if(!g('fFailure')&&!g('fUnit')){toast("Enter at least a failure description or unit");return;}
@@ -1080,10 +1462,8 @@ async function patchWorkbook(){
   const coachPath=findPath(smap,'COACH INCIDENT')||'xl/worksheets/sheet3.xml';
   /* ---- DASHBOARD ---- */
   const p1=SheetPatcher(await zip.file(dashPath).async('string'));
-  /* each system is written to its own row in the workbook layout (looked up by name, so hidden rows never shift the others) */
-  const wbSlot=(layout,name)=>layout.findIndex(x=>x.system===name);
-  S.pgcSummary.forEach(s=>{const i=wbSlot(DATA.pgcSummary,s.system);if(i<0)return;const cls=Object.keys(DATA.pgcSummary[i].classes);cls.forEach((c,ci)=>{for(let m=0;m<12;m++)p1.setNum(5+i*2+ci,5+m,nz(s.classes[c]&&s.classes[c][m]));});});
-  S.coachSummary.forEach(s=>{const i=wbSlot(DATA.coachSummary,s.system);if(i<0)return;const cls=Object.keys(DATA.coachSummary[i].classes);cls.forEach((c,ci)=>{for(let m=0;m<12;m++)p1.setNum(33+i*4+ci,5+m,nz(s.classes[c]&&s.classes[c][m]));});});
+  S.pgcSummary.forEach((s,i)=>{const cls=Object.keys(s.classes);cls.forEach((c,ci)=>{for(let m=0;m<12;m++)p1.setNum(5+i*2+ci,5+m,nz(s.classes[c][m]));});});
+  S.coachSummary.forEach((s,i)=>{const cls=Object.keys(s.classes);cls.forEach((c,ci)=>{for(let m=0;m<12;m++)p1.setNum(33+i*4+ci,5+m,nz(s.classes[c][m]));});});
   const put4m=(fm,r0)=>Object.keys(fm).forEach((k,i)=>{for(let m=0;m<12;m++){p1.setNum(r0+i,4+m*3,nz(fm[k].usw[m]));p1.setNum(r0+i,5+m*3,nz(fm[k].fis[m]));}});
   put4m(S.pgc4m,104);put4m(S.coach4m,113);
   const putAvail=(av,r0)=>av.forEach((mo,m)=>{const hasData=mo.actual.some(v=>v!=null)||mo.target.some(v=>v!=null);
@@ -1152,7 +1532,7 @@ function importExcel(inp){const f=inp.files[0];if(!f)return;const rd=new FileRea
           evidence:String(vals[8]||'').trim(),action:String(vals[9]||'').trim(),rectifiable:String(vals[10]||'').trim()});}
       return out;};
     N.pgcIncidents=rdInc(sheetBy('PGC INCIDENT'));N.coachIncidents=rdInc(sheetBy('COACH INCIDENT'));
-    S=onlySystemFailures(N);wbB64=u8ToB64(u8);setDirty(false);persist(f.name);
+    S=N;wbB64=u8ToB64(u8);setDirty(false);persist(f.name);
     document.getElementById('srcInfo').textContent="Data source: "+f.name+" (imported "+new Date().toLocaleTimeString()+")";
     buildIncFilters();renderAll();toast("Imported "+f.name+" — dashboard refreshed");
   }catch(err){console.error(err);toast("Import failed: "+err.message);}finally{inp.value='';}};
@@ -1445,7 +1825,7 @@ function axFont(sz,bold){return{family:'Calibri,Arial,sans-serif',size:sz,weight
 async function sectionImages(sn){
   const M=MONTHS_P;
   const avail=await pptChart({type:'line',data:{labels:M,datasets:[
-    {label:'Achievement %',data:sn.availPct.map(v=>v!=null?v*100:null),borderColor:CH_NAVY,backgroundColor:'rgba(18,60,105,.08)',fill:true,tension:.35,pointRadius:6,pointBackgroundColor:CH_GOLD,pointBorderColor:CH_NAVY,pointBorderWidth:2,borderWidth:3,spanGaps:false,vl:{size:20,bold:true,color:CH_INK,dy:16,fmt:v=>Math.round(v)+'%'}},
+    {label:'Achievement %',data:sn.availPct.map(v=>v!=null?Math.round(v*100):null),borderColor:CH_NAVY,backgroundColor:'rgba(18,60,105,.08)',fill:true,tension:.35,pointRadius:6,pointBackgroundColor:CH_GOLD,pointBorderColor:CH_NAVY,pointBorderWidth:2,borderWidth:3,spanGaps:false,vl:{size:20,bold:true,color:CH_INK,dy:16,fmt:v=>Math.round(v)+'%'}},
     {label:'Target (100%)',data:M.map(()=>100),borderColor:CH_RED,borderDash:[10,7],pointRadius:0,borderWidth:2.5,fill:false}]},
     options:{plugins:{legend:{position:'bottom',labels:{font:axFont(19),color:CH_INK,boxWidth:26}}},layout:{padding:{top:26}},
       scales:{y:{title:{display:true,text:'AVAILABILITY — ACTUAL VS TARGET (%)',font:axFont(17,true),color:CH_GRAY},ticks:{font:axFont(18),color:CH_GRAY,callback:v=>v+'%'},grid:{color:'#EDF1F6'}},
@@ -1455,7 +1835,7 @@ async function sectionImages(sn){
   const pe=await pptChart({data:{labels:M,datasets:[
     {type:'bar',label:'Target (units)',data:sn.pmT.map(v=>v),backgroundColor:CH_GRAY,borderRadius:3,vl:{size:19,color:'#7d8898'}},
     {type:'bar',label:'Actual (units)',data:sn.pmA.map(v=>v),backgroundColor:CH_NAVY,borderRadius:3,vl:{size:19,bold:true,color:CH_RED}},
-    {type:'line',label:'Achievement %',yAxisID:'y1',data:sn.peM.map(v=>v!=null?v*100:null),borderColor:CH_GOLD,borderWidth:3.5,tension:.3,pointRadius:6,pointBackgroundColor:CH_GOLD,pointBorderColor:CH_INK,pointBorderWidth:1.5,vl:{size:19,bold:true,color:CH_INK,inside:true,dy:26,fmt:v=>v+'%'}},
+    {type:'line',label:'Achievement %',yAxisID:'y1',data:sn.peM.map(v=>v!=null?+(v*100).toFixed(0):null),borderColor:CH_GOLD,borderWidth:3.5,tension:.3,pointRadius:6,pointBackgroundColor:CH_GOLD,pointBorderColor:CH_INK,pointBorderWidth:1.5,vl:{size:19,bold:true,color:CH_INK,inside:true,dy:26,fmt:v=>v+'%'}},
     ...(avgA!=null?[{type:'line',label:'Avg actual',data:M.map(()=>Math.round(avgA)),borderColor:CH_RED,borderDash:[9,6],pointRadius:0,borderWidth:2}]:[])]},
     options:{plugins:{legend:{position:'bottom',labels:{font:axFont(18),color:CH_INK,boxWidth:24,filter:i=>i.text!=='Avg actual'}}},layout:{padding:{top:26}},
       scales:{y:{beginAtZero:true,max:Math.ceil(maxPe*1.25),ticks:{font:axFont(17),color:CH_GRAY,precision:0},title:{display:true,text:'No. of jobs completed',font:axFont(16),color:CH_GRAY},grid:{color:'#EDF1F6'}},
@@ -1475,7 +1855,7 @@ async function sectionImages(sn){
   const tots=sn.fmTotals.map(x=>x.sum);
   const fm=await pptChart({type:'bar',data:{labels:sn.fmTotals.map(x=>x.el),datasets:[
     {label:'USW',data:sn.fmTotals.map(x=>x.usw),backgroundColor:CH_NAVY,stack:'s',borderRadius:2},
-    {label:'FIS',data:sn.fmTotals.map(x=>x.fis),backgroundColor:CH_GOLD,stack:'s',borderRadius:2,vl:{size:21,bold:true,color:CH_INK,fmt:(v,i)=>String(wholeNum(tots[i]))}}]},
+    {label:'FIS',data:sn.fmTotals.map(x=>x.fis),backgroundColor:CH_GOLD,stack:'s',borderRadius:2,vl:{size:21,bold:true,color:CH_INK,fmt:(v,i)=>String(tots[i])}}]},
     options:{plugins:{legend:{position:'bottom',labels:{font:axFont(19),color:CH_INK,boxWidth:26}}},layout:{padding:{top:28}},
       scales:{x:{stacked:true,ticks:{font:axFont(20,true),color:CH_INK},grid:{display:false}},
         y:{stacked:true,beginAtZero:true,ticks:{font:axFont(17),color:CH_GRAY,precision:0},grid:{color:'#EDF1F6'}}}}},940,517);
@@ -1527,15 +1907,31 @@ function btnBusy(id,labelId,on,text,fallback){
   if(l)l.textContent=on?text:fallback;}
 
 /* ---- 💾 Save ---- */
-function saveDashboard(){
+async function saveDashboard(){
   try{
     lastSaved=new Date().toISOString();
     setDirty(false);
     persist();
     updateSaveInfo();
+    btnBusy('btnSave','btnSaveLabel',true,'Saving…','Save');
+    let cloudNote='';
+    if(sbEnabled()){
+      try{await cloudPushAll();cloudNote=' and in the cloud';}
+      catch(err){
+        if(err&&err.conflict){
+          if(confirm(err.message+"\n\nOK = replace their data in the cloud with yours\nCancel = keep their data in the cloud (your changes stay on this computer only — reload the page to see theirs)")){
+            try{await cloudPushAll({force:true});cloudNote=' and in the cloud (replaced the newer cloud copy)';}
+            catch(e2){cloudNote=' · cloud failed: '+e2.message;updateCloudChip(false,e2.message);}
+          }else{
+            cloudNote=' on this computer only — cloud kept the other person\'s newer data';
+            updateCloudChip(false,"Newer data is in the cloud — reload the page to get it");
+          }
+        }else{cloudNote=' · cloud failed: '+err.message;updateCloudChip(false,err.message);}
+      }
+    }
     btnBusy('btnSave','btnSaveLabel',false,'','Saved');
     setTimeout(()=>btnBusy('btnSave','btnSaveLabel',false,'','Save'),1600);
-    toast('Dashboard changes saved ✔');
+    toast('Dashboard changes saved'+cloudNote+' ✔');
   }catch(e){console.error(e);toast('Save failed: '+e.message);}}
 
 /* ---- 📥 Download Excel ---- */
@@ -1559,10 +1955,21 @@ document.addEventListener('DOMContentLoaded',()=>{
     d.style.cssText='background:#fdeaea;color:#c22030;padding:12px 22px;font-weight:600;font-size:.9rem';
     d.textContent='⚠ Required libraries failed to load — please re-download this file.';
     document.body.prepend(d);}
-  initState();buildYearSelect();buildMonthSelects();setSection('coach');setTab('overview');
-  const si=document.getElementById('srcInfo');
-  if(si)si.textContent="Reporting year "+RS_YEAR+" · "+(yrSrcLabel||("embedded snapshot of "+SRC_NAME))+(lastSaved?" (with saved edits)":"");
-  updateSaveInfo();});
+  (async function(){
+    initState();
+    /* first visit on a laptop that already typed data before the built-in cloud: keep a copy before loading the shared data */
+    try{
+      if(sbUsingBuiltin()&&!localStorage.getItem("rsd_cloud_joined_v1")){
+        if(localHasData())downloadDataBackup("coach-pgc-this-computer-before-cloud");
+        localStorage.setItem("rsd_cloud_joined_v1","1");
+      }
+    }catch(e){}
+    await cloudHydrate();
+    buildYearSelect();buildMonthSelects();setSection('coach');setTab('overview');
+    const si=document.getElementById('srcInfo');
+    if(si)si.textContent="Reporting year "+RS_YEAR+" · "+(yrSrcLabel||("embedded snapshot of "+SRC_NAME))+(lastSaved?" (with saved edits)":"");
+    updateSaveInfo();updateCloudChip();
+  })();});
 </script>
 
 <!-- ============================================================================
@@ -2062,10 +2469,10 @@ function rptRenderCharts(R){
     {label:'PGC',data:R.months.map(m=>p.monthTotals[m]),backgroundColor:RCOL.gold,borderRadius:4}]},
     options:{...base,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
   mkChart('rptChKpi',{type:'line',data:{labels,datasets:[
-    {label:'Coach Avail %',data:R.months.map(m=>c.availPct[m]!=null?c.availPct[m]*100:null),borderColor:RCOL.navy,tension:.3,pointRadius:3},
-    {label:'PGC Avail %',data:R.months.map(m=>p.availPct[m]!=null?p.availPct[m]*100:null),borderColor:RCOL.teal,tension:.3,pointRadius:3},
-    {label:'Coach PM %',data:R.months.map(m=>c.peM[m]!=null?c.peM[m]*100:null),borderColor:RCOL.red,borderDash:[5,3],tension:.3,pointRadius:3},
-    {label:'PGC PM %',data:R.months.map(m=>p.peM[m]!=null?p.peM[m]*100:null),borderColor:RCOL.gold,borderDash:[5,3],tension:.3,pointRadius:3},
+    {label:'Coach Avail %',data:R.months.map(m=>c.availPct[m]!=null?+(c.availPct[m]*100).toFixed(1):null),borderColor:RCOL.navy,tension:.3,pointRadius:3},
+    {label:'PGC Avail %',data:R.months.map(m=>p.availPct[m]!=null?+(p.availPct[m]*100).toFixed(1):null),borderColor:RCOL.teal,tension:.3,pointRadius:3},
+    {label:'Coach PM %',data:R.months.map(m=>c.peM[m]!=null?+(c.peM[m]*100).toFixed(1):null),borderColor:RCOL.red,borderDash:[5,3],tension:.3,pointRadius:3},
+    {label:'PGC PM %',data:R.months.map(m=>p.peM[m]!=null?+(p.peM[m]*100).toFixed(1):null),borderColor:RCOL.gold,borderDash:[5,3],tension:.3,pointRadius:3},
     {label:'Target 100%',data:R.months.map(()=>100),borderColor:'#9aa7bd',borderDash:[2,3],pointRadius:0,borderWidth:1.5}]},
     options:{...base,plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:10}}}},scales:{y:{ticks:{callback:v=>v+'%'}}}}});
 }
@@ -2464,11 +2871,6 @@ if(document.readyState==='interactive'||document.readyState==='complete')rptMoun
 .dly-umhd,.dly-umrow{display:grid;grid-template-columns:78px 96px 1fr 30px;gap:7px;align-items:center}
 .dly-umhd{font-size:.65rem;letter-spacing:.7px;text-transform:uppercase;color:var(--mut);font-weight:800;margin-bottom:5px}
 .dly-umrow{margin-bottom:6px}
-.dly-umtools{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--line)}
-.dly-umtools .dly-fld{flex:1 1 150px;min-width:0}
-.dly-umtools select{width:100%;cursor:pointer}
-.dly-umtools .dly-mini{flex-basis:100%}
-.dly-umtools .dly-mini:empty{display:none}
 .dly-tg{border:1px solid var(--line);border-radius:8px;background:#e7f6ee;color:var(--ok);font-weight:800;cursor:pointer;padding:5px 0;font-size:.85rem}
 .dly-tg.no{background:#fdeaea;color:var(--bad)}
 .dly-mini{font-size:.72rem;color:var(--mut)}
@@ -2622,14 +3024,23 @@ function template(){return{
 var EKEY='ktmb_report_sharing_v3', RKEY='ktmb_report_records_v1';
 var EMEM=null, RMEM={};
 function loadEntry(){try{var s=localStorage.getItem(EKEY);return s?JSON.parse(s):EMEM}catch(e){return EMEM}}
-function storeEntry(v){EMEM=v;try{localStorage.setItem(EKEY,JSON.stringify(v))}catch(e){}}
+function storeEntry(v){EMEM=v;try{localStorage.setItem(EKEY,JSON.stringify(v))}catch(e){} if(window.rsdAfterDailyStore)try{window.rsdAfterDailyStore()}catch(e){}}
 function loadRecs(){try{var s=localStorage.getItem(RKEY);return s?JSON.parse(s):RMEM}catch(e){return RMEM}}
-function storeRecs(o){RMEM=o;try{localStorage.setItem(RKEY,JSON.stringify(o))}catch(e){}}
+function storeRecs(o){RMEM=o;try{localStorage.setItem(RKEY,JSON.stringify(o))}catch(e){} if(window.rsdAfterDailyStore)try{window.rsdAfterDailyStore()}catch(e){}}
 function dlFile(name,text,mime){var b=new Blob([text],{type:(mime||'application/json')+';charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href)},3000);}
 
 var D=loadEntry()||template();
+window.addEventListener('rsd-backup-applied',function(){
+  try{
+    EMEM=null;RMEM={};
+    var nxt=loadEntry();
+    if(nxt)D=nxt;
+    if(!D.ump)D.ump=[];
+    if(typeof render==='function')render(1);
+  }catch(e){console.warn('daily reload',e)}
+});
 if(!D.ump)D.ump=[];
 D.time=parseTime(D.time)||sysTime();   /* migrate legacy 0830-style values */
 if(!D.spareDepots)D.spareDepots=['Tumpat','K.Lipis','Gemas','KLSD','Kempas'];
@@ -2674,25 +3085,6 @@ function sortTypes(){
     .sort(function(a,b){return (tRank(a.o.t)-tRank(b.o.t))||(a.i-b.i)})
     .map(function(x){return x.o});
 }
-
-/* ---------- unscheduled maintenance (coach) — filter & sort by type ----------
-   View preference only: the saved entry keeps its own order. The sort also
-   orders the broadcast and daily summary; the filter only narrows the entry list. */
-var UMVKEY='ktmb_um_view_v1', UMV={sort:'',type:''};
-try{var _umv=JSON.parse(localStorage.getItem(UMVKEY)||'null');if(_umv){UMV.sort=_umv.sort||'';UMV.type=_umv.type||''}}catch(e){}
-function umType(u){return String(u.t||'').trim().toUpperCase()}
-/* indices of list in display order — by type, then unit no ascending */
-function umOrder(list,sort){
-  var idx=list.map(function(u,i){return i});
-  if(!sort)return idx;
-  var dir=sort==='desc'?-1:1;
-  return idx.sort(function(a,b){
-    return dir*umType(list[a]).localeCompare(umType(list[b]))
-      || String(list[a].n||'').localeCompare(String(list[b].n||''),undefined,{numeric:true})
-      || a-b;
-  });
-}
-function umSorted(list){return umOrder(list,UMV.sort).map(function(i){return list[i]})}
 
 /* =====================================================================
    DERIVED ENGINEERING METRICS
@@ -2828,7 +3220,6 @@ function panelHtml(){return ''
         +'<div class="dly-mini" style="margin-bottom:6px">Unit · Engines · Assignment · Serviceable (click ✅ / ❌ to toggle)</div>'
         +'<div id="dlyPgcList"></div><button class="dly-btn s" onclick="dlyAddPGC()">+ Add unit</button></div></div>'
       +'<div class="dly-sec" id="dlyS5"><h4 onclick="dlyTog(\'dlyS5\')"><span class="ar">▼</span> Unscheduled Maintenance — Coach<span class="ct" id="dlyCt5">0</span></h4><div class="in">'
-        +'<div class="dly-umtools" id="dlyUmTools"></div>'
         +'<div id="dlyUmList"></div><button class="dly-btn s" onclick="dlyAddUM()">+ Add coach</button></div></div>'
       +'<div class="dly-sec" id="dlyS6"><h4 onclick="dlyTog(\'dlyS6\')"><span class="ar">▼</span> Unscheduled Maintenance — PGC<span class="ct" id="dlyCt6">0</span></h4><div class="in">'
         +'<div id="dlyUmpList"></div><button class="dly-btn s" onclick="dlyAddUMP()">+ Add PGC</button></div></div>'
@@ -2911,30 +3302,13 @@ function buildInputs(){
    +'<button class="dly-btn x" onclick="dlyDelP('+i+')">✕</button></div>'}).join('');
 
   var head='<div class="dly-umhd"><span>Type</span><span>Unit No</span><span>Remarks</span><span></span></div>';
-  var rows=function(list,fn,del,order){return (order||list.map(function(u,i){return i})).map(function(i){var u=list[i];
-    return '<div class="dly-umrow" data-i="'+i+'"><input class="dly-in" value="'+esc(u.t)+'" oninput="'+fn+'('+i+',\'t\',this.value)" placeholder="Type">'
+  var rows=function(list,fn,del){return list.map(function(u,i){
+    return '<div class="dly-umrow"><input class="dly-in" value="'+esc(u.t)+'" oninput="'+fn+'('+i+',\'t\',this.value)" placeholder="Type">'
    +'<input class="dly-in" value="'+esc(u.n)+'" oninput="'+fn+'('+i+',\'n\',this.value)" placeholder="Unit no">'
    +'<input class="dly-in" value="'+esc(u.r||'')+'" oninput="'+fn+'('+i+',\'r\',this.value)" placeholder="Remarks">'
    +'<button class="dly-btn x" onclick="'+del+'('+i+')">✕</button></div>'}).join('')};
 
-  var types={}; D.um.forEach(function(u){var t=umType(u);if(t)types[t]=(types[t]||0)+1});
-  if(UMV.type&&!types[UMV.type])UMV.type='';
-  var umIdx=umOrder(D.um,UMV.sort).filter(function(i){return !UMV.type||umType(D.um[i])===UMV.type});
-  var opt=function(v,label,cur){return '<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(label)+'</option>'};
-  $('#dlyUmTools').style.display=D.um.length?'':'none';
-  $('#dlyUmTools').innerHTML=!D.um.length?'':''
-    +'<div class="dly-fld"><label>Filter by type</label><select onchange="dlyUmView(\'type\',this.value)">'
-      +opt('','All types ('+D.um.length+')',UMV.type)
-      +Object.keys(types).sort().map(function(t){return opt(t,t+' ('+types[t]+')',UMV.type)}).join('')
-    +'</select></div>'
-    +'<div class="dly-fld"><label>Sort by type</label><select onchange="dlyUmView(\'sort\',this.value)">'
-      +opt('','As entered',UMV.sort)+opt('asc','Ascending (A → Z)',UMV.sort)+opt('desc','Descending (Z → A)',UMV.sort)
-    +'</select></div>'
-    +'<div class="dly-mini">'
-      +(UMV.type?'Showing <b>'+umIdx.length+'</b> of '+D.um.length+' — the broadcast still lists every unit. ':'')
-      +(UMV.sort?'The broadcast and daily summary follow this sort order.':'')
-    +'</div>';
-  $('#dlyUmList').innerHTML=D.um.length?head+rows(D.um,'dlySetU','dlyDelU',umIdx)
+  $('#dlyUmList').innerHTML=D.um.length?head+rows(D.um,'dlySetU','dlyDelU')
     :'<div class="dly-mini">No coach listed — the broadcast will show “NIL”.</div>';
   $('#dlyUmpList').innerHTML=D.ump.length?head+rows(D.ump,'dlySetUP','dlyDelUP')
     :'<div class="dly-mini">No PGC listed — the broadcast will show “NIL”.</div>';
@@ -2987,7 +3361,7 @@ function waCoach(){
       }).join('\n\n')+'\n\n';
 
   s+='🔴 UNSCHEDULED MAINTENANCE : '+D.um.length+'\n';
-  s+=(D.um.length?umSorted(D.um).map(umLine).join('\n'):'• NIL');
+  s+=(D.um.length?D.um.map(umLine).join('\n'):'• NIL');
   return s;
 }
 function waPGC(){
@@ -3069,7 +3443,7 @@ function renderCharts(){
 
   mkChart('dlyChTrend',{type:'line',data:{labels:L,datasets:[
       {label:'Coach availability',data:Mt.map(function(x){return x.avail}),borderColor:C.navy,backgroundColor:'rgba(11,42,91,.08)',tension:.3,fill:true,yAxisID:'y',pointRadius:3},
-      {label:'Fleet readiness %',data:Mt.map(function(x){return x.readiness!=null?x.readiness*100:null}),borderColor:C.gold,backgroundColor:'transparent',tension:.3,yAxisID:'y1',pointRadius:3,borderDash:[5,4]}
+      {label:'Fleet readiness %',data:Mt.map(function(x){return x.readiness!=null?+(x.readiness*100).toFixed(1):null}),borderColor:C.gold,backgroundColor:'transparent',tension:.3,yAxisID:'y1',pointRadius:3,borderDash:[5,4]}
     ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       scales:{y:{title:{display:true,text:'Coaches'},grid:GRID},y1:{position:'right',min:0,max:100,title:{display:true,text:'Readiness %'},grid:{drawOnChartArea:false}}},
       plugins:withTip({legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}})}});
@@ -3079,7 +3453,7 @@ function renderCharts(){
       datasets:[{data:[m.op,m.spare,m.um],backgroundColor:[C.navy3,C.teal,C.red],borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
       tooltip:{callbacks:{label:function(c){var t=c.dataset.data.reduce(function(a,b){return a+b},0);
-        return c.label+': '+c.raw+' ('+(t?wholeNum(c.raw/t*100):0)+'%)'}}}}}});
+        return c.label+': '+c.raw+' ('+(t?(c.raw/t*100).toFixed(1):0)+'%)'}}}}}});
 
   var types=[];D.spare.forEach(function(s){s.items.forEach(function(i){var t=String(i.t||'').toUpperCase();if(t&&types.indexOf(t)<0)types.push(t)})});
   types.sort(function(a,b){return tRank(a)-tRank(b)});
@@ -3104,7 +3478,7 @@ function renderCharts(){
       plugins:withTip({legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}})}});
 
   var off=offenders().slice(0,12), tot=offenders().reduce(function(a,x){return a+x.days},0), run=0;
-  var cum=off.map(function(x){run+=x.days;return tot?run/tot*100:0});
+  var cum=off.map(function(x){run+=x.days;return tot?+(run/tot*100).toFixed(1):0});
   mkChart('dlyChPareto',{data:{labels:off.map(function(x){return x.unit}),datasets:[
       {type:'bar',label:'Days in maintenance',data:off.map(function(x){return x.days}),backgroundColor:C.navy,borderRadius:3,yAxisID:'y'},
       {type:'line',label:'Cumulative %',data:cum,borderColor:C.red,backgroundColor:'transparent',tension:.25,pointRadius:3,yAxisID:'y1'}
@@ -3223,7 +3597,7 @@ function sheetHtml(){
         +'<td>'+(u.r?esc(String(u.r).toUpperCase()):'-')+'</td></tr>'}).join('')
       +'<tr><td colspan="3"><b>TOTAL</b></td><td><b>'+list.length+'</b></td></tr></tbody></table>';
   };
-  h+='<h5>4. Unscheduled Maintenance — Coach ('+D.um.length+' unit'+(D.um.length===1?'':'s')+')</h5>'+umTable(umSorted(D.um));
+  h+='<h5>4. Unscheduled Maintenance — Coach ('+D.um.length+' unit'+(D.um.length===1?'':'s')+')</h5>'+umTable(D.um);
   h+='<h5>5. Unscheduled Maintenance — PGC ('+D.ump.length+' unit'+(D.ump.length===1?'':'s')+')</h5>'+umTable(D.ump);
 
   if(down.length){
@@ -3329,10 +3703,7 @@ window.dlyTogP=function(i){D.pgc[i].ok=!D.pgc[i].ok;render()};
 window.dlyAddPGC=function(){D.pgc.push({no:'PGC ',eng:2,ok:true,as:''});render()};
 window.dlyDelP=function(i){D.pgc.splice(i,1);render()};
 window.dlySetU=function(i,k,v){D.um[i][k]=v;render(1)};
-/* a new coach takes the filtered type so it stays visible; focus it since a sort may place it mid-list */
-window.dlyAddUM=function(){D.um.push({t:UMV.type||'ADNS',n:'',r:''});render();
-  var el=document.querySelector('#dlyUmList .dly-umrow[data-i="'+(D.um.length-1)+'"] input:nth-child(2)');if(el)el.focus()};
-window.dlyUmView=function(k,v){UMV[k]=v;try{localStorage.setItem(UMVKEY,JSON.stringify(UMV))}catch(e){}render()};
+window.dlyAddUM=function(){D.um.push({t:'ADNS',n:'',r:''});render()};
 window.dlyDelU=function(i){D.um.splice(i,1);render()};
 window.dlySetUP=function(i,k,v){D.ump[i][k]=v;render(1)};
 window.dlyAddUMP=function(){D.ump.push({t:'PGC',n:'',r:''});render()};
@@ -4202,8 +4573,26 @@ if(document.readyState==='interactive'||document.readyState==='complete')setTime
 .sav-tbl td input[type=number]{width:74px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;
   text-align:center;font-size:.82rem;background:#fff;color:var(--navy)}
 .sav-tbl td input[type=number]:focus{border-color:var(--navy3);outline:2px solid #cfe0f8}
+.sav-tbl td input[type=number].dly{background:#f2f9f4;border-color:#bfe0ca;color:#14663c;font-weight:800}
+.sav-tbl td input[type=number].ovr{background:#fdf7ec;border-color:#f0d8a4;color:#8a5d05;font-weight:800}
+.sav-src{font-size:.62rem;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+.sav-src.d{background:#e7f6ee;color:#158a4c}
+.sav-src.o{background:#fdf3e2;color:#a9700a}
+.sav-src.m{background:#eef1f6;color:#5d6b83}
+.sav-src.n{background:transparent;color:#b3bcca}
+.sav-rev{margin-left:6px;padding:1px 7px;border:1px solid #e2c682;background:#fff;color:#8a5d05;
+  border-radius:7px;font-size:.68rem;font-weight:800;cursor:pointer}
+.sav-rev:hover{background:#fdf3e2}
 .sav-pct.ok{color:#158a4c;font-weight:800}.sav-pct.lo{color:#c0392b;font-weight:800}
 .sav-note{font-size:.76rem;color:var(--mut);background:#f7f9fd;border:1px dashed var(--line);border-radius:10px;padding:9px 12px;margin-top:12px;line-height:1.55}
+/* hint injected into the one-day fill-up card */
+.sav-dhint{max-width:620px;margin:10px auto 0;padding:9px 13px;border-radius:10px;text-align:center;
+  font-size:.8rem;font-weight:600;border:1px solid var(--line);background:#f7f9fd;color:var(--mut)}
+.sav-dhint.live{background:#eef8f1;border-color:#bfe0ca;color:#14663c}
+.sav-dhint.ovr{background:#fdf7ec;border-color:#f0d8a4;color:#8a5d05}
+.sav-dhint button{margin-left:7px;padding:2px 9px;border:1px solid currentColor;background:transparent;
+  color:inherit;border-radius:7px;font-size:.76rem;font-weight:800;cursor:pointer}
+.sav-dhint button:hover{background:rgba(0,0,0,.05)}
 </style>
 <script id="savJs">
 (function(){
@@ -4320,29 +4709,46 @@ function fmtPctLocal(v){return v==null||!isFinite(v)?'—':Math.round(v*100)+'%'
 function busy(){var a=document.activeElement;
   return !!(a&&(a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'));}
 
+/* ---- classify one day: d = from Daily Status, o = typed over it, m = typed in, n = empty ---- */
+function srcOf(f,m,i,act,map,on){
+  var ds=map[m+'|'+i];
+  if(ds&&ovHas(f,m,i))return 'o';
+  if(ds&&on)return 'd';
+  return (typeof act==='number')?'m':'n';
+}
+
 function panel(){
   var yr=YR();
   var m=(savMonth==null?((typeof avSel!=='undefined'&&avSel)?avSel.m:0):savMonth);
   if(!(m>=0&&m<12))m=0;
   var f=FL(), name=FLNAME(f);
   var mo=(f==='pgc'?S.pgcAvail:S.coachAvail)[m]; if(!mo)return '';
-  var on=autoOn(), dm=dim(m);
+  var map=sourceMap(), on=autoOn(), dm=dim(m);
   var MF=(typeof MFULL!=='undefined')?MFULL:['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var LAB={d:'Daily Status',o:'Edited',m:'Manual',n:'—'};
 
-  var rows='',i,act,tgt,pc,filled=0,sumA=0,cntA=0,sumT=0,cntT=0;
+  var rows='',i,act,tgt,src,pc,ds,dv,filled=0,sumA=0,cntA=0,sumT=0,cntT=0,fromDaily=0,edited=0,ttl;
   for(i=0;i<31;i++){
     act=mo.actual[i]; tgt=mo.target[i];
+    ds=map[m+'|'+i]; dv=ds?dsVal(ds,f):null;
+    src=srcOf(f,m,i,act,map,on);
+    if(src==='d')fromDaily++; if(src==='o')edited++;
     if(typeof act==='number'){filled++;sumA+=act;cntA++;}
     if(typeof tgt==='number'){sumT+=tgt;cntT++;}
     pc=(typeof act==='number'&&tgt)?act/tgt:null;
+    ttl=src==='d'?'Filled from the Daily Status record — type over it to use your own figure'
+        :(src==='o'?('Typed in by hand. Daily Status records '+dv)
+        :'Type the figure for this day');
     rows+='<tr'+(i>=dm?' class="off"':'')+'>'
       +'<td><b>'+(i+1)+'</b></td>'
-      +'<td><input type="number" min="0"'
-        +' value="'+(act==null?'':act)+'" title="Actual available units for this day"'
+      +'<td><input type="number" min="0" class="'+(src==='d'?'dly':(src==='o'?'ovr':''))+'"'
+        +' value="'+(act==null?'':act)+'" title="'+ttl+'"'
         +' onchange="updAvail('+m+',\'actual\','+i+',this.value)"></td>'
       +'<td><input type="number" min="0" value="'+(tgt==null?'':tgt)+'" onchange="updAvail('+m+',\'target\','+i+',this.value)"></td>'
       +'<td class="sav-pct '+(pc==null?'':(pc>=1?'ok':'lo'))+'">'+fmtPctLocal(pc)+'</td>'
-      +'</tr>';
+      +'<td><span class="sav-src '+src+'">'+LAB[src]+'</span>'
+        +(src==='o'?' <button class="sav-rev" onclick="savRevert('+m+','+i+')" title="Put the Daily Status figure back">↺ '+dv+'</button>':'')
+      +'</td></tr>';
   }
   var avgA=cntA?sumA/cntA:null, avgT=cntT?sumT/cntT:null, ovTot=ovCount(f);
 
@@ -4360,18 +4766,39 @@ function panel(){
     +'</div>'
     +'<div class="sav-stats">'
       +'<div class="sav-stat"><div class="v">'+filled+' / '+dm+'</div><div class="l">Days recorded</div></div>'
+      +'<div class="sav-stat"><div class="v">'+fromDaily+'</div><div class="l">From Daily Status</div></div>'
+      +'<div class="sav-stat"><div class="v">'+edited+'</div><div class="l">Edited by hand</div></div>'
       +'<div class="sav-stat"><div class="v">'+(avgA==null?'—':Math.round(avgA))+'</div><div class="l">Avg actual / day</div></div>'
       +'<div class="sav-stat"><div class="v">'+(avgT==null?'—':Math.round(avgT))+'</div><div class="l">Avg target / day</div></div>'
       +'<div class="sav-stat"><div class="v">'+((avgA!=null&&avgT)?fmtPctLocal(avgA/avgT):'—')+'</div><div class="l">Of target</div></div>'
     +'</div>'
     +'<div class="tblwrap" style="max-height:430px"><table class="sav-tbl"><thead><tr>'
-      +'<th>Day</th><th>Actual</th><th>Target</th><th>% of target</th></tr></thead>'
+      +'<th>Day</th><th>Actual</th><th>Target</th><th>% of target</th><th>Source</th></tr></thead>'
       +'<tbody>'+rows+'</tbody></table></div>'
     +'<div class="sav-note">Days logged on the <b>Daily Status</b> tab fill in here on their own — there is nothing to retype. '
-      +'<b>Every field stays editable:</b> type over any day and your figure is kept instead of being replaced at the next sync. '
-      +'Targets are always yours to set. '
+      +'<b>Every field stays editable:</b> type over any day and your figure is kept (marked <b>Edited</b>) instead of being '
+      +'replaced at the next sync; press <b>↺</b> on that row to take the Daily Status number back. Targets are always yours to set. '
       +'Every entry feeds the availability KPIs, charts, report and Excel export for '+yr+'.</div>'
     +'</div>';
+}
+
+/* ---- source line inside the one-day fill-up card ---- */
+function annotate(){
+  if(typeof availView==='undefined'||availView!=='daily')return;
+  if(typeof avSel==='undefined'||!avSel)return;
+  var host=document.querySelector('#dataArea .avstatus');
+  if(!host||host._sav)return;
+  host._sav=1;
+  var f=FL(), m=avSel.m, i=avSel.d-1, map=sourceMap(), ds=map[m+'|'+i];
+  if(!ds)return;
+  var dv=dsVal(ds,f), on=autoOn(), ov=ovHas(f,m,i), h;
+  if(ov)h='<div class="sav-dhint ovr">✎ Typed in by hand — kept as it is. Daily Status records <b>'+dv+'</b>.'
+        +'<button onclick="savRevert('+m+','+i+')">Use '+dv+'</button></div>';
+  else if(on)h='<div class="sav-dhint live">✓ Filled automatically from the Daily Status record (<b>'+dv+'</b>). '
+        +'Type over it any time — your figure will be kept.</div>';
+  else h='<div class="sav-dhint">Auto-fill is paused. Daily Status records <b>'+dv+'</b> for this day.'
+        +'<button onclick="savRevert('+m+','+i+')">Use '+dv+'</button></div>';
+  host.insertAdjacentHTML('afterend',h);
 }
 
 /* ---- public handlers ---- */
@@ -4413,6 +4840,7 @@ function mount(){
   if(typeof tab==='undefined'||tab!=='data')return;
   if(typeof dataTab==='undefined'||dataTab!=='avail')return;
   var area=document.getElementById('dataArea'); if(!area)return;
+  annotate();
   if(area.querySelector('.sav-wrap'))return;
   runSync();
   var box=document.createElement('div'); box.innerHTML=panel();
