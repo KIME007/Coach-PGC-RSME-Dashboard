@@ -1,5 +1,6 @@
 # Applies new SQL files in supabase/migrations to the Supabase project on every push to main.
-# Needs two repository secrets: SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD.
+# Needs one repository secret: SUPABASE_DB_URL — the "Session pooler" connection string
+# from Supabase → Connect, with your database password filled in.
 name: Update Supabase tables
 
 on:
@@ -14,13 +15,17 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: wcypqogvzbknzbuymoms
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-      - run: supabase db push --include-all
+      - name: Check the secret is set
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the SUPABASE_DB_URL secret (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+      - name: Apply new tables to Supabase
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all
