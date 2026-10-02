@@ -213,7 +213,6 @@ input,select,textarea{font-family:inherit;font-size:.92rem;color:var(--ink)}
   border:1px solid rgba(255,255,255,.7);border-radius:26px;width:100%;max-width:400px;padding:34px 30px 24px;
   box-shadow:0 30px 80px rgba(30,27,75,.35),inset 0 1px 0 rgba(255,255,255,.9);overflow:hidden;animation:loginIn .5s cubic-bezier(.2,.8,.2,1)}
 @keyframes loginIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
-.logincard::before{content:"";position:absolute;left:28px;right:28px;top:0;height:4px;border-radius:0 0 6px 6px;background:linear-gradient(90deg,#1e40af 0 40%,#f5c400 40% 70%,#d7263d 70%)}
 .loginlogo{display:block;height:56px;width:auto;margin:2px auto 16px;mix-blend-mode:multiply}
 .logincard h2{font-size:1.32rem;font-weight:800;margin:0;text-align:center;letter-spacing:-.2px;
   background:linear-gradient(100deg,#0f766e,#1d4ed8 50%,#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -752,7 +751,7 @@ async function sbFetch(path, opts){
   const c=sbCfg();if(!c||!c.url||!c.key)return {skip:true};
   opts=opts||{};
   const tok=await authToken();
-  if(!tok){showLogin("Please log in to save and load data");const e=new Error("Not logged in");e.needLogin=true;throw e;}
+  if(!tok){showLogin(_loginResolve?"":"Please log in to save and load data");const e=new Error("Not logged in");e.needLogin=true;throw e;}
   const res=await fetch(c.url+"/rest/v1/"+path,{
     method:opts.method||"GET",
     headers:{
@@ -1040,7 +1039,7 @@ function cloudPushQuiet(){
   return cloudPushAll().catch(err=>{if(err&&err.conflict)cloudConflictNotice();else{console.warn(err);updateCloudChip(false,String(err&&err.message||err));}});
 }
 function scheduleCloudPush(){
-  if(!sbEnabled())return;
+  if(!sbEnabled()||!_auth)return;
   clearTimeout(_cloudTimer);
   _cloudPending=true;renderCloudPill();
   _cloudTimer=setTimeout(cloudPushQuiet,1200);
