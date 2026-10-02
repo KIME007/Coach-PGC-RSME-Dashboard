@@ -248,24 +248,37 @@ returns jsonb language sql stable as $$
 $$;
 
 /* =====================================================================
-   4. Access (same open policy as before)
+   4. Access — only logged-in users (Supabase Auth). Create accounts with
+      select add_dashboard_user('ID','password');  (see migrations/20261002000000_dashboard_users.sql)
+      and turn off "Allow new users to sign up".
    ===================================================================== */
+
 do $$
-declare t text;
+declare
+  tbls text[] := array['dashboard_store','report_years','failure_summary','failure_4m',
+                       'monthly_failures','availability','pm_compliance','incidents','daily_reports'];
+  t text;
+  r record;
 begin
-  foreach t in array array['dashboard_store','report_years','failure_summary','failure_4m',
-                           'monthly_failures','availability','pm_compliance','incidents','daily_reports']
+  -- remove every existing policy on these tables (including any created by hand)
+  for r in select policyname, tablename from pg_policies
+           where schemaname = 'public' and tablename = any(tbls)
+  loop
+    execute format('drop policy %I on public.%I', r.policyname, r.tablename);
+  end loop;
+
+  foreach t in array tbls
   loop
     execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists "anon_all_%s" on public.%I', t, t);
-    execute format('create policy "anon_all_%s" on public.%I for all to anon using (true) with check (true)', t, t);
-    execute format('grant select, insert, update, delete on public.%I to anon', t);
+    execute format('create policy "auth_all_%s" on public.%I for all to authenticated using (true) with check (true)', t, t);
+    execute format('revoke all on public.%I from anon', t);
+    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
   end loop;
 end $$;
 
-grant execute on function public.rsd_sync_year(int, jsonb, text) to anon;
-grant execute on function public.rsd_sync_daily(jsonb) to anon;
-grant execute on function public.rsd_load_all() to anon;
-
--- Anyone with the anon key in the HTML/config can read and write.
--- Add login + tighter policies before sharing this on the public internet.
+revoke execute on function public.rsd_sync_year(int, jsonb, text) from public, anon;
+revoke execute on function public.rsd_sync_daily(jsonb) from public, anon;
+revoke execute on function public.rsd_load_all() from public, anon;
+grant execute on function public.rsd_sync_year(int, jsonb, text) to authenticated;
+grant execute on function public.rsd_sync_daily(jsonb) to authenticated;
+grant execute on function public.rsd_load_all() to authenticated;
