@@ -381,15 +381,12 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Import Excel</button>
     <button class="hbtn save clean" id="btnSave" onclick="saveDashboard()" title="Save the current dashboard changes (Ctrl+S)">
       <span class="emo">💾</span><span id="btnSaveLabel">Save</span></button>
-    <button class="hbtn" onclick="openCloudModal()" title="Download a backup file or connect Supabase so data is kept in the cloud">
-      <span class="emo">☁</span>Backup</button>
     <button class="hbtn" id="btnDownload" onclick="downloadExcel()" title="Download the latest saved data as an Excel workbook (original formatting preserved)">
       <span class="emo">📥</span><span id="btnDownloadLabel">Download Excel</span></button>
     <button class="hbtn accent" onclick="generatePpt()" title="Generate a PowerPoint for the current section from live data">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4m-4 0h8M8 12l2.5-3 2 2L16 7.5"/></svg>Generate Presentation</button>
   </div>
   <input type="file" id="fileIn" accept=".xlsx" style="display:none" onchange="importExcel(this)">
-  <input type="file" id="fileBackupIn" accept="application/json,.json" style="display:none" onchange="restoreDataBackupFile(this)">
 </header>
 
 <div class="strip">
@@ -398,8 +395,8 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
   <span id="editInfo"></span>
   <span style="flex:1"></span>
   <span id="saveInfo">No changes saved yet this session.</span>
-  <span class="chip" id="cloudChip" onclick="openCloudModal()" style="cursor:pointer">Cloud: off</span>
-  <span>&nbsp;|&nbsp;<b>💾 Save</b> stores your changes · <b>Backup</b> keeps a JSON/cloud copy · <b>📥 Download Excel</b> exports the saved data.</span>
+  <span class="chip" id="cloudChip" onclick="openCloudModal()" style="cursor:pointer" title="Cloud connection details">Cloud: off</span>
+  <span>&nbsp;|&nbsp;<b>💾 Save</b> stores your changes in the cloud · <b>📥 Download Excel</b> exports the saved data.</span>
   <button class="linkbtn" onclick="resetAll()">Reset to file data</button>
 </div>
 
@@ -497,21 +494,9 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
 </div></div>
 
 <div class="overlay" id="ovCloud"><div class="modal" style="max-width:640px">
-  <div class="mhead"><h3>Keep your dashboard data</h3><button class="iconb" onclick="closeCloudModal()">✕</button></div>
+  <div class="mhead"><h3>Cloud connection</h3><button class="iconb" onclick="closeCloudModal()">✕</button></div>
   <div class="mbody">
-    <p class="note" style="margin-top:0">Save still writes to this browser. Use a backup file and/or Supabase so you do not lose work when you switch computers or clear site data.</p>
-    <h3 style="margin:14px 0 8px;font-size:.92rem">1. Backup file (works immediately)</h3>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      <button class="btn primary" type="button" onclick="downloadDataBackup()">Download JSON backup</button>
-      <button class="btn ghost" type="button" onclick="document.getElementById('fileBackupIn').click()">Restore from JSON…</button>
-    </div>
-    <h3 style="margin:18px 0 8px;font-size:.92rem">2. Cloud (Supabase)</h3>
-    <ol style="margin:0 0 10px 18px;color:var(--mut);font-size:.84rem;line-height:1.45">
-      <li>Create a project at supabase.com</li>
-      <li>SQL Editor → paste and run <code>supabase/schema.sql</code> from this folder</li>
-      <li>Settings → API → copy Project URL and the <b>anon public</b> key (not service_role)</li>
-    </ol>
-    <p class="note" style="margin:0 0 10px">Your data then shows up in Supabase <b>Table Editor</b>: failure_summary, failure_4m, monthly_failures, availability, pm_compliance, incidents and daily_reports. Changes you make there load into the dashboard next time it opens.</p>
+    <p class="note" style="margin-top:0">This dashboard saves to Supabase every time you click <b>💾 Save</b> — nothing is saved as a file on this computer. You normally don't need to change anything here.</p>
     <div class="fgrid">
       <div class="fld full"><label>Project URL</label><input id="sbUrl" type="url" placeholder="https://xxxx.supabase.co"></div>
       <div class="fld full"><label>anon public key</label><textarea id="sbKey" placeholder="eyJ..." style="min-height:72px"></textarea></div>
@@ -888,12 +873,10 @@ async function connectSupabase(){
       cloudHasData=!!(t&&((t.years||[]).length||(t.daily||[]).length));
     }
     if(cloudHasData){
-      const kept=localHasData()&&downloadDataBackup("coach-pgc-this-computer-before-cloud");
       if(!(await cloudHydrate()))throw new Error("could not load the cloud data");
       applyYear();
       closeCloudModal();
-      toast("Connected — loaded the dashboard data from Supabase ✔"
-        +(kept?" (this computer's old data was downloaded as a backup file)":""));
+      toast("Connected — loaded the dashboard data from Supabase ✔");
       return;
     }
     await cloudPushAll({force:true});
@@ -1016,7 +999,7 @@ function resetAll(){if(!confirm("Discard the edits for "+RS_YEAR+" and restore t
   else S=blankYear();
   lastSaved=null;yrSrcLabel=null;setDirty(false);applyYear();toast("Reporting year "+RS_YEAR+" reset");
   if(sbEnabled())cloudPushQuiet();}
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600);}
+function toast(m,ms){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),ms||2600);}
 
 /* ================= ACCESSORS / DERIVED ================= */
 function sec(){return section==="pgc"
@@ -1936,24 +1919,27 @@ async function saveDashboard(){
     persist();
     updateSaveInfo();
     btnBusy('btnSave','btnSaveLabel',true,'Saving…','Save');
-    let cloudNote='';
-    if(sbEnabled()){
-      try{await cloudPushAll();cloudNote=' and in the cloud';}
+    let msg='✔ Saved to cloud — everyone will see it', ms=3500;
+    const failed=err=>{msg='⚠ NOT saved to cloud — check your internet and click Save again';ms=9000;updateCloudChip(false,String(err&&err.message||err));};
+    if(!sbEnabled()){
+      msg='Saved on this computer only — cloud is off (click the Cloud label to connect)';ms=7000;
+    }else{
+      try{await cloudPushAll();}
       catch(err){
         if(err&&err.conflict){
           if(confirm(err.message+"\n\nOK = replace their data in the cloud with yours\nCancel = keep their data in the cloud (your changes stay on this computer only — reload the page to see theirs)")){
-            try{await cloudPushAll({force:true});cloudNote=' and in the cloud (replaced the newer cloud copy)';}
-            catch(e2){cloudNote=' · cloud failed: '+e2.message;updateCloudChip(false,e2.message);}
+            try{await cloudPushAll({force:true});msg='✔ Saved to cloud (replaced the newer cloud copy)';}
+            catch(e2){failed(e2);}
           }else{
-            cloudNote=' on this computer only — cloud kept the other person\'s newer data';
+            msg='Not saved to cloud — someone else saved newer data. Reload the page to see it.';ms=9000;
             updateCloudChip(false,"Newer data is in the cloud — reload the page to get it");
           }
-        }else{cloudNote=' · cloud failed: '+err.message;updateCloudChip(false,err.message);}
+        }else failed(err);
       }
     }
     btnBusy('btnSave','btnSaveLabel',false,'','Saved');
     setTimeout(()=>btnBusy('btnSave','btnSaveLabel',false,'','Save'),1600);
-    toast('Dashboard changes saved'+cloudNote+' ✔');
+    toast(msg,ms);
   }catch(e){console.error(e);toast('Save failed: '+e.message);}}
 
 /* ---- 📥 Download Excel ---- */
@@ -1979,13 +1965,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.prepend(d);}
   (async function(){
     initState();
-    /* first visit on a laptop that already typed data before the built-in cloud: keep a copy before loading the shared data */
-    try{
-      if(sbUsingBuiltin()&&!localStorage.getItem("rsd_cloud_joined_v1")){
-        if(localHasData())downloadDataBackup("coach-pgc-this-computer-before-cloud");
-        localStorage.setItem("rsd_cloud_joined_v1","1");
-      }
-    }catch(e){}
     await cloudHydrate();
     buildYearSelect();buildMonthSelects();setSection('coach');setTab('overview');
     const si=document.getElementById('srcInfo');
