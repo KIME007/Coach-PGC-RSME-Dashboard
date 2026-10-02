@@ -191,6 +191,22 @@ input,select,textarea{font-family:inherit;font-size:.92rem;color:var(--ink)}
 .hbtn.save:hover{background:#16b95c}
 .hbtn.save.clean{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.16)}
 .hbtn.save.clean:hover{background:rgba(255,255,255,.24)}
+/* login screen + signed-in user in the header */
+.loginov{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:16px;
+  background:linear-gradient(135deg,#2f343b 0%,#3d434b 55%,#4b5563 100%)}
+.loginov.show{display:flex}
+.logincard{background:#fff;border-radius:18px;width:100%;max-width:380px;padding:28px 26px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.logincard h2{font-size:1.15rem;color:#2f343b;margin:0 0 4px}
+.logincard p.sub{font-size:.8rem;color:var(--mut);margin:0 0 18px}
+.logincard label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin:12px 0 5px}
+.logincard input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:.95rem}
+.logincard input:focus{outline:2px solid #9aa3ad;outline-offset:0}
+.logincard button{width:100%;margin-top:18px;padding:12px;border-radius:10px;background:#2f343b;color:#fff;font-weight:700;font-size:.95rem}
+.logincard button:disabled{opacity:.6;cursor:wait}
+.loginerr{min-height:1.2em;margin-top:10px;font-size:.82rem;color:#b3223a;font-weight:600}
+.ubox{display:flex;align-items:center;gap:6px}
+.ulink{color:#fff;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.16);padding:8px 12px;border-radius:10px;font-size:.8rem;font-weight:600;white-space:nowrap}
+.ulink:hover{background:rgba(255,255,255,.24)}
 /* cloud save status light next to 💾 Save */
 .cpill{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border-radius:99px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:.15s}
 .cpill.ok{background:#e3f6ea;color:#11743a;border-color:#a8dcb9}
@@ -389,6 +405,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
     <button class="hbtn save clean" id="btnSave" onclick="saveDashboard()" title="Save the current dashboard changes (Ctrl+S)">
       <span class="emo">💾</span><span id="btnSaveLabel">Save</span></button>
     <span class="cpill off" id="cloudPill" onclick="openCloudModal()" title="Cloud save status">☁ Cloud off</span>
+    <span class="ubox" id="userBox"></span>
     <button class="hbtn" id="btnDownload" onclick="downloadExcel()" title="Download the latest saved data as an Excel workbook (original formatting preserved)">
       <span class="emo">📥</span><span id="btnDownloadLabel">Download Excel</span></button>
     <button class="hbtn accent" onclick="generatePpt()" title="Generate a PowerPoint for the current section from live data">
@@ -516,6 +533,14 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
     <button class="btn primary" type="button" onclick="connectSupabase()">Connect &amp; upload</button>
   </div>
 </div></div>
+<div class="loginov" id="loginOv"><form class="logincard" onsubmit="event.preventDefault();doLogin()">
+  <h2>Rolling Stock Performance</h2>
+  <p class="sub">Coach &amp; PGC Dashboard — please log in</p>
+  <label for="loginId">ID</label><input id="loginId" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+  <label for="loginPw">Password</label><input id="loginPw" type="password" autocomplete="current-password" required>
+  <div class="loginerr" id="loginErr"></div>
+  <button type="submit" id="loginBtn">Log in</button>
+</form></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -565,12 +590,109 @@ function sbSetCfg(c){try{
   else{localStorage.removeItem(SB_OFF_KEY);localStorage.setItem(SB_CFG_KEY,JSON.stringify({url:sbCleanUrl(c.url),key:String(c.key||"").trim()}));}
 }catch(e){}}
 function sbEnabled(){const c=sbCfg();return !!(c&&c.url&&c.key)}
+
+/* ================= LOGIN (Supabase Auth: ID + password) ================= */
+/* Supabase accounts need an email, so an ID like "hakimi" is stored as hakimi@coachpgc.example.com.
+   People only ever type the ID. Accounts are created by the admin in Supabase → Authentication → Users. */
+const AUTH_KEY="rsd_auth_v1", AUTH_DOMAIN="coachpgc.example.com";
+let _auth=null, _refreshing=null, _loginResolve=null;
+try{_auth=JSON.parse(localStorage.getItem(AUTH_KEY)||"null")}catch(e){}
+function authId(){return _auth&&_auth.id||null}
+function authSave(a){
+  _auth=a;
+  try{if(a)localStorage.setItem(AUTH_KEY,JSON.stringify(a));else localStorage.removeItem(AUTH_KEY)}catch(e){}
+  renderUserBox();if(typeof renderCloudPill==="function")renderCloudPill();
+}
+function authEmail(id){id=String(id||"").trim().toLowerCase();return id.indexOf("@")>=0?id:id+"@"+AUTH_DOMAIN}
+async function authCall(path,body,token,method){
+  const c=sbCfg();if(!c||!c.url||!c.key)throw new Error("Cloud is not set up");
+  const h={apikey:c.key,"Content-Type":"application/json"};if(token)h.Authorization="Bearer "+token;
+  const res=await fetch(c.url+"/auth/v1/"+path,{method:method||"POST",headers:h,body:JSON.stringify(body||{})});
+  const raw=await res.text();let j=null;try{j=raw?JSON.parse(raw):null}catch(e){}
+  if(!res.ok){const e=new Error((j&&(j.error_description||j.msg||j.message||j.error))||("HTTP "+res.status));e.status=res.status;throw e;}
+  return j;
+}
+function authFromToken(j,id){return {id:id,access:j.access_token,refresh:j.refresh_token,exp:Date.now()+(j.expires_in||3600)*1000}}
+async function authLogin(id,pw){
+  const j=await authCall("token?grant_type=password",{email:authEmail(id),password:pw});
+  authSave(authFromToken(j,String(id).trim().toLowerCase().split("@")[0]));
+}
+async function authRefresh(){
+  if(!_auth||!_auth.refresh)throw new Error("Not logged in");
+  if(!_refreshing)_refreshing=(async()=>{
+    try{const j=await authCall("token?grant_type=refresh_token",{refresh_token:_auth.refresh});authSave(authFromToken(j,_auth.id));}
+    catch(e){if(e.status>=400&&e.status<500)authSave(null);throw e;}   /* refresh rejected → session is over */
+    finally{_refreshing=null}
+  })();
+  return _refreshing;
+}
+/* a valid access token, refreshed when it is about to expire */
+async function authToken(){
+  if(!_auth)return null;
+  if(Date.now()>_auth.exp-120000)await authRefresh();
+  return _auth&&_auth.access;
+}
+function showLogin(msg){
+  const ov=document.getElementById("loginOv");if(!ov)return;
+  ov.classList.add("show");
+  const er=document.getElementById("loginErr");if(er)er.textContent=msg||"";
+  const id=document.getElementById("loginId");if(id&&!id.value)setTimeout(()=>id.focus(),50);
+}
+async function doLogin(){
+  const id=(document.getElementById("loginId").value||"").trim(), pw=document.getElementById("loginPw").value||"";
+  const er=document.getElementById("loginErr"), btn=document.getElementById("loginBtn");
+  if(!id||!pw){er.textContent="Enter your ID and password";return;}
+  btn.disabled=true;btn.textContent="Logging in…";er.textContent="";
+  try{
+    await authLogin(id,pw);
+    document.getElementById("loginPw").value="";
+    document.getElementById("loginOv").classList.remove("show");
+    if(_loginResolve){const r=_loginResolve;_loginResolve=null;r();}
+    else{await cloudHydrate();if(typeof applyYear==="function")applyYear();toast("Logged in as "+authId()+" ✔");}
+  }catch(e){
+    er.textContent=/invalid|credentials|not found|400/i.test(e.message)?"Wrong ID or password":("Could not log in: "+e.message);
+  }finally{btn.disabled=false;btn.textContent="Log in";}
+}
+/* start-up: wait here until someone is logged in (a saved session counts) */
+async function ensureLogin(){
+  if(!sbEnabled())return;
+  if(_auth){
+    try{await authToken();if(_auth)return;}
+    catch(e){if(_auth)return;}          /* offline: keep the saved session, saving will retry later */
+  }
+  showLogin();
+  await new Promise(res=>{_loginResolve=res});
+}
+function renderUserBox(){
+  const el=document.getElementById("userBox");if(!el)return;
+  if(!_auth){el.innerHTML="";return;}
+  const id=String(_auth.id).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  el.innerHTML='<button class="ulink" type="button" onclick="authChangePasswordUI()" title="Logged in — click to change your password">👤 '+id+'</button>'
+    +'<button class="ulink" type="button" onclick="authLogoutUI()">Log out</button>';
+}
+async function authChangePasswordUI(){
+  const p1=prompt("New password for "+authId()+" (at least 6 characters):");if(p1==null)return;
+  if(p1.length<6){toast("Password must be at least 6 characters");return;}
+  const p2=prompt("Type the new password again:");if(p2==null)return;
+  if(p1!==p2){toast("The two passwords do not match — nothing changed");return;}
+  try{await authCall("user",{password:p1},await authToken(),"PUT");toast("Password changed ✔",4000);}
+  catch(e){toast("Could not change password: "+e.message,7000);}
+}
+/* log out also removes this laptop's copy of the data, so the next person sees only the login screen */
+async function authLogoutUI(){
+  if(typeof dirty!=="undefined"&&dirty&&!confirm("You have changes that are not saved to the cloud. Log out anyway and lose them?"))return;
+  if(!confirm("Log out "+authId()+"?"))return;
+  try{await authCall("logout",{},_auth&&_auth.access);}catch(e){}
+  try{[AUTH_KEY,"rsd_years_v1","rsd_state_v2","rsd_wb_b64_v2",DAILY_EKEY,DAILY_RKEY,"rsd_avail_manual_v1","rptDocSeq_v1"].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  location.reload();
+}
 /* ---- status light next to 💾 Save: is what you typed saved to the cloud? ---- */
 let _cloudBusy=false, _cloudErr=null, _cloudPending=false, _cloudSavedAt=null;
 function renderCloudPill(){
   const el=document.getElementById("cloudPill");if(!el)return;
   let cls,txt,tip;
   if(!sbEnabled()){cls="off";txt="☁ Cloud off";tip="Not connected — changes stay on this computer only";}
+  else if(!_auth){cls="off";txt="🔒 Logged out";tip="Log in to load and save data";}
   else if(_cloudBusy||_cloudPending){cls="busy";txt="☁ Saving…";tip="Sending your changes to the cloud";}
   else if(_cloudErr){cls="bad";txt="⚠ Not saved to cloud";tip=_cloudErr+" — click 💾 Save to try again";}
   else if(typeof dirty!=="undefined"&&dirty){cls="dirty";txt="● Not saved — click Save";tip="You have changes that are not in the cloud yet";}
@@ -589,16 +711,22 @@ function updateCloudChip(ok,msg){
 async function sbFetch(path, opts){
   const c=sbCfg();if(!c||!c.url||!c.key)return {skip:true};
   opts=opts||{};
+  const tok=await authToken();
+  if(!tok){showLogin("Please log in to save and load data");const e=new Error("Not logged in");e.needLogin=true;throw e;}
   const res=await fetch(c.url+"/rest/v1/"+path,{
     method:opts.method||"GET",
     headers:{
       apikey:c.key,
-      Authorization:"Bearer "+c.key,
+      Authorization:"Bearer "+tok,
       "Content-Type":"application/json",
       Prefer:opts.prefer||"return=representation"
     },
     body:opts.body
   });
+  if(res.status===401&&!opts._retried){          /* token expired mid-session: refresh once and retry */
+    try{await authRefresh();}catch(e){if(!_auth)showLogin("Your login has expired — please log in again");throw e;}
+    return sbFetch(path,Object.assign({},opts,{_retried:true}));
+  }
   const raw=await res.text();
   let body=null;try{body=raw?JSON.parse(raw):null}catch(e){body=raw}
   if(!res.ok){
@@ -627,7 +755,8 @@ function packBackup(){
     availOv:availOv,
     auto:auto,
     rptSeq:rptSeq,
-    by:deviceId()
+    by:deviceId(),
+    byUser:authId()
   };
 }
 /* random id per browser, so a cloud save can tell "this computer" from "another computer" */
@@ -791,13 +920,15 @@ function overlayTables(pack,t){
 /* ---- overwrite protection: remember the cloud copy we last loaded or saved ---- */
 let _cloudSeen;              // undefined = unknown, null = cloud had no copy, number = its updated_at (ms)
 async function cloudRemoteStamp(){
-  const r=await sbFetch("dashboard_store?select=updated_at,by:value->>by&key=eq.bundle");
+  const r=await sbFetch("dashboard_store?select=updated_at,by:value->>by,byUser:value->>byUser&key=eq.bundle");
   const row=Array.isArray(r)&&r[0];
-  return row?{ts:Date.parse(row.updated_at),by:row.by||null}:{ts:null,by:null};
+  return row?{ts:Date.parse(row.updated_at),by:row.by||null,user:row.byUser||null}:{ts:null,by:null,user:null};
 }
 function cloudConflictText(c){
-  const who=c.by&&c.by===deviceId()?"another window on this computer":"another computer";
-  return "Someone saved newer data to the cloud from "+who+(c.ts?" at "+new Date(c.ts).toLocaleString():"")+".";
+  const when=c.ts?" at "+new Date(c.ts).toLocaleString():"";
+  if(c.user&&c.user!==authId())return c.user+" saved newer data to the cloud"+when+".";
+  const where=c.by&&c.by===deviceId()?"another window on this computer":"another computer";
+  return (c.user?"You":"Someone")+" saved newer data to the cloud from "+where+when+".";
 }
 function cloudConflictNotice(){
   updateCloudChip(false,"Newer data is in the cloud — reload the page to get it");
@@ -1994,6 +2125,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.prepend(d);}
   (async function(){
     initState();
+    renderUserBox();
+    await ensureLogin();
     await cloudHydrate();
     buildYearSelect();buildMonthSelects();setSection('coach');setTab('overview');
     const si=document.getElementById('srcInfo');
@@ -4010,6 +4143,7 @@ if(document.readyState==='interactive'||document.readyState==='complete')setTime
   .hbtns{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .hbtn{justify-content:center;text-align:center;padding:10px 8px;font-size:.79rem;min-height:46px;line-height:1.15}
   .cpill{grid-column:1/-1;min-height:40px}
+  .ubox{grid-column:1/-1;justify-content:center}
 
   /* ---------- status strip ---------- */
   .strip{padding:7px 12px;gap:8px;font-size:.71rem}
