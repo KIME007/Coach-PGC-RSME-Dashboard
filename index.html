@@ -192,18 +192,36 @@ input,select,textarea{font-family:inherit;font-size:.92rem;color:var(--ink)}
 .hbtn.save.clean{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.16)}
 .hbtn.save.clean:hover{background:rgba(255,255,255,.24)}
 /* login screen + signed-in user in the header */
-.loginov{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:16px;
-  background:linear-gradient(135deg,#0f766e 0%,#1e40af 52%,#6d28d9 100%)}
+.loginov{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px 150px;overflow:auto;
+  background:radial-gradient(circle at 12% 18%,rgba(45,212,191,.45) 0,transparent 38%),
+             radial-gradient(circle at 88% 12%,rgba(167,139,250,.5) 0,transparent 40%),
+             radial-gradient(circle at 70% 85%,rgba(245,196,0,.22) 0,transparent 35%),
+             linear-gradient(135deg,#0f766e 0%,#1e40af 52%,#6d28d9 100%)}
 .loginov.show{display:flex}
-.logincard{background:#fff;border-radius:18px;width:100%;max-width:380px;padding:28px 26px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
-.logincard h2{font-size:1.15rem;color:#1e40af;margin:0 0 4px}
-.logincard p.sub{font-size:.8rem;color:var(--mut);margin:0 0 18px}
-.logincard label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin:12px 0 5px}
-.logincard input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:.95rem}
-.logincard input:focus{outline:2px solid #93c5fd;outline-offset:0}
-.logincard button{width:100%;margin-top:18px;padding:12px;border-radius:10px;background:linear-gradient(120deg,#0f766e,#1e40af 55%,#6d28d9);color:#fff;font-weight:700;font-size:.95rem}
-.logincard button:disabled{opacity:.6;cursor:wait}
-.loginerr{min-height:1.2em;margin-top:10px;font-size:.82rem;color:#b3223a;font-weight:600}
+.loginstrip{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(980px,100%);height:auto;pointer-events:none;
+  -webkit-mask-image:linear-gradient(to top,#000 55%,transparent);mask-image:linear-gradient(to top,#000 55%,transparent);opacity:.95}
+.logincard{position:relative;background:rgba(255,255,255,.97);border-radius:22px;width:100%;max-width:400px;padding:30px 28px 22px;
+  box-shadow:0 30px 80px rgba(15,23,42,.45),0 0 0 1px rgba(255,255,255,.4);overflow:hidden;animation:pop .25s ease}
+.logincard::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:linear-gradient(90deg,#1e40af 0 40%,#f5c400 40% 70%,#d7263d 70%)}
+.loginlogo{display:block;height:58px;width:auto;margin:4px auto 14px}
+.logincard h2{font-size:1.2rem;color:#1e3a8a;margin:0;text-align:center;letter-spacing:.2px}
+.logincard p.sub{font-size:.78rem;color:var(--mut);margin:4px 0 18px;text-align:center;text-transform:uppercase;letter-spacing:1.2px;font-weight:700}
+.logincard label{display:block;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#475569;margin:12px 0 6px}
+.lfield{position:relative}
+.lfield .ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.95rem;opacity:.7;pointer-events:none}
+.logincard input{width:100%;padding:12px 44px 12px 38px;border:1.5px solid #dbe3ef;border-radius:12px;font-size:.95rem;background:#f8fafc;transition:.15s}
+.logincard input:focus{outline:none;border-color:#3b82f6;background:#fff;box-shadow:0 0 0 4px rgba(59,130,246,.15)}
+.peek{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:1rem;cursor:pointer;padding:6px;opacity:.65}
+.peek:hover{opacity:1}
+.logincard button[type=submit]{width:100%;margin-top:18px;padding:13px;border-radius:12px;color:#fff;font-weight:800;font-size:.98rem;letter-spacing:.3px;
+  background:linear-gradient(120deg,#0f766e,#1e40af 55%,#6d28d9);box-shadow:0 10px 24px rgba(30,64,175,.35);transition:.15s}
+.logincard button[type=submit]:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(30,64,175,.42)}
+.logincard button:disabled{opacity:.6;cursor:wait;transform:none}
+.loginerr{min-height:1.2em;margin-top:10px;font-size:.82rem;color:#b3223a;font-weight:700;text-align:center}
+.loginfoot{margin-top:16px;padding-top:12px;border-top:1px dashed #e2e8f0;text-align:center;font-size:.68rem;color:#94a3b8;letter-spacing:.4px}
+.loginfoot b{color:#64748b}
+@media (max-height:640px){.loginstrip{display:none}.loginov{padding-bottom:20px}}
+@media (max-width:480px){.loginov{padding-bottom:110px}.logincard{padding:26px 20px 18px}.loginlogo{height:48px}}
 .ubox{display:flex;align-items:center;gap:6px}
 .ulink{color:#fff;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.16);padding:8px 12px;border-radius:10px;font-size:.8rem;font-weight:600;white-space:nowrap}
 .ulink:hover{background:rgba(255,255,255,.24)}
@@ -533,14 +551,22 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
     <button class="btn primary" type="button" onclick="connectSupabase()">Connect &amp; upload</button>
   </div>
 </div></div>
-<div class="loginov" id="loginOv"><form class="logincard" onsubmit="event.preventDefault();doLogin()">
+<div class="loginov" id="loginOv">
+<form class="logincard" onsubmit="event.preventDefault();doLogin()">
+  <img class="loginlogo" id="loginLogo" alt="KTM">
   <h2>Rolling Stock Performance</h2>
-  <p class="sub">Coach &amp; PGC Dashboard — please log in</p>
-  <label for="loginId">ID</label><input id="loginId" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-  <label for="loginPw">Password</label><input id="loginPw" type="password" autocomplete="current-password" required>
+  <p class="sub">Coach &amp; PGC Dashboard</p>
+  <label for="loginId">ID</label>
+  <div class="lfield"><span class="ico">👤</span><input id="loginId" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your ID" required></div>
+  <label for="loginPw">Password</label>
+  <div class="lfield"><span class="ico">🔒</span><input id="loginPw" type="password" autocomplete="current-password" placeholder="Your password" required>
+    <button class="peek" type="button" title="Show / hide password" onclick="const i=document.getElementById('loginPw');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'">👁</button></div>
   <div class="loginerr" id="loginErr"></div>
   <button type="submit" id="loginBtn">Log in</button>
-</form></div>
+  <div class="loginfoot"><b>Keretapi Tanah Melayu Berhad</b><br>Rolling Stock · Coach &amp; PGC Maintenance</div>
+</form>
+<img class="loginstrip" id="loginStrip" alt="">
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -634,6 +660,10 @@ async function authToken(){
 }
 function showLogin(msg){
   const ov=document.getElementById("loginOv");if(!ov)return;
+  try{                                    /* KTM logo + train photos already built into this page */
+    const lg=document.getElementById("loginLogo"),st=document.getElementById("loginStrip");
+    if(typeof KASSET!=="undefined"){if(lg&&!lg.src)lg.src=KASSET.logo;if(st&&!st.src)st.src=KASSET.strip;}
+  }catch(e){}
   ov.classList.add("show");
   const er=document.getElementById("loginErr");if(er)er.textContent=msg||"";
   const id=document.getElementById("loginId");if(id&&!id.value)setTimeout(()=>id.focus(),50);
