@@ -191,6 +191,13 @@ input,select,textarea{font-family:inherit;font-size:.92rem;color:var(--ink)}
 .hbtn.save:hover{background:#16b95c}
 .hbtn.save.clean{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.16)}
 .hbtn.save.clean:hover{background:rgba(255,255,255,.24)}
+/* cloud save status light next to 💾 Save */
+.cpill{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border-radius:99px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:.15s}
+.cpill.ok{background:#e3f6ea;color:#11743a;border-color:#a8dcb9}
+.cpill.dirty{background:#fff3d6;color:#8a5a00;border-color:#f0cf7a}
+.cpill.busy{background:#e4eefc;color:#1d4f9c;border-color:#b7cdef}
+.cpill.bad{background:#fde6e8;color:#b3223a;border-color:#f2b3bc}
+.cpill.off{background:rgba(255,255,255,.13);color:#dfe6f2;border-color:rgba(255,255,255,.2)}
 .hbtn.busy{opacity:.6;pointer-events:none}
 .hbtn .emo{font-size:.95rem;line-height:1}
 .hbtn svg{flex-shrink:0}
@@ -381,6 +388,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Import Excel</button>
     <button class="hbtn save clean" id="btnSave" onclick="saveDashboard()" title="Save the current dashboard changes (Ctrl+S)">
       <span class="emo">💾</span><span id="btnSaveLabel">Save</span></button>
+    <span class="cpill off" id="cloudPill" onclick="openCloudModal()" title="Cloud save status">☁ Cloud off</span>
     <button class="hbtn" id="btnDownload" onclick="downloadExcel()" title="Download the latest saved data as an Excel workbook (original formatting preserved)">
       <span class="emo">📥</span><span id="btnDownloadLabel">Download Excel</span></button>
     <button class="hbtn accent" onclick="generatePpt()" title="Generate a PowerPoint for the current section from live data">
@@ -557,7 +565,21 @@ function sbSetCfg(c){try{
   else{localStorage.removeItem(SB_OFF_KEY);localStorage.setItem(SB_CFG_KEY,JSON.stringify({url:sbCleanUrl(c.url),key:String(c.key||"").trim()}));}
 }catch(e){}}
 function sbEnabled(){const c=sbCfg();return !!(c&&c.url&&c.key)}
+/* ---- status light next to 💾 Save: is what you typed saved to the cloud? ---- */
+let _cloudBusy=false, _cloudErr=null, _cloudPending=false, _cloudSavedAt=null;
+function renderCloudPill(){
+  const el=document.getElementById("cloudPill");if(!el)return;
+  let cls,txt,tip;
+  if(!sbEnabled()){cls="off";txt="☁ Cloud off";tip="Not connected — changes stay on this computer only";}
+  else if(_cloudBusy||_cloudPending){cls="busy";txt="☁ Saving…";tip="Sending your changes to the cloud";}
+  else if(_cloudErr){cls="bad";txt="⚠ Not saved to cloud";tip=_cloudErr+" — click 💾 Save to try again";}
+  else if(typeof dirty!=="undefined"&&dirty){cls="dirty";txt="● Not saved — click Save";tip="You have changes that are not in the cloud yet";}
+  else{cls="ok";txt="✔ Saved to cloud";tip=_cloudSavedAt?"Last saved "+_cloudSavedAt.toLocaleString():"Everything you see is in the cloud";}
+  el.className="cpill "+cls;el.textContent=txt;el.title=tip;
+}
 function updateCloudChip(ok,msg){
+  if(ok===false)_cloudErr=msg||"Could not reach the cloud";else if(ok===true)_cloudErr=null;
+  renderCloudPill();
   const el=document.getElementById("cloudChip");if(!el)return;
   if(!sbEnabled()){el.textContent="Cloud: off";el.title="Data is only on this browser until you connect Supabase";el.className="chip";return;}
   el.textContent=ok===false?"Cloud: error":"Cloud: on";
@@ -784,6 +806,11 @@ function cloudConflictNotice(){
 /* opts.force skips the "did someone else save meanwhile?" check */
 async function cloudPushAll(opts){
   if(!sbEnabled())return {skipped:true};
+  _cloudBusy=true;_cloudPending=false;renderCloudPill();
+  try{return await cloudPushAllInner(opts);}
+  finally{_cloudBusy=false;renderCloudPill();}
+}
+async function cloudPushAllInner(opts){
   opts=opts||{};
   if(!opts.force){
     const c=await cloudRemoteStamp();
@@ -801,7 +828,7 @@ async function cloudPushAll(opts){
     prefer:"resolution=merge-duplicates,return=minimal",
     body:JSON.stringify(rows)
   });
-  _cloudSeen=now.getTime();
+  _cloudSeen=now.getTime();_cloudSavedAt=now;
   updateCloudChip(true,cloudChipNote("Last cloud save "+now.toLocaleString()));
   return {ok:true};
 }
@@ -839,11 +866,12 @@ async function cloudHydrate(){
 }
 /* background uploads never overwrite someone else's newer save */
 function cloudPushQuiet(){
-  return cloudPushAll().catch(err=>{if(err&&err.conflict)cloudConflictNotice();else console.warn(err);});
+  return cloudPushAll().catch(err=>{if(err&&err.conflict)cloudConflictNotice();else{console.warn(err);updateCloudChip(false,String(err&&err.message||err));}});
 }
 function scheduleCloudPush(){
   if(!sbEnabled())return;
   clearTimeout(_cloudTimer);
+  _cloudPending=true;renderCloudPill();
   _cloudTimer=setTimeout(cloudPushQuiet,1200);
 }
 function openCloudModal(){
@@ -991,7 +1019,8 @@ function persist(src){
 }
 function setDirty(d){dirty=d;const el=document.getElementById('dirtyDot');if(el)el.classList.toggle('dirty',d);
   const ei=document.getElementById('editInfo');if(ei)ei.textContent=d?"● Unsaved changes — click 💾 Save (Ctrl+S)":"";
-  const b=document.getElementById('btnSave');if(b)b.classList.toggle('clean',!d);}
+  const b=document.getElementById('btnSave');if(b)b.classList.toggle('clean',!d);
+  if(typeof renderCloudPill==="function")renderCloudPill();}
 function touched(){setDirty(true);persist();}
 function resetAll(){if(!confirm("Discard the edits for "+RS_YEAR+" and restore that year to its starting data?"))return;
   const all=yrLoadAll();delete all[String(RS_YEAR)];yrSaveAll(all);
@@ -3980,6 +4009,7 @@ if(document.readyState==='interactive'||document.readyState==='complete')setTime
   .seg button{flex:1;padding:11px 8px;font-size:.88rem;min-height:44px}
   .hbtns{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .hbtn{justify-content:center;text-align:center;padding:10px 8px;font-size:.79rem;min-height:46px;line-height:1.15}
+  .cpill{grid-column:1/-1;min-height:40px}
 
   /* ---------- status strip ---------- */
   .strip{padding:7px 12px;gap:8px;font-size:.71rem}
