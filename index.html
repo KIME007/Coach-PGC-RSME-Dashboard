@@ -2746,6 +2746,16 @@ window.generatePpt=function(){DLO.open();};
 .pj-inc table{font-size:.8rem;margin-bottom:10px}
 .pj-inc td.good{color:#3ddc84;font-weight:700}.pj-inc td.bad{color:#ff6b7a;font-weight:700}
 .pj-type{font-size:.68rem;letter-spacing:.6px;font-weight:800;color:#a3a8c3;margin:8px 0 4px}
+.pj-add-in{margin-left:10px;padding:3px 10px;border-radius:99px;border:1px dashed #6ea8fe;background:transparent;color:#6ea8fe;font-size:.68rem;font-weight:800;letter-spacing:.3px;text-transform:none;vertical-align:1px}
+.pj-add-in:hover{background:rgba(110,168,254,.12)}
+.pj-addcard{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;border-radius:14px;border:2px dashed #3b4050;background:transparent;color:#a3a8c3;font-weight:800;font-size:.92rem;margin:4px 0 8px}
+.pj-addcard span{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#AF1763;color:#fff;font-size:1.2rem}
+.pj-addcard:hover{border-color:#AF1763;color:#fff;background:rgba(175,23,99,.08)}
+.pj-fab{position:fixed;right:26px;bottom:26px;z-index:60;width:58px;height:58px;border-radius:50%;background:#AF1763;color:#fff;font-size:1.9rem;font-weight:700;line-height:1;
+  box-shadow:0 10px 26px rgba(175,23,99,.45),0 2px 6px rgba(0,0,0,.4);transition:.15s}
+.pj-fab:hover{transform:scale(1.07);background:#c41c71}
+#projArea{padding-bottom:70px}
+@media(max-width:700px){.pj-fab{right:16px;bottom:84px;width:52px;height:52px}}
 .pj-empty{padding:16px;border:1px dashed var(--line);border-radius:12px;color:var(--mut);font-size:.84rem;text-align:center}
 .pj-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .pj-form .full{grid-column:1/-1}
@@ -2763,7 +2773,7 @@ window.generatePpt=function(){DLO.open();};
    ===================================================================== */
 (function(){
 'use strict';
-var FILTER={fleet:'all',state:'all'}, editing=null, editKind='project';
+var FILTER={fleet:'all',state:'all'}, editing=null, editKind='project', PRESET='';
 function L(a){return a}
 var SEED={list:[
  {contractor:'Padu Sedia Sdn Bhd',slide:'Toilet, Floor & Basement Refurbishment — 16 ADNS Coaches',title:'Toilet, Floor & Basement (16 ADNS Coaches)',value:'RM 4,764,600.00',ref:'Tender No. KTMB/TC 10/2024',start:'01 Dec 2024',due:'31 Nov 2025',eot:'01 Dec 2025 → 29 Aug 2026',progress:70,health:'track',fleet:'coach',short:'6/16 done, 5 handed over',
@@ -2859,7 +2869,8 @@ function render(){
   var groups={},order=[];
   list.forEach(function(p){var g=p.contractor||'Other';if(!groups[g]){groups[g]=[];order.push(g)}groups[g].push(p)});
   order.forEach(function(g){
-    h+='<div class="pj-group"><h3>'+esc(g)+' · '+groups[g].length+' project'+(groups[g].length===1?'':'s')+'</h3>';
+    h+='<div class="pj-group"><h3>'+esc(g)+' · '+groups[g].length+' project'+(groups[g].length===1?'':'s')
+      +' <button class="pj-add-in" onclick="PROJ.addFor(\''+esc(g).replace(/'/g,"\\'")+'\')" title="Add another project for this contractor">＋ Add project</button></h3>';
     groups[g].forEach(function(p){var s=state(p),col={done:'#1d4f9c',track:'#c79a00',delay:'#AB2E3C'}[s],i=all.indexOf(p);
       h+='<div class="pj-card"><div><h4>'+esc(p.title)+'</h4><div class="pj-meta">'
         +(p.value?'<b>'+esc(p.value)+'</b> · ':'')+esc(p.ref||'')+(p.start?' · Start '+esc(p.start):'')+(p.due?' · Due '+esc(p.due):'')+(p.eot?' · EOT '+esc(p.eot):'')
@@ -2870,6 +2881,7 @@ function render(){
         +'<div class="pj-row-btns"><button class="pj-mini" title="Move up" onclick="PROJ.move('+i+',-1)">↑</button><button class="pj-mini" title="Move down" onclick="PROJ.move('+i+',1)">↓</button>'
         +'<button class="pj-mini" onclick="PROJ.edit('+i+')">✏️ Edit</button></div></div></div>';});
     h+='</div>';});
+  h+='<button class="pj-addcard" onclick="PROJ.edit()"><span>＋</span>Add another project</button>';
   /* incoming pipeline */
   h+='<div class="pj-top" style="margin-top:22px"><div><h2>Incoming Projects — CAPEX &amp; OPEX Pipeline</h2><small>Shown on the "Incoming projects" slide</small></div></div><div class="pj-inc">';
   [['coach','COACH'],['pgc','PGC']].forEach(function(f){
@@ -2906,9 +2918,10 @@ window.PROJ={
   render:render, book:book, state:state,
   filter:function(k,val){FILTER[k]=val;render();},
   move:function(i,d){var l=book().list,j=i+d;if(j<0||j>=l.length)return;var t=l[i];l[i]=l[j];l[j]=t;changed();},
+  addFor:function(c){PRESET=c;PROJ.edit();PRESET='';setTimeout(function(){var el=document.getElementById('pfTitle');if(el)el.focus()},60);},
   edit:function(i){
     editKind='project';editing=(typeof i==='number')?i:null;
-    var p=editing!=null?book().list[editing]:{contractor:'',slide:'',title:'',value:'',ref:'',start:'',due:'',eot:'',progress:0,health:'track',fleet:'coach',short:'',notes:[]};
+    var p=editing!=null?book().list[editing]:{contractor:PRESET||'',slide:'',title:'',value:'',ref:'',start:'',due:'',eot:'',progress:0,health:'track',fleet:'coach',short:'',notes:[]};
     var h='<div class="pj-form">'
       +field('Project title','pfTitle',p.title,{full:true})
       +field('Contractor','pfContractor',p.contractor,{list:'pjContractors',hint:'Pick an existing contractor or type a new one'})
@@ -2977,7 +2990,8 @@ function mount(){
   var tabs=document.querySelector('nav.tabs'),main=document.querySelector('main');if(!tabs||!main)return;
   var btn=document.createElement('button');btn.className='tab';btn.id='tabProj';btn.innerHTML='🏗️ Project Status';btn.onclick=function(){PROJ.open()};
   tabs.appendChild(btn);
-  var sec=document.createElement('section');sec.className='panel';sec.id='pProj';sec.style.display='none';sec.innerHTML='<div id="projArea"></div>';
+  var sec=document.createElement('section');sec.className='panel';sec.id='pProj';sec.style.display='none';
+  sec.innerHTML='<div id="projArea"></div><button class="pj-fab" onclick="PROJ.edit()" title="Add a new project" aria-label="Add a new project">＋</button>';
   main.appendChild(sec);
   ['setTab','dlyOpenTab','rptOpenTab'].forEach(wrap);
   /* keep the page in step with year changes and cloud loads */
