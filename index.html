@@ -2319,6 +2319,368 @@ document.addEventListener('DOMContentLoaded',()=>{
     updateSaveInfo();updateCloudChip();
   })();});
 </script>
+<div class="overlay" id="ovDeck"><div class="modal" style="max-width:820px">
+  <div class="mhead"><h3>Generate presentation — DLO report</h3><button class="iconb" onclick="closeOv('ovDeck')">✕</button></div>
+  <div class="mbody" id="deckBody"></div>
+  <div class="mfoot">
+    <button class="btn ghost" type="button" onclick="closeOv('ovDeck')">Cancel</button>
+    <button class="btn primary" type="button" id="deckGo" onclick="DLO.generate()">📊 Generate presentation</button>
+  </div>
+</div></div>
+<style id="dloCss">
+.dlo-sec{margin:4px 0 16px}
+.dlo-sec h4{font-size:.78rem;letter-spacing:.7px;text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+.dlo-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.dlo-row label{font-size:.82rem;font-weight:700;display:flex;gap:8px;align-items:center}
+.dlo-row select{padding:7px 10px;border-radius:9px;border:1px solid var(--line)}
+.dlo-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:.82rem}
+.dlo-tbl th,.dlo-tbl td{padding:5px 6px;text-align:center;border-bottom:1px solid var(--line)}
+.dlo-tbl th{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);background:transparent;position:static}
+.dlo-tbl td.l{text-align:left;font-weight:700;white-space:nowrap}
+.dlo-tbl input{width:64px;padding:5px;border-radius:7px;border:1px solid var(--line);text-align:center;font-weight:700}
+.dlo-usw{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.dlo-usw label{display:block;font-size:.72rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.dlo-usw textarea{width:100%;min-height:70px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);font-size:.82rem;resize:vertical}
+.dlo-hint{font-size:.74rem;color:var(--mut);margin-top:6px}
+</style>
+<script id="dloJs">
+/* =====================================================================
+   DLO PRESENTATION — follows the "DLO SLIDE" layout:
+   cover → per fleet (PGC, COACH): section · availability · PE ·
+   system failures (period months side by side) · 4M (side by side) → thank you
+   Extra figures (requirements, USW component notes) live in S.deckNotes,
+   so they are saved with the dashboard data and remembered next time.
+   ===================================================================== */
+(function(){
+'use strict';
+var MN=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+var MF=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+var REQ=[['intercity','INTERCITY REQ.'],['mpa','MPA REQ.'],['commuter','COMMUTER REQ.']];
+var FLEETS=[['pgc','PGC'],['coach','COACH']];
+var C={bg:'143C6B',circ:'1C4B7D',circ2:'0F335E',gold:'F2C230',navy:'133B6B',steel:'3D7AB8',sky:'C9D6E8',ink:'222B3B',mut:'5B6678',
+  gray:'8A93A3',line:'DDE2E9',light:'F3F6FA',white:'FFFFFF',green:'1E7B4F',red:'C0392B',redT:'FCEBEA',eyebrow:'3D5A80'};
+var F='Calibri';
+var from=null,to=null;
+
+function yr(){return typeof RS_YEAR!=='undefined'?RS_YEAR:new Date().getFullYear()}
+function notes(){
+  if(!S.deckNotes)S.deckNotes={};
+  var n=S.deckNotes;n.req=n.req||{};n.usw=n.usw||{};
+  FLEETS.forEach(function(f){var k=f[0];n.req[k]=n.req[k]||{};REQ.forEach(function(r){n.req[k][r[0]]=n.req[k][r[0]]||Array(12).fill(null)});
+    n.usw[k]=n.usw[k]||Array(12).fill('')});
+  return n;
+}
+/* requirement for a month; months never entered use the nearest month that was */
+function reqFor(k,key,m){
+  var a=notes().req[k][key],i;
+  if(typeof a[m]==='number')return a[m];
+  for(i=m-1;i>=0;i--)if(typeof a[i]==='number')return a[i];
+  for(i=m+1;i<12;i++)if(typeof a[i]==='number')return a[i];
+  return null;
+}
+function hasReq(k){return REQ.some(function(r){return notes().req[k][r[0]].some(function(v){return typeof v==='number'})})}
+function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function pct(v){return v==null||!isFinite(v)?null:Math.round(v*100)}
+function months(){var a=[];for(var m=from;m<=to;m++)a.push(m);return a}
+function periodLabel(){return from===to?MF[from]+' '+yr():MF[from]+' – '+MF[to]+' '+yr()}
+
+/* ---------------- dialog ---------------- */
+function defaults(){
+  var a=snapSec(S,'pgc'),b=snapSec(S,'coach'),last=Math.max(a.lastM,b.lastM);
+  to=last;from=Math.max(0,last-1);
+}
+function dialog(){
+  if(from==null)defaults();
+  var n=notes(),ms=months(),h='';
+  var opt=function(sel){return MN.map(function(x,i){return '<option value="'+i+'"'+(i===sel?' selected':'')+'>'+MF[i].charAt(0)+MF[i].slice(1).toLowerCase()+'</option>'}).join('')};
+  h+='<div class="dlo-sec"><h4>1 · Reporting period</h4><div class="dlo-row">'
+    +'<label>From <select id="dloFrom" onchange="DLO.period()">'+opt(from)+'</select></label>'
+    +'<label>To <select id="dloTo" onchange="DLO.period()">'+opt(to)+'</select></label>'
+    +'<span class="dlo-hint">Month cards, system failure and 4M slides follow this period.</span></div></div>';
+  h+='<div class="dlo-sec"><h4>2 · Fleet requirements (units)</h4><table class="dlo-tbl"><thead><tr><th></th>'
+    +ms.map(function(m){return '<th>'+MN[m]+'</th>'}).join('')+'</tr></thead><tbody>';
+  FLEETS.forEach(function(f){REQ.forEach(function(r){
+    h+='<tr><td class="l">'+f[1]+' · '+r[1].replace(' REQ.','')+'</td>'+ms.map(function(m){var v=reqFor(f[0],r[0],m);
+      return '<td><input type="number" min="0" data-k="'+f[0]+'" data-r="'+r[0]+'" data-m="'+m+'" value="'+(v==null?'':v)+'"></td>'}).join('')+'</tr>';});});
+  h+='</tbody></table><div class="dlo-hint">Entered once and remembered. Months you never entered use the nearest month\'s figure.</div></div>';
+  h+='<div class="dlo-sec"><h4>3 · USW component details (shown on the 4M slides)</h4><div class="dlo-usw">';
+  FLEETS.forEach(function(f){ms.forEach(function(m){
+    h+='<div><label>'+f[1]+' · '+MF[m]+'</label><textarea data-k="'+f[0]+'" data-m="'+m+'" placeholder="e.g. ELECTRICAL SYSTEM – AVR TERMINAL, RELAY (one per line)">'+esc(n.usw[f[0]][m]||'')+'</textarea></div>';});});
+  h+='</div><div class="dlo-hint">FIS descriptions are taken automatically from Incident Reports of each month.</div></div>';
+  document.getElementById('deckBody').innerHTML=h;
+}
+function readDialog(){
+  var n=notes(),changed=false;
+  document.querySelectorAll('#deckBody input[data-r]').forEach(function(el){
+    var k=el.getAttribute('data-k'),r=el.getAttribute('data-r'),m=+el.getAttribute('data-m'),v=el.value.trim()===''?null:Math.max(0,+el.value||0);
+    if(n.req[k][r][m]!==v){n.req[k][r][m]=v;changed=true;}});
+  document.querySelectorAll('#deckBody textarea[data-k]').forEach(function(el){
+    var k=el.getAttribute('data-k'),m=+el.getAttribute('data-m'),v=el.value.trim();
+    if((n.usw[k][m]||'')!==v){n.usw[k][m]=v;changed=true;}});
+  if(changed&&typeof touched==='function')touched();
+}
+
+/* ---------------- chart images (light, for PowerPoint) ---------------- */
+function ax(sz,b){return {family:'Calibri,Arial,sans-serif',size:sz,weight:b?'bold':'normal'}}
+async function imgAvail(sn){
+  var last=Math.max(to,sn.lastM),vals=sn.availPct.map(function(v,m){return v!=null&&m<=last?Math.round(v*100):null});
+  var have=vals.filter(function(v){return v!=null}),lo=Math.min.apply(null,have.concat([100])),hi=Math.max.apply(null,have.concat([100]));
+  return pptChart({type:'line',data:{labels:MN,datasets:[
+    {label:'ACTUAL (%)',data:vals,borderColor:'#133B6B',backgroundColor:'#133B6B',borderWidth:4,pointRadius:8,pointBackgroundColor:'#133B6B',tension:0,spanGaps:false,
+      vl:{size:19,bold:true,color:'#133B6B',dy:20,fmt:function(v){return Math.round(v)+'%'}}},
+    {label:'TARGET (100%)',data:MN.map(function(){return 100}),borderColor:'#F2C230',borderDash:[16,10],borderWidth:4,pointRadius:0,fill:false}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:ax(18),color:'#5B6678',boxWidth:30}}},layout:{padding:{top:30,right:20}},
+      scales:{y:{min:Math.floor((lo-12)/10)*10,max:Math.ceil((hi+8)/10)*10,ticks:{font:ax(17),color:'#5B6678',callback:function(v){return v+'%'},stepSize:10},grid:{color:'#E8EDF3'}},
+        x:{ticks:{font:ax(18),color:'#5B6678'},grid:{display:false}}}}},1150,520);
+}
+function lastPe(sn){var l=-1;for(var m=0;m<12;m++)if(sn.pmT[m]!=null||sn.pmA[m]!=null)l=m;return Math.max(to,l)}
+async function imgPe(sn){
+  var last=lastPe(sn),ms=MN.slice(0,last+1);
+  var T=sn.pmT.slice(0,last+1),A=sn.pmA.slice(0,last+1),P=sn.peM.slice(0,last+1).map(function(v){return v==null?null:Math.round(v*100)});
+  var mx=Math.max.apply(null,T.concat(A).map(function(v){return +v||0}).concat([1]));
+  return pptChart({data:{labels:ms,datasets:[
+    {type:'bar',label:'Target (units)',data:T,backgroundColor:'#C5D0E0',borderRadius:2,order:2,vl:{size:17,bold:true,color:'#5B6678'}},
+    {type:'bar',label:'Actual (units)',data:A,backgroundColor:'#133B6B',borderRadius:2,order:2,vl:{size:17,bold:true,color:'#133B6B'}},
+    {type:'line',label:'Achievement %',yAxisID:'y1',data:P,borderColor:'#F2C230',backgroundColor:'#F2C230',borderWidth:4,pointRadius:7,tension:0,order:1,
+      vl:{size:17,bold:true,color:'#8A6D00',dy:18,fmt:function(v){return v+'%'}}}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:ax(17),color:'#5B6678',boxWidth:26}}},layout:{padding:{top:34}},
+      scales:{y:{beginAtZero:true,max:Math.ceil(mx*1.25/5)*5,ticks:{font:ax(16),color:'#5B6678',precision:0},grid:{color:'#E8EDF3'}},
+        y1:{position:'right',beginAtZero:true,max:Math.max(100,Math.ceil(Math.max.apply(null,P.filter(function(v){return v!=null}).concat([100]))/20)*20+20),
+          ticks:{font:ax(16),color:'#8A6D00',callback:function(v){return v+'%'}},grid:{drawOnChartArea:false}},
+        x:{ticks:{font:ax(18,true),color:'#222B3B'},grid:{display:false}}}}},1800,560);
+}
+function sysMonth(sn,m){
+  return sn.summary.map(function(s){var by={},t=0;sn.classes.forEach(function(c){var v=+(s.classes[c]&&s.classes[c][m])||0;by[c]=v;t+=v});return {system:s.system,by:by,total:t}})
+    .filter(function(x){return x.total>0}).sort(function(a,b){return b.total-a.total});
+}
+async function imgSys(sn,m,w,h){
+  var rows=sysMonth(sn,m);if(!rows.length)rows=[{system:'No failures recorded',by:{},total:0}];
+  var labels=rows.map(function(r){return r.system}),cols=['#133B6B','#3D7AB8','#F2C230','#9FB4CF'];
+  var ds;
+  if(sn.classes.length>2){
+    ds=sn.classes.map(function(c,i){return {label:c,data:rows.map(function(r){return r.by[c]||0}),backgroundColor:cols[i%cols.length],stack:'s',
+      vl:i===sn.classes.length-1?{horiz:true,size:17,bold:true,color:'#222B3B',fmt:function(v,j){return String(rows[j].total)}}:undefined}});
+  }else{
+    var top=rows[0].total;
+    ds=[{data:rows.map(function(r){return r.total}),backgroundColor:rows.map(function(r){return r.total===top?'#133B6B':'#3D7AB8'}),vl:{horiz:true,size:18,bold:true,color:'#222B3B'}}];
+  }
+  return pptChart({type:'bar',data:{labels:labels,datasets:ds},
+    options:{indexAxis:'y',plugins:{legend:{display:sn.classes.length>2,position:'bottom',labels:{font:ax(16),color:'#5B6678',boxWidth:20}}},layout:{padding:{right:40}},
+      scales:{x:{stacked:true,beginAtZero:true,ticks:{font:ax(15),color:'#8A93A3',precision:0},grid:{color:'#E8EDF3'}},
+        y:{stacked:true,ticks:{font:ax(15,true),color:'#222B3B'},grid:{display:false}}}}},w,h);
+}
+async function img4m(sn,m,w,h){
+  var keys=Object.keys(sn.fm);
+  return pptChart({type:'bar',data:{labels:keys,datasets:[
+    {label:'USW',data:keys.map(function(k){return +sn.fm[k].usw[m]||0}),backgroundColor:'#133B6B',vl:{size:18,bold:true,color:'#133B6B',fmt:function(v){return v?String(v):''}}},
+    {label:'FIS',data:keys.map(function(k){return +sn.fm[k].fis[m]||0}),backgroundColor:'#F2C230',vl:{size:18,bold:true,color:'#8A6D00',fmt:function(v){return v?String(v):''}}}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:ax(16),color:'#5B6678',boxWidth:20}}},layout:{padding:{top:28}},
+      scales:{y:{beginAtZero:true,ticks:{font:ax(15),color:'#8A93A3',precision:0},grid:{color:'#E8EDF3'}},x:{ticks:{font:ax(15,true),color:'#222B3B'},grid:{display:false}}}}},w,h);
+}
+
+/* ---------------- slide helpers ---------------- */
+function build(p,data){
+  p.defineLayout({name:'W',width:13.33,height:7.5});p.layout='W';p.theme={headFontFace:F,bodyFontFace:F};
+  var Y=yr(),PL=periodLabel();
+  var pill=function(s,x,y,sc){sc=sc||1;s.addShape('roundRect',{x:x,y:y,w:1.75*sc,h:.58*sc,fill:{color:C.white},rectRadius:.29*sc,line:{color:C.white}});
+    s.addImage({data:KASSET.logo,x:x+.28*sc,y:y+.1*sc,w:1.2*sc,h:.39*sc});};
+  var header=function(s,eyebrow,title){
+    s.background={color:C.white};
+    s.addText(eyebrow,{x:.5,y:.28,w:9,h:.26,fontSize:9.5,bold:true,color:C.eyebrow,charSpacing:2,fontFace:F});
+    s.addText(title,{x:.5,y:.55,w:10.8,h:.6,fontSize:25,bold:true,color:C.navy,fontFace:F});
+    s.addImage({data:KASSET.logo,x:11.55,y:.38,w:1.3,h:.42});
+    s.addImage({data:KASSET.curve,x:10.93,y:6.75,w:2.4,h:.75});};
+  var foot=function(s,label){s.addText('KTM INTERCITY  |  ROLLING STOCK PERFORMANCE & ANALYSIS  —  '+label,{x:.5,y:7.1,w:9.5,h:.25,fontSize:7.5,color:C.gray,charSpacing:1,fontFace:F});};
+  var card=function(s,x,y,w,h,o){
+    s.addShape('roundRect',{x:x,y:y,w:w,h:h,fill:{color:o.fill||C.light},line:{color:o.border||C.line,width:.75},rectRadius:.08});
+    s.addText(o.eyebrow,{x:x+.2,y:y+.12,w:w-.3,h:.22,fontSize:8,bold:true,color:C.mut,charSpacing:1.5,fontFace:F});
+    s.addText(o.value,{x:x+.2,y:y+.36,w:w-.3,h:.48,fontSize:o.big||24,bold:true,color:o.color||C.navy,fontFace:F});
+    if(o.sub)s.addText(o.sub,{x:x+.2,y:y+h-.34,w:w-.3,h:.24,fontSize:8,color:C.mut,fontFace:F});};
+  var panel=function(s,x,y,w,h){s.addShape('roundRect',{x:x,y:y,w:w,h:h,fill:{color:C.white},line:{color:C.line,width:.75},rectRadius:.08});};
+  var label=function(s,t,x,y,w){s.addText(t,{x:x,y:y,w:w||8,h:.26,fontSize:10,bold:true,color:C.navy,charSpacing:1,fontFace:F});};
+  var tag=function(s,t,x,y,w){s.addShape('roundRect',{x:x,y:y,w:w,h:.34,fill:{color:C.navy},rectRadius:.17,line:{color:C.navy}});
+    s.addText(t,{x:x,y:y,w:w,h:.34,fontSize:9,bold:true,color:C.white,align:'center',valign:'middle',charSpacing:1,fontFace:F,margin:0});};
+  var th=function(t){return {text:t,options:{bold:true,color:C.white,fill:{color:C.navy},fontFace:F,align:'center'}}};
+  var td=function(t,o){o=o||{};return {text:t==null||t===''?'':String(t),options:{color:o.color||C.ink,bold:!!o.bold,fill:{color:o.fill||C.white},fontFace:F,align:o.align||'center'}}};
+  var hTable=function(s,rows,y,rowH){ /* months across */
+    var head=[th('MONTH')].concat(MN.map(th));
+    var body=rows.map(function(r,i){return [td(r[0],{bold:true,fill:i%2?C.light:C.white})].concat(r[1].map(function(v,m){
+      return td(v,{fill:i%2?C.light:C.white,bold:!!r[2],color:r[2]&&v!==''&&v!=null?(r[2](v,m)):C.ink})}))});
+    s.addTable([head].concat(body),{x:.5,y:y,w:12.33,colW:[1.95].concat(MN.map(function(){return (12.33-1.95)/12})),fontSize:8.5,rowH:rowH||.25,
+      border:{pt:.5,color:C.line},valign:'middle',autoPage:false});};
+  var good=function(v){return +v>=100?C.green:C.red};
+
+  /* ---------- cover ---------- */
+  var s=p.addSlide();s.background={color:C.bg};
+  s.addShape('ellipse',{x:8.6,y:-2.4,w:7.2,h:7.2,fill:{color:C.circ}});
+  s.addShape('ellipse',{x:10.4,y:3.2,w:5.6,h:5.6,fill:{color:C.circ2}});
+  pill(s,.6,.5,1.15);
+  s.addText('PERFORMANCE REPORT   •   '+PL,{x:.6,y:2.05,w:9,h:.32,fontSize:11,bold:true,color:C.gold,charSpacing:3,fontFace:F});
+  s.addText('ROLLING STOCK PERFORMANCE\n& ANALYSIS',{x:.55,y:2.45,w:9.5,h:1.75,fontSize:40,bold:true,color:C.white,fontFace:F,lineSpacing:50});
+  s.addText('COACH & PGC FLEET   |   DLO INTERCITY',{x:.6,y:4.3,w:8,h:.35,fontSize:14,color:C.sky,fontFace:F});
+  [['Availability',1.55],['Preventive Maintenance',2.55],['System Failure Analysis',2.6],['Incident Reports',1.85]].reduce(function(x,t){
+    s.addShape('roundRect',{x:x,y:4.95,w:t[1],h:.38,fill:{color:C.circ},line:{color:'2E5C8F',width:.75},rectRadius:.19});
+    s.addText(t[0],{x:x,y:4.95,w:t[1],h:.38,fontSize:9.5,color:C.sky,align:'center',valign:'middle',fontFace:F,margin:0});return x+t[1]+.12;},.6);
+  s.addImage({data:KASSET.strip,x:.6,y:5.6,w:5.6,h:1.22});
+
+  /* ---------- per fleet ---------- */
+  FLEETS.forEach(function(f,fi){
+    var k=f[0],sn=data[k].sn,im=data[k].im,ms=months();
+    /* section */
+    var d=p.addSlide();d.background={color:C.bg};
+    d.addShape('ellipse',{x:8.65,y:1.1,w:5.3,h:5.3,fill:{color:C.circ}});
+    d.addShape('ellipse',{x:9.6,y:2.05,w:3.4,h:3.4,fill:{color:C.circ2},line:{color:C.gold,width:2.5}});
+    d.addImage({data:k==='pgc'?KASSET.gaugeGold:KASSET.trainGold,x:10.65,y:3.1,w:1.3,h:1.3});
+    pill(d,.6,.5,1.15);
+    d.addText('SECTION '+String(fi+1).padStart(2,'0'),{x:.6,y:2.85,w:5,h:.3,fontSize:11,bold:true,color:C.gold,charSpacing:4,fontFace:F});
+    d.addText(f[1]+' PERFORMANCE',{x:.55,y:3.2,w:8,h:.75,fontSize:34,bold:true,color:C.white,fontFace:F});
+    d.addText((k==='pgc'?'Power Generator Cars (PGC)':'Passenger Coaches')+' — Availability, Preventive Maintenance, System Reliability & Incident Reports, January – December '+Y,
+      {x:.6,y:4.05,w:7.9,h:.65,fontSize:11.5,color:C.sky,fontFace:F,lineSpacing:16});
+    d.addText('KTM INTERCITY  |  DLO ROLLING STOCK PERFORMANCE REPORT',{x:.6,y:7.1,w:8,h:.25,fontSize:7.5,color:C.sky,charSpacing:1,fontFace:F});
+
+    /* availability */
+    var sl=p.addSlide();header(sl,f[1]+' — AVAILABILITY','AVAILABILITY: ACTUAL VS TARGET');
+    panel(sl,.5,1.3,8.35,3.65);label(sl,'AVAILABILITY — ACTUAL VS TARGET (%)',.75,1.42);
+    sl.addImage({data:im.avail,x:.65,y:1.72,w:8.05,h:3.15});
+    var cy=1.3,ch=1.14,gap=.12;
+    ms.slice(-2).forEach(function(m){var v=pct(sn.availPct[m]);
+      card(sl,9.05,cy,3.78,ch,{eyebrow:MF[m]+' '+Y,value:v==null?'—':v+'%',color:v==null?C.mut:good(v),sub:v==null?'No data recorded':(v>=100?'Above':'Below')+' the 100% target'});cy+=ch+gap;});
+    var av=sn.availPct.map(function(v,m){return {v:pct(v),m:m}}).filter(function(x){return x.v!=null});
+    if(av.length){var hi=Math.max.apply(null,av.map(function(x){return x.v})),lo=Math.min.apply(null,av.map(function(x){return x.v}));
+      var inPeriod=ms.some(function(m){return pct(sn.availPct[m])===hi});
+      var pick=inPeriod?lo:hi,mm=av.filter(function(x){return x.v===pick}).map(function(x){return MN[x.m]});
+      card(sl,9.05,cy,3.78,ch,{eyebrow:(inPeriod?'LOWEST — ':'HIGHEST — ')+mm.join(' & '),value:pick+'%',color:C.navy,
+        sub:inPeriod?(pick>=100?'Still above target':'Below target'):'Peak monthly availability'});}
+    label(sl,'FLEET AVAILABILITY DETAIL — MONTHLY',.5,5.05);
+    var last=Math.max(to,sn.lastM),upto=function(m){return m<=last};
+    var rows=[['TARGET',MN.map(function(_,m){var t=sn.availM[m].tgt;return upto(m)&&t!=null?Math.round(t):''})],
+      ['ACTUAL (AVERAGE)',MN.map(function(_,m){var a=sn.availM[m].act;return upto(m)&&a!=null?Math.round(a):''})]];
+    var hasAv=function(m){return m<=to&&(sn.availM[m].act!=null||sn.availM[m].tgt!=null)};
+    if(hasReq(k))REQ.forEach(function(r){rows.push([r[1],MN.map(function(_,m){var v=reqFor(k,r[0],m);return hasAv(m)&&v!=null?v:''})])});
+    rows.push(['AVAILABILITY (%)',MN.map(function(_,m){var v=pct(sn.availPct[m]);return upto(m)&&v!=null?v:''}),function(v){return good(v)}]);
+    hTable(sl,rows,5.32,hasReq(k)?.235:.3);
+    foot(sl,f[1]+' AVAILABILITY');
+
+    /* preventive maintenance */
+    sl=p.addSlide();header(sl,f[1]+' — PREVENTIVE MAINTENANCE','Preventive Maintenance (PE): Target vs. Actual');
+    ms.slice(-3).forEach(function(m,i){var v=pct(sn.peM[m]),low=v!=null&&v<100;
+      card(sl,.5+i*4.18,1.25,3.95,1.1,{eyebrow:MF[m]+' '+Y,value:v==null?'—':v+'%',big:21,color:v==null?C.mut:good(v),fill:low?C.redT:C.white,border:low?'F2C4C0':C.line,
+        sub:sn.pmT[m]!=null?((+sn.pmA[m]||0)+' of '+sn.pmT[m]+' PE completed'):'No PE plan recorded'});});
+    panel(sl,.5,2.45,12.33,3.0);label(sl,'PE TARGET vs. ACTUAL WITH ACHIEVEMENT % — '+f[1],.75,2.55);
+    sl.addImage({data:im.pe,x:.65,y:2.82,w:12.05,h:2.58});
+    label(sl,'PREVENTIVE MAINTENANCE DETAIL — MONTHLY',.5,5.55);
+    last=lastPe(sn);
+    hTable(sl,[['TARGET NO. OF PE',MN.map(function(_,m){return m<=last&&sn.pmT[m]!=null?sn.pmT[m]:''})],
+      ['ACTUAL NO. OF PE',MN.map(function(_,m){return m<=last&&sn.pmA[m]!=null?sn.pmA[m]:''})],
+      ['PE COMPLETION (%)',MN.map(function(_,m){var v=pct(sn.peM[m]);return m<=last&&v!=null?v:''}),function(v){return good(v)}]],5.82,.27);
+    foot(sl,f[1]+' PREVENTIVE MAINTENANCE');
+
+    /* system failures + 4M: period months side by side, 2 per slide */
+    for(var c0=0;c0<ms.length;c0+=2){
+      var grp=ms.slice(c0,c0+2),n=grp.length,colW=n===1?12.33:6.05,gapX=.23;
+      /* system failures */
+      sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','FAILURE ANALYSIS BY SYSTEM & MONTHLY TREND');
+      grp.forEach(function(m,gi){
+        var x=.5+gi*(colW+gapX),rowsM=sysMonth(sn,m),tot=rowsM.reduce(function(a,r){return a+r.total},0);
+        tag(sl,MF[m]+' '+Y+'  ·  '+tot+' CASES',x,1.28,Math.min(colW,3.6));
+        panel(sl,x,1.72,colW,3.28);
+        sl.addImage({data:im.sys[m],x:x+.12,y:1.8,w:colW-.24,h:3.12});
+        /* class counts */
+        var cw=(colW-(sn.classes.length-1)*.12)/sn.classes.length;
+        sn.classes.forEach(function(cl,ci){var v=rowsM.reduce(function(a,r){return a+(r.by[cl]||0)},0);
+          card(sl,x+ci*(cw+.12),5.1,cw,.78,{eyebrow:cl,value:String(v),big:18,color:v?C.navy:C.gray,fill:ci===0?C.light:C.white});});
+        /* most cases */
+        var topCls=sn.classes.map(function(cl){return [cl,rowsM.reduce(function(a,r){return a+(r.by[cl]||0)},0)]}).sort(function(a,b){return b[1]-a[1]})[0];
+        var top4=rowsM.slice(0,4);
+        sl.addText([{text:'MOST CASES'+(topCls&&topCls[1]?'  ·  '+topCls[0]:'')+'   ',options:{bold:true,color:C.eyebrow,charSpacing:1}}].concat(
+          top4.length?top4.map(function(r,i){return {text:'▪ '+r.system+' – '+r.total+(i<top4.length-1?'     ':''),options:{bold:true,color:C.ink}}}):[{text:'No failures recorded',options:{color:C.mut}}]),
+          {x:x,y:5.98,w:colW,h:.62,fontSize:8.5,fontFace:F,valign:'top'});
+      });
+      foot(sl,f[1]+' FAILURE ANALYSIS');
+
+      /* 4M */
+      sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','4M Failure Classification — Method, Material, Manpower, Machine');
+      grp.forEach(function(m,gi){
+        var x=.5+gi*(colW+gapX),keys=Object.keys(sn.fm);
+        tag(sl,'4M ELEMENT · '+MF[m]+' '+Y,x,1.28,Math.min(colW,3.6));
+        panel(sl,x,1.72,colW,2.2);
+        sl.addImage({data:im.fm[m],x:x+.12,y:1.78,w:colW-.24,h:2.08});
+        var U=keys.map(function(kk){return +sn.fm[kk].usw[m]||0}),Fv=keys.map(function(kk){return +sn.fm[kk].fis[m]||0});
+        sl.addTable([[th('4M')].concat(keys.map(th)),
+          [td('USW',{bold:true})].concat(U.map(function(v){return td(v,{bold:!!v})})),
+          [td('FIS',{bold:true,fill:C.light})].concat(Fv.map(function(v){return td(v,{bold:!!v,fill:C.light})})),
+          [td('SUM',{bold:true})].concat(U.map(function(v,i){return td(v+Fv[i],{bold:true,color:v+Fv[i]?C.navy:C.ink})}))],
+          {x:x,y:4.02,w:colW,colW:[colW*.2].concat(keys.map(function(){return colW*.8/keys.length})),fontSize:8.5,rowH:.24,border:{pt:.5,color:C.line},valign:'middle',autoPage:false});
+        /* FIS — from incident reports of that month */
+        var inc=sn.inc.filter(function(i){var d=String(i.date||'');return d.slice(0,4)===String(Y)&&+d.slice(5,7)===m+1});
+        var fis=inc.length?inc.slice(0,2).map(function(i,ii){return {text:'▪  '+(i.date||'')+'  ·  '+(i.unit||'—')+'  —  '+trunc(String(i.failure||'').replace(/\s+/g,' '),colW>7?190:105),
+              options:{breakLine:ii<Math.min(inc.length,2)-1||inc.length>2}}})
+          .concat(inc.length>2?[{text:'+ '+(inc.length-2)+' more in Incident Reports',options:{italic:true,color:C.mut}}]:[])
+          :[{text:'No failure-in-service incident reported this month.',options:{color:C.mut}}];
+        panel(sl,x,5.1,colW,.95);
+        sl.addText('FIS  ·  FAILURE IN SERVICE',{x:x+.15,y:5.14,w:colW-.3,h:.22,fontSize:8,bold:true,color:C.eyebrow,charSpacing:1,fontFace:F});
+        sl.addText(fis,{x:x+.15,y:5.36,w:colW-.3,h:.66,fontSize:7.5,color:C.ink,fontFace:F,valign:'top',lineSpacing:10});
+        /* USW — typed in the dialog */
+        var usw=String(notes().usw[k][m]||'').split(/\n+/).map(function(t){return t.trim()}).filter(Boolean);
+        panel(sl,x,6.12,colW,.88);
+        sl.addText('USW  ·  COMPONENTS',{x:x+.15,y:6.16,w:colW-.3,h:.22,fontSize:8,bold:true,color:C.eyebrow,charSpacing:1,fontFace:F});
+        sl.addText(usw.length?usw.slice(0,4).map(function(t,ii){return {text:'➢  '+t.toUpperCase(),options:{bold:true,breakLine:ii<Math.min(usw.length,4)-1}}})
+            :[{text:'Add component details in the Generate window (optional).',options:{color:C.mut,italic:true}}],
+          {x:x+.15,y:6.38,w:colW-.3,h:.6,fontSize:7.5,color:C.ink,fontFace:F,valign:'top',lineSpacing:10});
+      });
+      foot(sl,f[1]+' 4M ANALYSIS');
+    }
+  });
+
+  /* ---------- thank you ---------- */
+  s=p.addSlide();s.background={color:C.bg};
+  s.addShape('ellipse',{x:-2.6,y:-3.6,w:6.6,h:6.6,fill:{color:C.circ2}});
+  pill(s,5.78,1.0,1.2);
+  s.addText('THANK YOU',{x:1.67,y:3.0,w:10,h:.9,fontSize:44,bold:true,color:C.white,align:'center',fontFace:F});
+  var cap=function(t){return t.charAt(0)+t.slice(1).toLowerCase()};
+  s.addText('Rolling Stock Performance & Analysis — Coach & PGC  |  '+(from===to?cap(MF[from]):cap(MF[from])+' – '+cap(MF[to]))+' '+Y,
+    {x:1.67,y:3.95,w:10,h:.35,fontSize:12,color:C.sky,align:'center',fontFace:F});
+  s.addImage({data:KASSET.strip,x:4.17,y:4.6,w:5,h:1.09});
+  s.addText('© Keretapi Tanah Melayu Berhad',{x:1.67,y:6.95,w:10,h:.28,fontSize:8.5,color:C.sky,align:'center',fontFace:F});
+  return p;
+}
+
+/* ---------------- public ---------------- */
+window.DLO={
+  open:function(){from=null;dialog();document.getElementById('ovDeck').classList.add('show');},
+  period:function(){
+    readDialog();
+    var a=+document.getElementById('dloFrom').value,b=+document.getElementById('dloTo').value;
+    from=Math.min(a,b);to=Math.max(a,b);dialog();},
+  generate:async function(){
+    var btn=document.getElementById('deckGo');
+    try{
+      readDialog();btn.disabled=true;btn.textContent='Building…';
+      toast('Generating DLO presentation…');
+      var old=Chart.defaults.font.family;Chart.defaults.font.family='Calibri,Arial,sans-serif';
+      var data={};
+      for(var fi=0;fi<FLEETS.length;fi++){
+        var k=FLEETS[fi][0],sn=snapSec(S,k),ms=months(),im={sys:{},fm:{}},colW=ms.length>1?6.05:12.33;
+        im.avail=await imgAvail(sn);im.pe=await imgPe(sn);
+        for(var i=0;i<ms.length;i++){
+          im.sys[ms[i]]=await imgSys(sn,ms[i],Math.round(colW*150),468);
+          im.fm[ms[i]]=await img4m(sn,ms[i],Math.round(colW*150),312);}
+        data[k]={sn:sn,im:im};
+      }
+      Chart.defaults.font.family=old;
+      var p=new PptxGenJS();build(p,data);
+      var tag=from===to?MN[from]:MN[from]+'-'+MN[to];
+      await p.writeFile({fileName:'DLO_Rolling_Stock_Performance_'+tag+'_'+yr()+'.pptx'});
+      closeOv('ovDeck');toast('DLO presentation downloaded ✔');
+    }catch(e){console.error(e);toast('Presentation failed: '+e.message);}
+    finally{btn.disabled=false;btn.textContent='📊 Generate presentation';}
+  },
+  _build:build,_set:function(a,b){from=a;to=b}
+};
+window.generatePpt=function(){DLO.open();};
+})();
+</script>
+
 
 <!-- ============================================================================
      MANAGEMENT REPORT MODULE  (additive — follows RSME Intercity reporting style)
