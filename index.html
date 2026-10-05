@@ -1015,7 +1015,9 @@ function overlayTables(pack,t){
   return true;
 }
 /* ---- overwrite protection: remember the cloud copy we last loaded or saved ---- */
-let _cloudSeen;              // undefined = unknown, null = cloud had no copy, number = its updated_at (ms)
+let _cloudSeen;
+const SEEN_KEY="rsd_cloud_seen_v1";
+function setSeen(v){_cloudSeen=v;try{localStorage.setItem(SEEN_KEY,JSON.stringify(v==null?null:v))}catch(e){}}              // undefined = unknown, null = cloud had no copy, number = its updated_at (ms)
 async function cloudRemoteStamp(){
   const r=await sbFetch("dashboard_store?select=updated_at,by:value->>by,byUser:value->>byUser&key=eq.bundle");
   const row=Array.isArray(r)&&r[0];
@@ -1056,7 +1058,7 @@ async function cloudPushAllInner(opts){
     prefer:"resolution=merge-duplicates,return=minimal",
     body:JSON.stringify(rows)
   });
-  _cloudSeen=now.getTime();_cloudSavedAt=now;
+  setSeen(now.getTime());_cloudSavedAt=now;
   updateCloudChip(true,cloudChipNote("Last cloud save "+now.toLocaleString()));
   return {ok:true};
 }
@@ -1067,7 +1069,8 @@ async function cloudHydrate(){
     const map={};
     (rows||[]).forEach(r=>{map[r.key]=r.value});
     const b=(rows||[]).find(r=>r.key==="bundle");
-    _cloudSeen=b?Date.parse(b.updated_at):null;
+    let baseSeen;try{baseSeen=JSON.parse(localStorage.getItem(SEEN_KEY)||"undefined")}catch(e){}
+    setSeen(b?Date.parse(b.updated_at):null);
     let pack=null;
     if(map.bundle&&map.bundle.years){
       pack=map.bundle;
@@ -1079,12 +1082,19 @@ async function cloudHydrate(){
       const base=pack||{years:yrLoadAll(),yearSel:RS_YEAR};
       if(overlayTables(base,t))pack=base;
     }
+    /* years edited on this computer but never saved stay as they are (Save still checks for newer cloud data) */
+    const local=yrLoadAll(), keep=Object.keys(local).filter(y=>local[y]&&local[y].dirty&&local[y].data);
+    if(pack&&keep.length){
+      pack.years=pack.years||{};keep.forEach(y=>{pack.years[y]=local[y]});
+      if(baseSeen!==undefined)setSeen(baseSeen);           /* compare the next Save with the copy these edits started from */
+    }
     if(pack){
       applyBackupPack(pack,true);
     }else{
       await cloudPushAll();
     }
     updateCloudChip(true,cloudChipNote("Saved copies go to Supabase"));
+    if(keep.length)setTimeout(()=>toast("Your unsaved changes from last time are kept on this computer — click 💾 Save to send them to the cloud",9000),400);
     return true;
   }catch(e){
     console.warn("cloud hydrate",e);
@@ -1150,7 +1160,19 @@ function disconnectSupabase(){
   if(!confirm("Stop cloud backup? Data already in Supabase stays there. This browser will keep using local saves only."))return;
   sbSetCfg(null);updateCloudChip();closeCloudModal();toast("Cloud backup disconnected");
 }
-window.rsdAfterDailyStore=function(){scheduleCloudPush()};
+/* Daily Status stores its entry on every redraw (the clock ticks each minute); only real content changes go to the cloud */
+let _dailySig;
+window.rsdAfterDailyStore=function(){
+  let sig=null;
+  try{const e=JSON.parse(localStorage.getItem(DAILY_EKEY)||"null")||{};
+    sig=JSON.stringify(Object.assign({},e,{time:null,date:null}))+"|"+(localStorage.getItem(DAILY_RKEY)||"");}catch(x){}
+  if(sig!==null){
+    if(_dailySig===undefined){_dailySig=sig;return;}      /* first look after opening: nothing changed yet */
+    if(sig===_dailySig)return;
+    _dailySig=sig;
+  }
+  scheduleCloudPush();
+};
 /* System Failures list only genuine system failures — "Accident" is not a system category */
 function isSystemFailure(s){return !!s&&!/^\s*ACCIDENTS?\s*$/i.test(String(s.system||''));}
 function onlySystemFailures(st){
