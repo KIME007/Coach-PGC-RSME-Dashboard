@@ -643,7 +643,14 @@ function authEmail(id){id=String(id||"").trim().toLowerCase();return id.indexOf(
 async function authCall(path,body,token,method){
   const c=sbCfg();if(!c||!c.url||!c.key)throw new Error("Cloud is not set up");
   const h={apikey:c.key,"Content-Type":"application/json"};if(token)h.Authorization="Bearer "+token;
-  const res=await fetch(c.url+"/auth/v1/"+path,{method:method||"POST",headers:h,body:JSON.stringify(body||{})});
+  let res;
+  for(let attempt=1;;attempt++){           /* connection drops (Safari: "Load failed") are retried twice */
+    try{res=await fetch(c.url+"/auth/v1/"+path,{method:method||"POST",headers:h,body:JSON.stringify(body||{})});break;}
+    catch(e){
+      if(attempt>=3){const n=new Error("Can't reach the server — check your internet connection and try again");n.network=true;throw n;}
+      await new Promise(r=>setTimeout(r,1200*attempt));
+    }
+  }
   const raw=await res.text();let j=null;try{j=raw?JSON.parse(raw):null}catch(e){}
   if(!res.ok){const e=new Error((j&&(j.error_description||j.msg||j.message||j.error))||("HTTP "+res.status));e.status=res.status;throw e;}
   return j;
@@ -690,7 +697,7 @@ async function doLogin(){
     if(_loginResolve){const r=_loginResolve;_loginResolve=null;r();}
     else{await cloudHydrate();if(typeof applyYear==="function")applyYear();toast("Logged in as "+authId()+" ✔");}
   }catch(e){
-    er.textContent=/invalid|credentials|not found|400/i.test(e.message)?"Wrong ID or password":("Could not log in: "+e.message);
+    er.textContent=e.network?e.message:(/invalid|credentials|not found|400/i.test(e.message)?"Wrong ID or password":("Could not log in: "+e.message));
   }finally{btn.disabled=false;btn.textContent="Log in";}
 }
 /* start-up: wait here until someone is logged in (a saved session counts) */
