@@ -2360,7 +2360,7 @@ var FLEETS=[['pgc','PGC'],['coach','COACH']];
 var C={bg:'143C6B',circ:'1C4B7D',circ2:'0F335E',gold:'F2C230',navy:'133B6B',steel:'3D7AB8',sky:'C9D6E8',ink:'222B3B',mut:'5B6678',
   gray:'8A93A3',line:'DDE2E9',light:'F3F6FA',white:'FFFFFF',green:'1E7B4F',red:'C0392B',redT:'FCEBEA',eyebrow:'3D5A80'};
 var F='Calibri';
-var from=null,to=null;
+var from=null,to=null,mode='range';
 
 function yr(){return typeof RS_YEAR!=='undefined'?RS_YEAR:new Date().getFullYear()}
 function notes(){
@@ -2382,6 +2382,8 @@ function hasReq(k){return REQ.some(function(r){return notes().req[k][r[0]].some(
 function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function pct(v){return v==null||!isFinite(v)?null:Math.round(v*100)}
 function months(){var a=[];for(var m=from;m<=to;m++)a.push(m);return a}
+/* month cards: the period's last two months; a one-month report adds the previous month for comparison */
+function cardMonths(){var ms=months();return ms.length===1?(ms[0]>0?[ms[0]-1,ms[0]]:[ms[0]]):ms.slice(-2)}
 function periodLabel(){return from===to?MF[from]+' '+yr():MF[from]+' – '+MF[to]+' '+yr()}
 
 /* ---------------- dialog ---------------- */
@@ -2393,10 +2395,16 @@ function dialog(){
   if(from==null)defaults();
   var n=notes(),ms=months(),h='';
   var opt=function(sel){return MN.map(function(x,i){return '<option value="'+i+'"'+(i===sel?' selected':'')+'>'+MF[i].charAt(0)+MF[i].slice(1).toLowerCase()+'</option>'}).join('')};
-  h+='<div class="dlo-sec"><h4>1 · Reporting period</h4><div class="dlo-row">'
-    +'<label>From <select id="dloFrom" onchange="DLO.period()">'+opt(from)+'</select></label>'
-    +'<label>To <select id="dloTo" onchange="DLO.period()">'+opt(to)+'</select></label>'
-    +'<span class="dlo-hint">Month cards, system failure and 4M slides follow this period.</span></div></div>';
+  h+='<div class="dlo-sec"><h4>1 · Report type &amp; period</h4><div class="dlo-row" style="margin-bottom:10px">'
+    +'<label><input type="radio" name="dloMode" value="range" '+(mode==='range'?'checked':'')+' onchange="DLO.mode(this.value)"> Two-month / multi-month report</label>'
+    +'<label><input type="radio" name="dloMode" value="single" '+(mode==='single'?'checked':'')+' onchange="DLO.mode(this.value)"> One-month report</label></div><div class="dlo-row">'
+    +(mode==='single'
+      ?'<label>Month <select id="dloFrom" onchange="DLO.period()">'+opt(to)+'</select></label>'
+        +'<span class="dlo-hint">Slides cover this month, compared with the previous month.</span>'
+      :'<label>From <select id="dloFrom" onchange="DLO.period()">'+opt(from)+'</select></label>'
+        +'<label>To <select id="dloTo" onchange="DLO.period()">'+opt(to)+'</select></label>'
+        +'<span class="dlo-hint">Month cards, system failure and 4M slides follow this period.</span>')
+    +'</div></div>';
   h+='<div class="dlo-sec"><h4>2 · Fleet requirements (units)</h4><table class="dlo-tbl"><thead><tr><th></th>'
     +ms.map(function(m){return '<th>'+MN[m]+'</th>'}).join('')+'</tr></thead><tbody>';
   FLEETS.forEach(function(f){REQ.forEach(function(r){
@@ -2543,8 +2551,10 @@ function build(p,data){
     panel(sl,.5,1.3,8.35,3.65);label(sl,'AVAILABILITY — ACTUAL VS TARGET (%)',.75,1.42);
     sl.addImage({data:im.avail,x:.65,y:1.72,w:8.05,h:3.15});
     var cy=1.3,ch=1.14,gap=.12;
-    ms.slice(-2).forEach(function(m){var v=pct(sn.availPct[m]);
-      card(sl,9.05,cy,3.78,ch,{eyebrow:MF[m]+' '+Y,value:v==null?'—':v+'%',color:v==null?C.mut:good(v),sub:v==null?'No data recorded':(v>=100?'Above':'Below')+' the 100% target'});cy+=ch+gap;});
+    cardMonths().forEach(function(m){var v=pct(sn.availPct[m]),prev=(ms.length===1&&m<ms[0]);
+      var sub=v==null?'No data recorded':(v>=100?'Above':'Below')+' the 100% target';
+      if(!prev&&ms.length===1&&m>0){var pv=pct(sn.availPct[m-1]);if(v!=null&&pv!=null)sub=(v>pv?'▲ ':v<pv?'▼ ':'= ')+Math.abs(v-pv)+' pts vs '+MF[m-1].charAt(0)+MF[m-1].slice(1).toLowerCase()+' · '+sub.toLowerCase();}
+      card(sl,9.05,cy,3.78,ch,{eyebrow:MF[m]+' '+Y+(prev?'  ·  PREVIOUS':''),value:v==null?'—':v+'%',color:v==null?C.mut:(prev?C.mut:good(v)),sub:sub,fill:prev?C.white:C.light});cy+=ch+gap;});
     var av=sn.availPct.map(function(v,m){return {v:pct(v),m:m}}).filter(function(x){return x.v!=null});
     if(av.length){var hi=Math.max.apply(null,av.map(function(x){return x.v})),lo=Math.min.apply(null,av.map(function(x){return x.v}));
       var inPeriod=ms.some(function(m){return pct(sn.availPct[m])===hi});
@@ -2563,8 +2573,8 @@ function build(p,data){
 
     /* preventive maintenance */
     sl=p.addSlide();header(sl,f[1]+' — PREVENTIVE MAINTENANCE','Preventive Maintenance (PE): Target vs. Actual');
-    ms.slice(-3).forEach(function(m,i){var v=pct(sn.peM[m]),low=v!=null&&v<100;
-      card(sl,.5+i*4.18,1.25,3.95,1.1,{eyebrow:MF[m]+' '+Y,value:v==null?'—':v+'%',big:21,color:v==null?C.mut:good(v),fill:low?C.redT:C.white,border:low?'F2C4C0':C.line,
+    cardMonths().forEach(function(m,i){var v=pct(sn.peM[m]),prev=(ms.length===1&&m<ms[0]),low=!prev&&v!=null&&v<100;
+      card(sl,.5+i*4.18,1.25,3.95,1.1,{eyebrow:MF[m]+' '+Y+(prev?'  ·  PREVIOUS':''),value:v==null?'—':v+'%',big:21,color:v==null||prev?C.mut:good(v),fill:low?C.redT:C.white,border:low?'F2C4C0':C.line,
         sub:sn.pmT[m]!=null?((+sn.pmA[m]||0)+' of '+sn.pmT[m]+' PE completed'):'No PE plan recorded'});});
     panel(sl,.5,2.45,12.33,3.0);label(sl,'PE TARGET vs. ACTUAL WITH ACHIEVEMENT % — '+f[1],.75,2.55);
     sl.addImage({data:im.pe,x:.65,y:2.82,w:12.05,h:2.58});
@@ -2647,11 +2657,12 @@ function build(p,data){
 
 /* ---------------- public ---------------- */
 window.DLO={
-  open:function(){from=null;dialog();document.getElementById('ovDeck').classList.add('show');},
+  open:function(){from=null;mode='range';dialog();document.getElementById('ovDeck').classList.add('show');},
   period:function(){
     readDialog();
-    var a=+document.getElementById('dloFrom').value,b=+document.getElementById('dloTo').value;
+    var a=+document.getElementById('dloFrom').value,bEl=document.getElementById('dloTo'),b=bEl?+bEl.value:a;
     from=Math.min(a,b);to=Math.max(a,b);dialog();},
+  mode:function(v){readDialog();mode=v;if(v==='single')from=to;else if(from===to)from=Math.max(0,to-1);dialog();},
   generate:async function(){
     var btn=document.getElementById('deckGo');
     try{
