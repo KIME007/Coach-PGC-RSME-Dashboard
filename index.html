@@ -1341,40 +1341,94 @@ function darkChartCfg(cfg){
   });
   return cfg;
 }
+/* ---- numbers drawn on charts: bar ends / above columns / stack totals ---- */
+function chartLabels(o){o=o||{};return {id:'lbl'+Math.random().toString(36).slice(2,8),afterDatasetsDraw(c){
+  const ctx=c.ctx,horiz=c.options.indexAxis==='y';ctx.save();
+  ctx.font='700 '+(o.size||11)+'px "Segoe UI",system-ui,sans-serif';ctx.fillStyle=o.color||'#d6d9e6';
+  const put=(t,x,y)=>{if(!t)return;if(horiz){ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,x+6,y);}
+    else{ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(t,x,y-5);}};
+  if(o.stackTotal){
+    const n=(c.data.labels||[]).length;
+    for(let i=0;i<n;i++){let tot=0,top=null,x=null;
+      c.data.datasets.forEach((ds,di)=>{const mt=c.getDatasetMeta(di);if(mt.hidden||mt.type!=='bar')return;
+        const v=+ds.data[i]||0;tot+=v;const el=mt.data[i];if(el&&v){x=el.x;top=top==null?el.y:Math.min(top,el.y);}});
+      if(x!=null)put(o.fmt?o.fmt(tot,i):String(tot),x,top);}
+  }else{
+    (o.datasets||[0]).forEach(di=>{const mt=c.getDatasetMeta(di);if(!mt||mt.hidden)return;
+      mt.data.forEach((el,i)=>{const v=c.data.datasets[di].data[i];if(v==null||(!v&&o.skipZero!==false))return;
+        let y=el.y;if(o.above!=null){const am=c.getDatasetMeta(o.above),ae=am&&am.data[i];if(ae&&isFinite(ae.y))y=Math.min(y,ae.y-6);}
+        put(o.fmt?o.fmt(v,i):String(v),el.x,y);});});
+  }
+  ctx.restore();}};}
+/* ---- big total in the hole of a doughnut ---- */
+function chartCenter(main,sub){return {id:'ctr',afterDraw(c){const mt=c.getDatasetMeta(0);if(!mt.data.length)return;
+  const x=mt.data[0].x,y=mt.data[0].y,ctx=c.ctx;ctx.save();ctx.textAlign='center';
+  ctx.fillStyle='#ffffff';ctx.font='800 24px "Segoe UI",system-ui,sans-serif';ctx.textBaseline='bottom';ctx.fillText(main,x,y+6);
+  ctx.fillStyle='#8f94b0';ctx.font='700 10px "Segoe UI",system-ui,sans-serif';ctx.textBaseline='top';ctx.fillText(sub,x,y+9);ctx.restore();}};}
+/* category colours that carry no good/bad meaning (red & green are kept for status) */
+const CAT_COL=['#0D6EFD','#0DCAF0','#6f42c1','#AF1763','#fd7e14','#20c997','#6ea8fe','#d63384'];
+/* last month of the year that has failure figures; later months are not drawn as zero */
+function lastFailMonth(cls){let last=-1;for(let m=0;m<12;m++)if(monthTotal(m,cls)>0)last=m;
+  const d=new Date();if(d.getFullYear()===RS_YEAR)last=Math.min(Math.max(last,-1),d.getMonth());return last;}
 function mkChart(id,cfg){if(charts[id])charts[id].destroy();const cv=document.getElementById(id);if(!chartIsLight(cv))darkChartCfg(cfg);charts[id]=new Chart(cv,cfg);return charts[id];}
 function renderOverview(){renderKpis();
   const r=monRange(),cls=activeClasses(),labels=monthsIn(r).map(m=>MONTHS[m]);
   document.getElementById('classHint').textContent="Selected range · classes: "+cls.join(", ");
   // trend
-  const tot=monthsIn(r).map(m=>monthTotal(m,cls));
-  mkChart('chTrend',{type:'line',data:{labels,datasets:[{label:'Failures',data:tot,borderColor:'#d7263d',backgroundColor:'rgba(215,38,61,.09)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:'#d7263d'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+  const lastF=lastFailMonth(cls), months=monthsIn(r);
+  const tot=months.map(m=>m>lastF?null:monthTotal(m,cls));
+  mkChart('chTrend',{type:'line',data:{labels,datasets:[{label:'Failures',data:tot,borderColor:'#d7263d',backgroundColor:'rgba(215,38,61,.09)',fill:true,tension:0,pointRadius:4,pointBackgroundColor:'#d7263d',spanGaps:false}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>' '+c.raw+' failures',afterLabel:c=>{const i=c.dataIndex;if(!i||tot[i-1]==null)return '';const d=c.raw-tot[i-1];return d?(d>0?'▲ ':'▼ ')+Math.abs(d)+' vs '+labels[i-1]:'= same as '+labels[i-1];}}}},
+      scales:{y:{beginAtZero:true,ticks:{precision:0}}}},plugins:[chartLabels({skipZero:false})]});
   // class doughnut
   const ct=classTotals(r);
-  mkChart('chClass',{type:'doughnut',data:{labels:Object.keys(ct),datasets:[{data:Object.values(ct),backgroundColor:PAL,borderWidth:2,borderColor:'#fff'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},cutout:'58%'}});
+  const ctv=Object.values(ct), ctSum=ctv.reduce((a,b)=>a+b,0), ctPct=v=>ctSum?Math.round(v/ctSum*100):0;
+  mkChart('chClass',{type:'doughnut',data:{labels:Object.keys(ct),datasets:[{data:ctv,backgroundColor:CAT_COL,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{
+      legend:{position:'bottom',labels:{generateLabels:ch=>Chart.overrides.doughnut.plugins.legend.labels.generateLabels(ch).map((l,i)=>Object.assign(l,{text:l.text+'  '+ctv[i]+' · '+ctPct(ctv[i])+'%'}))}},
+      tooltip:{callbacks:{label:c=>' '+c.label+': '+c.raw+' failures ('+ctPct(c.raw)+'%)'}}}},
+    plugins:[chartCenter(String(ctSum),'FAILURES')]});
   // by system (clickable)
   const st=systemTotals(r,cls).sort((a,b)=>b.total-a.total);
   mkChart('chSystem',{type:'bar',data:{labels:st.map(s=>s.system),datasets:[{data:st.map(s=>s.total),backgroundColor:st.map((_,i)=>i===0?'#d7263d':'#0b2a5b'),borderRadius:5}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}},
-      onClick:(e,el)=>{if(el.length)openDrill(st[el[0].index].system);}}});
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:30}},plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>' '+c.raw+' failures — click for details'}}},scales:{x:{beginAtZero:true,ticks:{precision:0}}},
+      onClick:(e,el)=>{if(el.length)openDrill(st[el[0].index].system);}},plugins:[chartLabels()]});
   // 4M stacked
-  const fmKeys=Object.keys(sec().fm);
-  mkChart('ch4m',{type:'bar',data:{labels,datasets:fmKeys.map((k,i)=>({label:k,data:monthsIn(r).map(m=>nz(sec().fm[k].usw[m])+nz(sec().fm[k].fis[m])),backgroundColor:PAL[i],stack:'s',borderRadius:3}))},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
+  const fmAll=Object.keys(sec().fm), fmVal=(k,m)=>nz(sec().fm[k].usw[m])+nz(sec().fm[k].fis[m]);
+  const fmTot=k=>months.reduce((t,m)=>t+fmVal(k,m),0);
+  let fmKeys=fmAll.filter(k=>fmTot(k)>0); if(!fmKeys.length)fmKeys=fmAll;
+  mkChart('ch4m',{type:'bar',data:{labels,datasets:fmKeys.map(k=>({label:k+'  ('+fmTot(k)+')',data:months.map(m=>m>lastF?null:fmVal(k,m)),backgroundColor:CAT_COL[fmAll.indexOf(k)%CAT_COL.length],stack:'s',borderRadius:3}))},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}},
+    plugins:[chartLabels({stackTotal:true,fmt:t=>t?String(t):''})]});
   // availability
   const am=availMonthly();
   mkChart('chAvail',{type:'line',data:{labels,datasets:[
     {label:'Actual',data:monthsIn(r).map(m=>am[m].actual!=null?am[m].actual:null),borderColor:'#0e8a7d',backgroundColor:'rgba(14,138,125,.1)',fill:true,tension:.3,pointRadius:3},
     {label:'Target',data:monthsIn(r).map(m=>am[m].target!=null?am[m].target:null),borderColor:'#d7263d',borderDash:[6,4],pointRadius:0,fill:false}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{title:{display:true,text:'units/day (avg)'}}}}});
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},
+      tooltip:{callbacks:{label:c=>{const m=monthsIn(r)[c.dataIndex],a=am[m].actual,t=am[m].target;
+        if(c.datasetIndex===0)return ' Actual: '+Math.round(c.raw)+' units/day'+(t?' ('+Math.round(a/t*100)+'% of target)':'');
+        return ' Target: '+Math.round(c.raw)+' units/day';}}}},scales:{y:{title:{display:true,text:'units/day (avg)'}}}}});
   // PM
+  const pmComp=m=>sec().pmT[m]?nz(sec().pmA[m])/sec().pmT[m]:null;
+  const pmCol=m=>{const c=pmComp(m);return c==null?'#3b4050':c>=1?'#198754':c>=.8?'#FFC107':'#AB2E3C';};
   mkChart('chPm',{data:{labels,datasets:[
-    {type:'bar',label:'Target',data:monthsIn(r).map(m=>sec().pmT[m]),backgroundColor:'#c6d2e6',borderRadius:4},
-    {type:'bar',label:'Actual',data:monthsIn(r).map(m=>sec().pmA[m]),backgroundColor:'#0b2a5b',borderRadius:4},
-    {type:'line',label:'Completion %',yAxisID:'y1',data:monthsIn(r).map(m=>sec().pmT[m]?nz(sec().pmA[m])/sec().pmT[m]*100:null),borderColor:'#d7263d',tension:.3,pointRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},
-      scales:{y:{beginAtZero:true,ticks:{precision:0}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});}
+    {type:'bar',label:'Done',data:months.map(m=>sec().pmA[m]),backgroundColor:months.map(pmCol),borderRadius:4,order:2},
+    {type:'line',label:'Planned',data:months.map(m=>sec().pmT[m]),showLine:false,pointStyle:'line',pointRadius:15,pointHoverRadius:15,borderWidth:3,
+      borderColor:'#e4e6ef',pointBorderColor:'#e4e6ef',backgroundColor:'#e4e6ef',order:1}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},
+      plugins:{legend:{position:'bottom',labels:{generateLabels:()=>[
+          {text:'Done ≥ 100%',fillStyle:'#198754',strokeStyle:'#198754',lineWidth:0},
+          {text:'80–99%',fillStyle:'#FFC107',strokeStyle:'#FFC107',lineWidth:0},
+          {text:'< 80%',fillStyle:'#AB2E3C',strokeStyle:'#AB2E3C',lineWidth:0},
+          {text:'Planned (marker)',fillStyle:'#e4e6ef',strokeStyle:'#e4e6ef',lineWidth:0}].map(x=>Object.assign(x,{fontColor:'#d6d9e6'}))}},
+        tooltip:{callbacks:{label:c=>{const m=months[c.dataIndex];return c.datasetIndex===0
+          ?' Done: '+nz(sec().pmA[m])+' of '+(sec().pmT[m]??'—')+(pmComp(m)!=null?' ('+Math.round(pmComp(m)*100)+'%)':'')
+          :' Planned: '+c.raw;}}}},
+      scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'PM jobs'}}}},
+    plugins:[chartLabels({above:1,fmt:(v,i)=>{const c=pmComp(months[i]);return c==null?'':Math.round(c*100)+'%';}})]});}
 
 /* ================= DRILL-DOWN ================= */
 function openDrill(sysName){const s=sec().summary.find(x=>x.system===sysName);if(!s)return;
@@ -3720,12 +3774,16 @@ function renderCharts(){
   var dateTip={tooltip:{callbacks:{title:function(it){return FULL[it[0].dataIndex]||''}}}};
   var withTip=function(o){return Object.assign({},o,dateTip)};
 
-  mkChart('dlyChTrend',{type:'line',data:{labels:L,datasets:[
-      {label:'Coach availability',data:Mt.map(function(x){return x.avail}),borderColor:C.navy,backgroundColor:'rgba(11,42,91,.08)',tension:.3,fill:true,yAxisID:'y',pointRadius:3},
-      {label:'Fleet readiness %',data:Mt.map(function(x){return x.readiness!=null?x.readiness*100:null}),borderColor:C.gold,backgroundColor:'transparent',tension:.3,yAxisID:'y1',pointRadius:3,borderDash:[5,4]}
-    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      scales:{y:{title:{display:true,text:'Coaches'},grid:GRID},y1:{position:'right',min:0,max:100,title:{display:true,text:'Readiness %'},grid:{drawOnChartArea:false}}},
-      plugins:withTip({legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}})}});
+  mkChart('dlyChTrend',{type:'bar',data:{labels:L,datasets:[
+      {label:'In traffic',data:Mt.map(function(x){return x.op}),backgroundColor:C.navy3,stack:'f',borderRadius:2},
+      {label:'Spare',data:Mt.map(function(x){return x.spare}),backgroundColor:C.teal,stack:'f',borderRadius:2},
+      {label:'Unscheduled maintenance',data:Mt.map(function(x){return x.um}),backgroundColor:C.red,stack:'f',borderRadius:2}
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},interaction:{mode:'index',intersect:false},
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Coaches'},grid:GRID}},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
+        tooltip:{callbacks:{title:dateTip.tooltip.callbacks.title,
+          footer:function(it){var x=Mt[it[0].dataIndex];return 'Available '+x.avail+' · readiness '+(x.readiness!=null?Math.round(x.readiness*100)+'%':'—');}}}}},
+    plugins:(typeof chartLabels==='function')?[chartLabels({stackTotal:true,fmt:function(t,i){var x=Mt[i];return x&&x.readiness!=null?Math.round(x.readiness*100)+'%':'';}})]:[]});
 
   var m=metrics(D);
   mkChart('dlyChDisp',{type:'doughnut',data:{labels:['In traffic','Spare','Unscheduled maintenance'],
@@ -3745,8 +3803,8 @@ function renderCharts(){
 
   mkChart('dlyChPgc',{type:'bar',data:{labels:L,datasets:[
       {label:'Serviceable PGC',data:Mt.map(function(x){return x.pgcOk}),backgroundColor:C.navy,borderRadius:3,order:2},
-      {label:'Duty trains',type:'line',data:Mt.map(function(x){return x.duty}),borderColor:C.red,backgroundColor:'transparent',tension:.25,pointRadius:3,order:1},
-      {label:'Total fleet',type:'line',data:Mt.map(function(x){return x.pgcTot}),borderColor:C.mut,borderDash:[4,4],backgroundColor:'transparent',pointRadius:0,order:1}
+      {label:'Duty trains',type:'line',data:Mt.map(function(x){return x.duty}),borderColor:C.red,backgroundColor:'transparent',stepped:'middle',tension:0,pointRadius:3,order:1},
+      {label:'Total fleet',type:'line',data:Mt.map(function(x){return x.pgcTot}),borderColor:C.mut,borderDash:[4,4],backgroundColor:'transparent',stepped:'middle',tension:0,pointRadius:0,order:1}
     ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:GRID,title:{display:true,text:'Units'}}},
       plugins:withTip({legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}})}});
 
