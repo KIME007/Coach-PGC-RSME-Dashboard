@@ -449,6 +449,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
   <span class="chip" id="secChip">COACH</span>
   <span id="editInfo"></span>
   <span style="flex:1"></span>
+  <span class="chip lastby" id="lastBy" style="display:none"></span>
   <span id="saveInfo">No changes saved yet this session.</span>
   <span class="chip" id="cloudChip" onclick="openCloudModal()" style="cursor:pointer" title="Cloud connection details">Cloud: off</span>
   <span>&nbsp;|&nbsp;<b>💾 Save</b> stores your changes in the cloud · <b>📥 Download Excel</b> exports the saved data.</span>
@@ -1058,7 +1059,7 @@ async function cloudPushAllInner(opts){
     prefer:"resolution=merge-duplicates,return=minimal",
     body:JSON.stringify(rows)
   });
-  setSeen(now.getTime());_cloudSavedAt=now;
+  setSeen(now.getTime());_cloudSavedAt=now;showLastBy(authId(),now.getTime());
   updateCloudChip(true,cloudChipNote("Last cloud save "+now.toLocaleString()));
   return {ok:true};
 }
@@ -1071,6 +1072,7 @@ async function cloudHydrate(){
     const b=(rows||[]).find(r=>r.key==="bundle");
     let baseSeen;try{baseSeen=JSON.parse(localStorage.getItem(SEEN_KEY)||"undefined")}catch(e){}
     setSeen(b?Date.parse(b.updated_at):null);
+    showLastBy(b&&b.value&&b.value.byUser,b?Date.parse(b.updated_at):null);
     let pack=null;
     if(map.bundle&&map.bundle.years){
       pack=map.bundle;
@@ -1089,6 +1091,7 @@ async function cloudHydrate(){
       if(baseSeen!==undefined)setSeen(baseSeen);           /* compare the next Save with the copy these edits started from */
     }
     if(pack){
+      _dailySig=undefined;
       applyBackupPack(pack,true);
     }else{
       await cloudPushAll();
@@ -1102,6 +1105,61 @@ async function cloudHydrate(){
     return false;
   }
 }
+/* ================= LIVE UPDATES =================
+   Every 30 s (and when you come back to the tab) the dashboard asks the cloud who saved last.
+   If someone else saved and you have nothing unsaved, their data loads on its own.
+   If you have unsaved work, it is left alone and a banner tells you what happened. */
+let _lastBy=null,_liveBusy=false;
+function fmtWhen(ts){const d=new Date(ts),n=new Date(),t=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  return d.toDateString()===n.toDateString()?t:d.toLocaleDateString([],{day:'2-digit',month:'short'})+' '+t;}
+function whoLabel(u){return u?(u===authId()?'you':u):'someone'}
+function showLastBy(user,ts){
+  _lastBy=ts?{user:user||null,ts:ts}:null;
+  const el=document.getElementById('lastBy');if(!el)return;
+  if(!ts){el.style.display='none';return;}
+  el.style.display='';
+  el.textContent='👤 Last update: '+(user?(user===authId()?'you ('+user+')':user):'unknown')+' · '+fmtWhen(ts);
+  el.title='Last saved to the cloud by '+(user||'unknown')+' on '+new Date(ts).toLocaleString();
+}
+function showLiveNotice(user,ts){
+  let el=document.getElementById('liveNote');
+  if(!el){el=document.createElement('div');el.id='liveNote';el.className='livenote';document.body.appendChild(el);}
+  el.innerHTML='🔄 <b>'+esc0(whoLabel(user))+'</b> saved new data at '+fmtWhen(ts)+'. You have unsaved changes here — '
+    +'click <b>💾 Save</b> to send yours (you\'ll be asked before anything is replaced), or '
+    +'<button type="button" onclick="liveLoadTheirs()">Load theirs</button> <button type="button" class="x" onclick="hideLiveNotice()">✕</button>';
+  el.classList.add('show');
+}
+function hideLiveNotice(){const el=document.getElementById('liveNote');if(el)el.classList.remove('show');}
+function esc0(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+async function liveLoadTheirs(){
+  if(!confirm('Load the latest cloud data? Your unsaved changes on this computer will be discarded.'))return;
+  const all=yrLoadAll();Object.keys(all).forEach(y=>{if(all[y])all[y].dirty=false});yrSaveAll(all);
+  if(typeof setDirty==='function')setDirty(false);
+  hideLiveNotice();
+  if(await cloudHydrate()){if(typeof applyYear==='function')applyYear();toast('Latest cloud data loaded ✔');}
+}
+async function livePoll(){
+  if(!_auth||!sbEnabled()||document.hidden||_liveBusy||_cloudBusy||_cloudPending||_idleBusy)return;
+  _liveBusy=true;
+  try{
+    const c=await cloudRemoteStamp();
+    if(!c.ts||c.ts===_cloudSeen){hideLiveNotice();return;}
+    showLastBy(c.user,c.ts);
+    if(typeof dirty!=='undefined'&&dirty){showLiveNotice(c.user,c.ts);return;}
+    const a=document.activeElement;
+    if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;      /* typing — try again next round */
+    if(document.querySelector('.overlay.show'))return;               /* a form is open */
+    if(await cloudHydrate()){
+      if(typeof applyYear==='function')applyYear();
+      hideLiveNotice();
+      toast('🔄 Updated with '+whoLabel(c.user)+(c.user&&c.user===authId()?'r':'\'s')+' latest changes ('+fmtWhen(c.ts)+')',4500);
+    }
+  }catch(e){console.warn('live update',e);}
+  finally{_liveBusy=false;}
+}
+setInterval(livePoll,30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(livePoll,800);});
+
 /* background uploads never overwrite someone else's newer save */
 function cloudPushQuiet(){
   return cloudPushAll().catch(err=>{if(err&&err.conflict)cloudConflictNotice();else{console.warn(err);updateCloudChip(false,String(err&&err.message||err));}});
@@ -6422,6 +6480,12 @@ a{color:#6ea8fe}
 .logincard button[type=submit]{background:linear-gradient(120deg,#AF1763,#d63384);box-shadow:0 10px 26px rgba(175,23,99,.4)}
 .logincard button[type=submit]:hover{box-shadow:0 14px 30px rgba(175,23,99,.5)}
 .loginerr{color:#ff6b7a}.loginerr.info{color:#ffc107}
+.chip.lastby{background:#22252e;border-color:#2c2e33;color:#c9cde0;font-weight:600}
+.livenote{position:fixed;left:50%;top:14px;transform:translate(-50%,-160%);z-index:390;max-width:min(760px,calc(100% - 24px));padding:12px 16px;border-radius:12px;
+  background:#2a2d37;border:1px solid rgba(13,202,240,.5);color:#d6d9e6;font-size:.84rem;line-height:1.5;box-shadow:0 12px 30px rgba(0,0,0,.5);transition:transform .25s}
+.livenote.show{transform:translate(-50%,0)}.livenote b{color:#fff}
+.livenote button{margin-left:4px;padding:3px 10px;border-radius:8px;border:1px solid #0DCAF0;background:transparent;color:#0DCAF0;font-weight:700;font-size:.78rem}
+.livenote button.x{border-color:#3b4050;color:#a3a8c3}
 .idlewarn{position:fixed;left:50%;top:14px;transform:translate(-50%,-140%);z-index:400;max-width:calc(100% - 24px);padding:12px 18px;border-radius:12px;
   background:#2a2d37;border:1px solid rgba(255,193,7,.55);color:#ffe08a;font-size:.86rem;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.5);transition:transform .25s}
 .idlewarn.show{transform:translate(-50%,0)}.idlewarn b{color:#fff}
