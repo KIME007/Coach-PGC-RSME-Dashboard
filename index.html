@@ -2360,7 +2360,7 @@ var FLEETS=[['pgc','PGC'],['coach','COACH']];
 var C={bg:'143C6B',circ:'1C4B7D',circ2:'0F335E',gold:'F2C230',navy:'133B6B',steel:'3D7AB8',sky:'C9D6E8',ink:'222B3B',mut:'5B6678',
   gray:'8A93A3',line:'DDE2E9',light:'F3F6FA',white:'FFFFFF',green:'1E7B4F',red:'C0392B',redT:'FCEBEA',eyebrow:'3D5A80'};
 var F='Calibri';
-var from=null,to=null,mode='range';
+var from=null,to=null,mode='range',withProj=true;
 
 function yr(){return typeof RS_YEAR!=='undefined'?RS_YEAR:new Date().getFullYear()}
 function notes(){
@@ -2405,6 +2405,8 @@ function dialog(){
         +'<label>To <select id="dloTo" onchange="DLO.period()">'+opt(to)+'</select></label>'
         +'<span class="dlo-hint">Month cards, system failure and 4M slides follow this period.</span>')
     +'</div></div>';
+  var np=(window.PROJ&&PROJ.book)?PROJ.book().list.length:0;
+  h+='<div class="dlo-sec"><div class="dlo-row"><label><input type="checkbox" id="dloProj" '+(withProj?'checked':'')+' onchange="DLO.proj(this.checked)"> Include Section 03 — Project Status &amp; incoming projects ('+np+' projects)</label></div></div>';
   h+='<div class="dlo-sec"><h4>2 · Fleet requirements (units)</h4><table class="dlo-tbl"><thead><tr><th></th>'
     +ms.map(function(m){return '<th>'+MN[m]+'</th>'}).join('')+'</tr></thead><tbody>';
   FLEETS.forEach(function(f){REQ.forEach(function(r){
@@ -2492,10 +2494,10 @@ function build(p,data){
   var Y=yr(),PL=periodLabel();
   var pill=function(s,x,y,sc){sc=sc||1;s.addShape('roundRect',{x:x,y:y,w:1.75*sc,h:.58*sc,fill:{color:C.white},rectRadius:.29*sc,line:{color:C.white}});
     s.addImage({data:KASSET.logo,x:x+.28*sc,y:y+.1*sc,w:1.2*sc,h:.39*sc});};
-  var header=function(s,eyebrow,title){
+  var header=function(s,eyebrow,title,size){
     s.background={color:C.white};
-    s.addText(eyebrow,{x:.5,y:.28,w:9,h:.26,fontSize:9.5,bold:true,color:C.eyebrow,charSpacing:2,fontFace:F});
-    s.addText(title,{x:.5,y:.55,w:10.8,h:.6,fontSize:25,bold:true,color:C.navy,fontFace:F});
+    s.addText(eyebrow,{x:.5,y:.28,w:10.8,h:.26,fontSize:9.5,bold:true,color:C.eyebrow,charSpacing:2,fontFace:F});
+    s.addText(title,{x:.5,y:.55,w:10.8,h:.7,fontSize:size||25,bold:true,color:C.navy,fontFace:F,valign:'top',fit:'shrink'});
     s.addImage({data:KASSET.logo,x:11.55,y:.38,w:1.3,h:.42});
     s.addImage({data:KASSET.curve,x:10.93,y:6.75,w:2.4,h:.75});};
   var foot=function(s,label){s.addText('KTM INTERCITY  |  ROLLING STOCK PERFORMANCE & ANALYSIS  —  '+label,{x:.5,y:7.1,w:9.5,h:.25,fontSize:7.5,color:C.gray,charSpacing:1,fontFace:F});};
@@ -2642,6 +2644,12 @@ function build(p,data){
     }
   });
 
+  /* ---------- section 03: project status (Project Status tab) ---------- */
+  if(withProj&&window.PROJ&&PROJ.slides){
+    var capM=function(t){return t.charAt(0)+t.slice(1).toLowerCase()};
+    PROJ.slides(p,{C:C,F:F,Y:Y,PLc:(from===to?capM(MF[from]):capM(MF[from])+' – '+capM(MF[to]))+' '+Y,
+      header:header,foot:foot,pill:pill,card:card,panel:panel,label:label,tag:tag,th:th,td:td});
+  }
   /* ---------- thank you ---------- */
   s=p.addSlide();s.background={color:C.bg};
   s.addShape('ellipse',{x:-2.6,y:-3.6,w:6.6,h:6.6,fill:{color:C.circ2}});
@@ -2662,6 +2670,7 @@ window.DLO={
     readDialog();
     var a=+document.getElementById('dloFrom').value,bEl=document.getElementById('dloTo'),b=bEl?+bEl.value:a;
     from=Math.min(a,b);to=Math.max(a,b);dialog();},
+  proj:function(on){withProj=!!on;},
   mode:function(v){readDialog();mode=v;if(v==='single')from=to;else if(from===to)from=Math.max(0,to-1);dialog();},
   generate:async function(){
     var btn=document.getElementById('deckGo');
@@ -2691,6 +2700,375 @@ window.DLO={
 window.generatePpt=function(){DLO.open();};
 })();
 </script>
+<div class="overlay" id="ovProj"><div class="modal" style="max-width:860px">
+  <div class="mhead"><h3 id="projFormTitle">Project</h3><button class="iconb" onclick="closeOv('ovProj')">✕</button></div>
+  <div class="mbody" id="projForm"></div>
+  <div class="mfoot">
+    <button class="btn danger" type="button" id="projDel" onclick="PROJ.del()">Delete</button>
+    <span style="flex:1"></span>
+    <button class="btn ghost" type="button" onclick="closeOv('ovProj')">Cancel</button>
+    <button class="btn primary" type="button" onclick="PROJ.save()">💾 Save project</button>
+  </div>
+</div></div>
+<style id="projCss">
+.pj-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.pj-top h2{font-size:1.15rem;color:#fff}
+.pj-top small{display:block;color:var(--mut);font-size:.76rem;font-weight:600;margin-top:2px}
+.pj-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pj-btn{padding:8px 14px;border-radius:10px;font-weight:700;font-size:.82rem;background:#22252e;color:#e4e6ef;border:1px solid var(--line)}
+.pj-btn:hover{background:#2d303b}.pj-btn.p{background:#AF1763;border-color:#AF1763;color:#fff}.pj-btn.p:hover{background:#c41c71}
+.pj-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+.pj-k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.pj-k .v{font-size:1.5rem;font-weight:800;color:#fff;line-height:1.1}.pj-k .l{font-size:.66rem;letter-spacing:.6px;text-transform:uppercase;color:var(--mut);font-weight:700;margin-top:4px}
+.pj-k.ok .v{color:#6ea8fe}.pj-k.warn .v{color:#ffc107}.pj-k.bad .v{color:#ff6b7a}
+.pj-filter{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pj-filter button{padding:6px 13px;border-radius:99px;border:1px solid var(--line);background:#1d2029;color:#a3a8c3;font-size:.78rem;font-weight:700}
+.pj-filter button.on{background:#AF1763;border-color:#AF1763;color:#fff}
+.pj-filter span{flex-basis:12px}
+.pj-group{margin-bottom:18px}
+.pj-group h3{font-size:.78rem;letter-spacing:.8px;text-transform:uppercase;color:#6ea8fe;margin:0 0 8px}
+.pj-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:12px}
+.pj-card h4{font-size:.98rem;color:#fff;margin:0 0 4px}
+.pj-meta{font-size:.74rem;color:var(--mut);margin-bottom:8px;line-height:1.5}
+.pj-meta b{color:#d6d9e6}
+.pj-notes{margin:0;padding-left:18px;font-size:.82rem;color:#d6d9e6;line-height:1.5}
+.pj-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:150px}
+.pj-pill{padding:7px 16px;border-radius:99px;font-weight:800;font-size:.95rem;color:#fff;min-width:78px;text-align:center}
+.pj-pill.done{background:#1d4f9c}.pj-pill.track{background:#c79a00}.pj-pill.delay{background:#AB2E3C}
+.pj-bar{width:150px;height:7px;border-radius:99px;background:#2c2e33;overflow:hidden}.pj-bar i{display:block;height:100%;border-radius:99px}
+.pj-row-btns{display:flex;gap:6px}
+.pj-mini{padding:5px 10px;border-radius:8px;background:#22252e;border:1px solid var(--line);color:#e4e6ef;font-size:.75rem;font-weight:700}
+.pj-mini:hover{background:#2d303b}
+.pj-inc{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
+.pj-inc-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.pj-inc-box h4{display:flex;align-items:center;gap:10px;font-size:.9rem;color:#fff;margin:0 0 10px}
+.pj-inc-box h4 span{font-size:.72rem;color:var(--mut);font-weight:700}
+.pj-inc table{font-size:.8rem;margin-bottom:10px}
+.pj-inc td.good{color:#3ddc84;font-weight:700}.pj-inc td.bad{color:#ff6b7a;font-weight:700}
+.pj-type{font-size:.68rem;letter-spacing:.6px;font-weight:800;color:#a3a8c3;margin:8px 0 4px}
+.pj-empty{padding:16px;border:1px dashed var(--line);border-radius:12px;color:var(--mut);font-size:.84rem;text-align:center}
+.pj-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pj-form .full{grid-column:1/-1}
+.pj-form label{display:block;font-size:.7rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.pj-form input,.pj-form select,.pj-form textarea{width:100%;padding:8px 11px;border-radius:9px;border:1px solid var(--line);font-size:.86rem}
+.pj-form textarea{min-height:110px;resize:vertical}
+.pj-form .hint{font-size:.7rem;color:var(--mut);margin-top:3px}
+@media(max-width:700px){.pj-card{grid-template-columns:1fr}.pj-side{align-items:flex-start}.pj-form{grid-template-columns:1fr}}
+</style>
+<script id="projJs">
+/* =====================================================================
+   PROJECT STATUS — editable project portfolio + incoming CAPEX/OPEX pipeline
+   Stored in S.projects (saved to the cloud with the rest of the year's data)
+   and added to the DLO presentation as Section 03.
+   ===================================================================== */
+(function(){
+'use strict';
+var FILTER={fleet:'all',state:'all'}, editing=null, editKind='project';
+function L(a){return a}
+var SEED={list:[
+ {contractor:'Padu Sedia Sdn Bhd',slide:'Toilet, Floor & Basement Refurbishment — 16 ADNS Coaches',title:'Toilet, Floor & Basement (16 ADNS Coaches)',value:'RM 4,764,600.00',ref:'Tender No. KTMB/TC 10/2024',start:'01 Dec 2024',due:'31 Nov 2025',eot:'01 Dec 2025 → 29 Aug 2026',progress:70,health:'track',fleet:'coach',short:'6/16 done, 5 handed over',
+  notes:L(['13 of 16 coaches handed over to PSSB; 8+3 units fully completed — ADNS 2606, 2635, 2618, 2624, 2629, 2639, 2620, 2631 & 3 ADNS 2615, 2619 & 2627 (waiting auto five-way test and coupler functional test)','2 units (ADNS 2604, 2609) — joint inspection on 28 August 2026 and delivered to PSSB by 03 September 2026','13/16 target completion by 01 October 2026','Three more balance coaches will be swapped after 3 coaches at KLSD complete testing and handover'])},
+ {contractor:'Padu Sedia Sdn Bhd',slide:'Air-Conditioning Supply — ASC, ABC, ADNS & EP Coach',title:'Supply 12 Air-Cond Units (Toshiba) — ASC, ABC, ADNS',value:'RM 3,408,000.00',ref:'Tender No. KTMB/TC 8/2024',start:'10 Mar 2025',due:'14 Feb 2026',eot:'15 Feb 2026 → 15 Dec 2026',progress:60,health:'track',fleet:'coach',short:'EOT approved, delayed',
+  notes:['Delivery delayed to October 2026 due to shortage of an obsolete blower-motor component','EOT submitted by PSSB on 30 Jan 2026; approved 31 Mar 2026','Invitation for FAT already submitted and scheduled on 01–08 September 2026']},
+ {contractor:'Padu Sedia Sdn Bhd',slide:'Air-Conditioning Supply — ASC, ABC, ADNS & EP Coach',title:'Supply 2-unit Air-Cond Package — EP Coach',value:'RM 494,600.00',ref:'PO No. 50000363',start:'24 Nov 2023',due:'31 May 2025 (Overdue)',eot:'',progress:60,health:'track',fleet:'coach',short:'overdue',
+  notes:['Directly linked to the 12-unit order above; KTMB requires both orders resolved together']},
+ {contractor:'Padu Sedia Sdn Bhd',slide:'Repair, Supply, Install, Test & Commission — 4 ADNS Coaches',title:'Repair, Supply, Install, Testing & Commissioning of 4 ADNS',value:'RM 9.5 million',ref:'Tender No. KTMB/TC 18/2024',start:'15 Aug 2025',due:'14 Feb 2027',eot:'',progress:52,health:'track',fleet:'coach',short:'interior dismantling ongoing, 3 units bogie pending for NDT',
+  notes:['Kick-off held 8 Aug 2025; handover completed 30 Aug 2025 with joint inspection on 12 Sep 2025','FDR meeting held 9 Oct 2025 at KL Sentral Depot; MIP, MOS, HIRARC, Inventory List & Test Protocol submitted','Work in progress: partial interior dismantling, underframe repair (headstock area), bogie frame & parts repair','NDT for 5 units bogie frame done 24–25 June 2026; balance 3 units to be submitted by October 2026']},
+ {contractor:'Padu Sedia Sdn Bhd',slide:'Refurbishment of 4 ASC (INKA) Coaches',title:'Refurbishment of 4 ASC INKA',value:'RM 9.05 million',ref:'Tender No. KTMB/TC 28/2024',start:'08 Aug 2025',due:'31 Aug 2027',eot:'',progress:41,health:'delay',fleet:'coach',short:'dismantling & bogie frame',
+  notes:['Kick-off held 10 Sep 2025; handover completed 20 Sep 2025, joint inspection targeted 15 Oct 2025','Required documentation (MIP, MOS, HIRARC, Inventory List & Test Protocol) submitted','Work in progress: partial interior dismantling and bogie frame dismantling']},
+ {contractor:'Padu Sedia Sdn Bhd',slide:'Refurbishment of 4 ASC & 4 AFC Coaches',title:'Refurbishment of 4 ASC & 4 AFC',value:'RM 6.6 million',ref:'Tender No. KTMB/TC 27/2025',start:'18 Nov 2025',due:'08 Aug 2026',eot:'',progress:67.26,health:'track',fleet:'coach',short:'Interior assembly & tank install',
+  notes:['Kick-off held 1 Dec 2025; MIP, MOS, HIRARC, Inventory List & Test Protocol documents submitted','ASC 2178, 2182, 2183, 2187: static tests 3–5 Jun 2026, dynamic tests 11–12 Jun 2026; 3 coaches re-tested 25 Jun 2026 after wheel changes (vibration issue); handover targeted 3 Jul 2026','AFC 2134 (1419), 2135 (1420), 2156 (1421), 2170 (1422): interior installation work in progress at 38.03%']},
+ {contractor:'UMW Industrial Power Services Sdn Bhd',slide:'Supply, Delivery, Testing & Commissioning — 6 New Engine, Alternator & Radiator Sets (PGC)',title:'The Supply, Delivery, Testing and Commissioning Six (6) Units of New Engine, Alternator Assembly and Radiators for KTMB Power Generating Car (PGC)',value:'RM 5,940,600.00',ref:'Tender No. KTMB/TC 1/2026',start:'01 Sep 2026',due:'31 Aug 2028',eot:'',progress:2,health:'track',fleet:'pgc',short:'kick-off held',
+  notes:['Kick-off held 13 Aug 2026','Contractor to submit MIP, MOS, HIRARC, Inventory List & Test Protocol documents']},
+ {contractor:'Basic Network Engineering Sdn Bhd',slide:'Vinyl Flooring & Vestibule Installation — ADNS & ABC Coaches',title:'Vinyl Flooring & Vestibule — 10 ADNS Coach',value:'RM 375,000.00',ref:'PO No. KTM 50000863',start:'19 Feb 2024',due:'28 Feb 2026',eot:'01 Mar 2026 → 31 Dec 2027',progress:20,health:'delay',fleet:'coach',short:'2/10 done, EOT approved',
+  notes:['2 of 10 units complete (ADNS 2606, 2639); additional work ongoing on remaining units','EOT submitted by BNE on 15 Jan 2026','Approval of EOT by 01 Mar 2026']},
+ {contractor:'Basic Network Engineering Sdn Bhd',slide:'Vinyl Flooring & Vestibule Installation — ADNS & ABC Coaches',title:'Vinyl Flooring & Vestibule — 11 ABC Coach',value:'RM 350,350.00',ref:'PO No. KTM 50000866',start:'19 Feb 2024',due:'28 Feb 2026',eot:'',progress:100,health:'track',fleet:'coach',short:'completed',
+  notes:['All 11 units complete — ABC 4001, 4003, 4005, 4007, 4008, 4009, 4010, 4011, 4012, 4013 & 4015 — by 10 Mar 2026']},
+ {contractor:'Basic Network Engineering Sdn Bhd',slide:'Repaint, Seat Upgrade & Additional Fit-Out — ADNS & AFC Coaches',title:'Repaint 11 Coach ADNS',value:'RM 428,450.00',ref:'PO No. KTM 50001616',start:'02 Jul 2024',due:'31 Jul 2026',eot:'01 Mar 2026 → 30 Jun 2026',progress:18.2,health:'delay',fleet:'coach',short:'2/11 done, EOT submitted',
+  notes:['2 of 11 units complete (ADNS 2606, 2639); EOT submitted 28 May 2026']},
+ {contractor:'Basic Network Engineering Sdn Bhd',slide:'Repaint, Seat Upgrade & Additional Fit-Out — ADNS & AFC Coaches',title:'Upgrade Seat AFC (1st Class)',value:'RM 475,960.00',ref:'PO No. KTM 50002936',start:'21 Feb 2025',due:'28 Feb 2026',eot:'01 Mar 2026 → 30 Jun 2026',progress:100,health:'track',fleet:'coach',short:'installation completed',
+  notes:['FAT attended 25 Jun 2026; installation completed on 22 July 2026']},
+ {contractor:'Basic Network Engineering Sdn Bhd',slide:'Repaint, Seat Upgrade & Additional Fit-Out — ADNS & AFC Coaches',title:'Additional Work — ADNS Coach',value:'RM 477,725.00',ref:'PO No. KTM 50002938',start:'16 Jan 2025',due:'28 Feb 2026',eot:'',progress:100,health:'track',fleet:'coach',short:'completed',
+  notes:['Arm rest, LED lighting, compound floor & headrest mechanism completed for ADNS 2606 & 2639']},
+ {contractor:'Basic Network Engineering Sdn Bhd',slide:'Food Preparation System Servicing — Air-Conditioned Buffet Coach (ABC)',title:'Service & Maintain Food Preparation System — ABC Intercity Services',value:'',ref:'PO No. KTM 50004628',start:'05 Nov 2025',due:'30 Nov 2027',eot:'',progress:2,health:'delay',fleet:'coach',short:'pending kitchen design',
+  notes:['Kick-off held 18 Dec 2025; pending resubmission of kitchen design layout','No target completion date currently set']},
+ {contractor:'Kuasa Rail & Railtronics Engineering',slide:'Electrical Wiring Requalification & Panel Calibration',title:'Repair & Requalify Electrical Wiring Termination — ADNS 2606',value:'RM 44,280.00',ref:'PO No. KTM 50004390',start:'05 Nov 2025',due:'28 Feb 2026',eot:'',progress:100,health:'track',fleet:'coach',short:'completed',
+  notes:['Assembly and SAT test completed 23 Jan 2026, ahead of the 30 Jan 2026 target']},
+ {contractor:'Kuasa Rail & Railtronics Engineering',slide:'Electrical Wiring Requalification & Panel Calibration',title:'Supply & Calibration — 22 Electrical Panels (14 PGC)',value:'',ref:'PO No. KTM 50001635',start:'31 Jul 2024',due:'30 Apr 2025 (Overdue)',eot:'',progress:100,health:'track',fleet:'pgc',short:'completed',
+  notes:['All 14 PGC units completed 2 Mar 2026 — PGC 221, 218, 213, 203, 225, 226, 219, 209, 222, 208, 202, 220, 211 & 215','3 reminder notices issued to the contractor (25 Sep 2025, 5 Dec 2025, 20 Jan 2026) before close-out']},
+ {contractor:'Perencana Dingin Sdn Bhd',slide:'HVAC Repair & Comprehensive Maintenance — Coach Fleet',title:'VDP Additional Repair Work — HVAC Coach',value:'RM 414,252.00',ref:'PO No. KTM 50003197',start:'27 Mar 2025',due:'31 Mar 2027',eot:'',progress:100,health:'track',fleet:'coach',short:'completed',
+  notes:['ADNS & AFC package repair work completed 15 Jan 2026, well ahead of schedule']},
+ {contractor:'Perencana Dingin Sdn Bhd',slide:'HVAC Repair & Comprehensive Maintenance — Coach Fleet',title:'Comprehensive HVAC Maintenance — 12 Months',value:'RM 477,340.00',ref:'PO No. KTM 50003977',start:'06 Sep 2025',due:'30 Sep 2026',eot:'',progress:75,health:'track',fleet:'coach',short:'batch 3 of 3 ongoing',
+  notes:['Kick-off held 9 Oct 2025; 3rd of 3 maintenance batch cycles currently in progress and pending 80/160 units ACU']},
+ {contractor:'SIRIM Berhad',slide:'Genset Calibration & After-Cooler Supply',title:'Maintenance & Calibration — Genset Control & Sensor System',value:'RM 437,421.60',ref:'PO No. KTM 50005022',start:'28 Jan 2026',due:'28 Feb 2028',eot:'',progress:45,health:'delay',fleet:'pgc',short:'PGC 202, 220 completed; 209, 213 & 222 in progress',
+  notes:['Kick-off held 24 Feb 2026; PGC 202 & 220 calibration 20–23 Jul 2026 (completed)','3 more PGC 209, 213 & 222 work in progress']},
+ {contractor:'Evergrow SME',slide:'Genset Calibration & After-Cooler Supply',title:'After-Cooler Complete Set',value:'RM 78,900.00',ref:'PO No. KTM 50004810',start:'23 Dec 2025',due:'08 May 2026',eot:'',progress:100,health:'track',fleet:'pgc',short:'completed',
+  notes:['Design and supply completed 17 Apr 2026, ahead of the May 2026 due date']}],
+ incoming:[
+ {fleet:'coach',type:'CAPEX',title:'Refurbished 4 Charter Coach (Special Coach)',status:'Cancelled',tone:'bad'},
+ {fleet:'coach',type:'CAPEX',title:'Refurbishment 5 AFC Coaches',status:'KTMB/TC-29/2026 – Date Submission close By 17/09/2026',tone:'good'},
+ {fleet:'coach',type:'OPEX',title:'Exterior Car Body Repair — 8 ASC (EP) & 5 ABC',status:'Preparing document',tone:'normal'},
+ {fleet:'coach',type:'OPEX',title:'Service Contract — Train Media System (Coach)',status:'Preparing document',tone:'normal'},
+ {fleet:'coach',type:'OPEX',title:'Service Contract — DC Supply System (Coach)',status:'Preparing document',tone:'normal'},
+ {fleet:'coach',type:'OPEX',title:'NDT — 10 Coach Bogie Units',status:'Preparing document',tone:'normal'},
+ {fleet:'coach',type:'OPEX',title:'Supply & Install PA System — 6 ADNS Coaches',status:'Preparing document',tone:'normal'},
+ {fleet:'coach',type:'OPEX',title:'Revival — ASC 2168',status:'Preparing document',tone:'normal'},
+ {fleet:'coach',type:'OPEX',title:'Revival — ASC 2404',status:'Preparing document',tone:'normal'},
+ {fleet:'pgc',type:'CAPEX',title:'Overhaul Electrical Panel — 10 PGC',status:'KTMB/TC-28/2026 – Date Submission close By 15/09/2026',tone:'good'},
+ {fleet:'pgc',type:'CAPEX',title:'Overhaul Bogie — 10 PGC',status:'KTMB/TC-27/2026 – Date Submission close By 15/09/2026',tone:'good'},
+ {fleet:'pgc',type:'OPEX',title:'Overhaul 10 Engine Sets — PGC',status:'KTMB/TC 11/2026 — Awaiting MPC',tone:'normal'},
+ {fleet:'pgc',type:'OPEX',title:'Exterior Car Body Repair — 6 PGC',status:'Preparing document',tone:'normal'}]};
+
+function uid(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function yr(){return typeof RS_YEAR!=='undefined'?RS_YEAR:new Date().getFullYear()}
+/* the project book lives in the year's dataset; 2026 starts from the attached report */
+function book(){
+  if(typeof S==='undefined'||!S)return {list:[],incoming:[]};
+  if(!S.projects){
+    S.projects=yr()===2026?JSON.parse(JSON.stringify(SEED)):{list:[],incoming:[]};
+    S.projects.list.forEach(function(p){p.id=p.id||uid()});S.projects.incoming.forEach(function(p){p.id=p.id||uid()});
+    if(typeof persist==='function')persist();
+  }
+  return S.projects;
+}
+function state(p){return +p.progress>=100?'done':(p.health==='delay'?'delay':'track')}
+function stateLabel(s){return {done:'Completed',track:'On track',delay:'Delayed'}[s]}
+function changed(){if(typeof touched==='function')touched();render();}
+function pct(p){var v=+p.progress;return (Math.round(v*100)/100)+'%'}
+function money(v){var m=String(v||'').replace(/,/g,'').match(/([\d.]+)\s*(million|mil|m)?/i);if(!m)return 0;var n=+m[1];return /million|mil|^m$/i.test(m[2]||'')?n*1e6:n}
+function fmtRM(n){return n>=1e6?'RM '+(n/1e6).toFixed(1)+' mil':'RM '+Math.round(n).toLocaleString('en-MY')}
+
+/* ---------------- page ---------------- */
+function render(){
+  var el=document.getElementById('projArea');if(!el)return;
+  var b=book(),all=b.list;
+  var list=all.filter(function(p){return (FILTER.fleet==='all'||p.fleet===FILTER.fleet)&&(FILTER.state==='all'||state(p)===FILTER.state)});
+  var n={done:0,track:0,delay:0},val=0;all.forEach(function(p){n[state(p)]++;val+=money(p.value)});
+  var h='<div class="pj-top"><div><h2>Project Status — RSME Intercity Portfolio</h2><small>Coach &amp; PGC · reporting year '+yr()+' · click Edit on any project to update it</small></div>'
+    +'<div class="pj-actions"><button class="pj-btn p" onclick="PROJ.edit()">＋ New project</button><button class="pj-btn" onclick="PROJ.editInc()">＋ Incoming project</button></div></div>';
+  h+='<div class="pj-kpis"><div class="pj-k"><div class="v">'+all.length+'</div><div class="l">Total projects tracked</div></div>'
+    +'<div class="pj-k ok"><div class="v">'+n.done+'</div><div class="l">Completed (100%)</div></div>'
+    +'<div class="pj-k warn"><div class="v">'+n.track+'</div><div class="l">Ongoing — on track</div></div>'
+    +'<div class="pj-k bad"><div class="v">'+n.delay+'</div><div class="l">Delayed</div></div>'
+    +'<div class="pj-k"><div class="v">'+fmtRM(val)+'</div><div class="l">Total contract value</div></div></div>';
+  var fb=function(k,v,t){return '<button class="'+(FILTER[k]===v?'on':'')+'" onclick="PROJ.filter(\''+k+'\',\''+v+'\')">'+t+'</button>'};
+  h+='<div class="pj-filter">'+fb('fleet','all','All fleets')+fb('fleet','coach','Coach')+fb('fleet','pgc','PGC')+'<span></span>'
+    +fb('state','all','All status')+fb('state','track','On track')+fb('state','delay','Delayed')+fb('state','done','Completed')+'</div>';
+  if(!list.length)h+='<div class="pj-empty">No projects here yet — click <b>＋ New project</b> to add one.</div>';
+  var groups={},order=[];
+  list.forEach(function(p){var g=p.contractor||'Other';if(!groups[g]){groups[g]=[];order.push(g)}groups[g].push(p)});
+  order.forEach(function(g){
+    h+='<div class="pj-group"><h3>'+esc(g)+' · '+groups[g].length+' project'+(groups[g].length===1?'':'s')+'</h3>';
+    groups[g].forEach(function(p){var s=state(p),col={done:'#1d4f9c',track:'#c79a00',delay:'#AB2E3C'}[s],i=all.indexOf(p);
+      h+='<div class="pj-card"><div><h4>'+esc(p.title)+'</h4><div class="pj-meta">'
+        +(p.value?'<b>'+esc(p.value)+'</b> · ':'')+esc(p.ref||'')+(p.start?' · Start '+esc(p.start):'')+(p.due?' · Due '+esc(p.due):'')+(p.eot?' · EOT '+esc(p.eot):'')
+        +' · '+(p.fleet==='pgc'?'PGC':p.fleet==='both'?'Coach & PGC':'Coach')+'</div>'
+        +(p.notes&&p.notes.length?'<ul class="pj-notes">'+p.notes.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>':'')+'</div>'
+        +'<div class="pj-side"><span class="pj-pill '+s+'">'+pct(p)+'</span><div class="pj-bar"><i style="width:'+Math.min(100,+p.progress||0)+'%;background:'+col+'"></i></div>'
+        +'<small style="color:var(--mut);font-weight:700;font-size:.72rem">'+stateLabel(s)+'</small>'
+        +'<div class="pj-row-btns"><button class="pj-mini" title="Move up" onclick="PROJ.move('+i+',-1)">↑</button><button class="pj-mini" title="Move down" onclick="PROJ.move('+i+',1)">↓</button>'
+        +'<button class="pj-mini" onclick="PROJ.edit('+i+')">✏️ Edit</button></div></div></div>';});
+    h+='</div>';});
+  /* incoming pipeline */
+  h+='<div class="pj-top" style="margin-top:22px"><div><h2>Incoming Projects — CAPEX &amp; OPEX Pipeline</h2><small>Shown on the "Incoming projects" slide</small></div></div><div class="pj-inc">';
+  [['coach','COACH'],['pgc','PGC']].forEach(function(f){
+    var rows=b.incoming.filter(function(x){return x.fleet===f[0]});
+    var cap=rows.filter(function(x){return x.type==='CAPEX'}),opx=rows.filter(function(x){return x.type!=='CAPEX'});
+    h+='<div class="pj-inc-box"><h4>'+f[1]+' <span>'+cap.length+' CAPEX · '+opx.length+' OPEX</span></h4>';
+    [['CAPEX',cap],['OPEX',opx]].forEach(function(t){
+      h+='<div class="pj-type">'+t[0]+'</div>'+(t[1].length?'<table><thead><tr><th>No.</th><th>Title project</th><th>Status progress</th><th></th></tr></thead><tbody>'
+        +t[1].map(function(x,k){return '<tr><td>'+(k+1)+'</td><td>'+esc(x.title)+'</td><td class="'+(x.tone||'')+'">'+esc(x.status)+'</td>'
+          +'<td><button class="pj-mini" onclick="PROJ.editInc('+b.incoming.indexOf(x)+')">✏️</button></td></tr>'}).join('')+'</tbody></table>':'<div class="pj-empty" style="padding:10px">None</div>');});
+    h+='</div>';});
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+/* ---------------- forms ---------------- */
+function field(lab,id,val,o){o=o||{};
+  return '<div class="'+(o.full?'full':'')+'"><label for="'+id+'">'+lab+'</label>'
+    +(o.area?'<textarea id="'+id+'">'+esc(val)+'</textarea>':o.opts?'<select id="'+id+'">'+o.opts.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===val?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select>'
+      :'<input id="'+id+'" value="'+esc(val)+'"'+(o.type?' type="'+o.type+'" step="any" min="0" max="100"':'')+(o.list?' list="'+o.list+'"':'')+'>')
+    +(o.hint?'<div class="hint">'+o.hint+'</div>':'')+'</div>';
+}
+function contractorList(){var s={};book().list.forEach(function(p){if(p.contractor)s[p.contractor]=1});return Object.keys(s)}
+function slideList(){var s={};book().list.forEach(function(p){if(p.slide)s[p.slide]=1});return Object.keys(s)}
+function openForm(title,html,canDelete){
+  document.getElementById('projFormTitle').textContent=title;
+  document.getElementById('projForm').innerHTML=html;
+  document.getElementById('projDel').style.display=canDelete?'':'none';
+  document.getElementById('ovProj').classList.add('show');
+}
+var v=function(id){var el=document.getElementById(id);return el?el.value.trim():''};
+
+window.PROJ={
+  render:render, book:book, state:state,
+  filter:function(k,val){FILTER[k]=val;render();},
+  move:function(i,d){var l=book().list,j=i+d;if(j<0||j>=l.length)return;var t=l[i];l[i]=l[j];l[j]=t;changed();},
+  edit:function(i){
+    editKind='project';editing=(typeof i==='number')?i:null;
+    var p=editing!=null?book().list[editing]:{contractor:'',slide:'',title:'',value:'',ref:'',start:'',due:'',eot:'',progress:0,health:'track',fleet:'coach',short:'',notes:[]};
+    var h='<div class="pj-form">'
+      +field('Project title','pfTitle',p.title,{full:true})
+      +field('Contractor','pfContractor',p.contractor,{list:'pjContractors',hint:'Pick an existing contractor or type a new one'})
+      +field('Fleet','pfFleet',p.fleet,{opts:[['coach','Coach'],['pgc','PGC'],['both','Coach & PGC']]})
+      +field('Contract value','pfValue',p.value,{hint:'e.g. RM 4,764,600.00 or RM 9.5 million'})
+      +field('Tender / PO No.','pfRef',p.ref,{hint:'e.g. Tender No. KTMB/TC 10/2024 or PO No. KTM 50000863'})
+      +field('Start date','pfStart',p.start,{hint:'e.g. 01 Dec 2024'})
+      +field('Due date','pfDue',p.due,{hint:'e.g. 31 May 2025 (Overdue)'})
+      +field('EOT (if any)','pfEot',p.eot,{hint:'e.g. 01 Dec 2025 → 29 Aug 2026'})
+      +field('Progress %','pfProgress',p.progress,{type:'number',hint:'100% = completed'})
+      +field('Status','pfHealth',p.health,{opts:[['track','On track (yellow)'],['delay','Delayed (red)']],hint:'Shown in navy automatically when progress is 100%'})
+      +field('Short status for the summary table','pfShort',p.short,{hint:'e.g. 6/16 done, 5 handed over'})
+      +field('Status details — one point per line','pfNotes',(p.notes||[]).join('\n'),{area:true,full:true})
+      +field('Slide title (projects with the same title share one slide)','pfSlide',p.slide,{full:true,list:'pjSlides',hint:'Leave empty to use the project title'})
+      +'</div><datalist id="pjContractors">'+contractorList().map(function(c){return '<option value="'+esc(c)+'">'}).join('')+'</datalist>'
+      +'<datalist id="pjSlides">'+slideList().map(function(c){return '<option value="'+esc(c)+'">'}).join('')+'</datalist>';
+    openForm(editing!=null?'Edit project':'New project',h,editing!=null);
+  },
+  editInc:function(i){
+    editKind='incoming';editing=(typeof i==='number')?i:null;
+    var x=editing!=null?book().incoming[editing]:{fleet:'coach',type:'CAPEX',title:'',status:'Preparing document',tone:'normal'};
+    var h='<div class="pj-form">'
+      +field('Title project','piTitle',x.title,{full:true})
+      +field('Fleet','piFleet',x.fleet,{opts:[['coach','Coach'],['pgc','PGC']]})
+      +field('Type','piType',x.type,{opts:[['CAPEX','CAPEX'],['OPEX','OPEX']]})
+      +field('Status progress','piStatus',x.status,{full:true,hint:'e.g. Preparing document · KTMB/TC-29/2026 – Date Submission close By 17/09/2026 · Cancelled'})
+      +field('Colour','piTone',x.tone,{opts:[['normal','Normal'],['good','Green — tender in progress'],['bad','Red — cancelled / problem']]})
+      +'</div>';
+    openForm(editing!=null?'Edit incoming project':'New incoming project',h,editing!=null);
+  },
+  save:function(){
+    var b=book();
+    if(editKind==='project'){
+      var t=v('pfTitle');if(!t){toast('Type a project title');return;}
+      var p={id:editing!=null?b.list[editing].id:uid(),title:t,contractor:v('pfContractor'),fleet:v('pfFleet'),value:v('pfValue'),ref:v('pfRef'),start:v('pfStart'),due:v('pfDue'),eot:v('pfEot'),
+        progress:Math.max(0,Math.min(100,+v('pfProgress')||0)),health:v('pfHealth'),short:v('pfShort'),slide:v('pfSlide'),
+        notes:v('pfNotes').split(/\n+/).map(function(s){return s.trim()}).filter(Boolean)};
+      if(editing!=null)b.list[editing]=p;else b.list.push(p);
+    }else{
+      var ti=v('piTitle');if(!ti){toast('Type a project title');return;}
+      var x={id:editing!=null?b.incoming[editing].id:uid(),title:ti,fleet:v('piFleet'),type:v('piType'),status:v('piStatus'),tone:v('piTone')};
+      if(editing!=null)b.incoming[editing]=x;else b.incoming.push(x);
+    }
+    closeOv('ovProj');changed();toast('Project saved — click 💾 Save to send it to the cloud');
+  },
+  del:function(){
+    if(editing==null)return;var b=book(),arr=editKind==='project'?b.list:b.incoming;
+    if(!confirm('Delete "'+arr[editing].title+'"?'))return;
+    arr.splice(editing,1);closeOv('ovProj');changed();toast('Project deleted');
+  },
+  open:function(){
+    ['tabOverview','tabData','tabIncidents','tabDaily','tabReport'].forEach(function(id){var el=document.getElementById(id);if(el)el.classList.remove('on')});
+    ['pOverview','pData','pIncidents','dlyDaily','pReport'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none'});
+    document.getElementById('tabProj').classList.add('on');document.getElementById('pProj').style.display='';
+    render();
+  }
+};
+
+/* ---------------- mount the tab (same way as Daily Status) ---------------- */
+function hide(){var t=document.getElementById('tabProj'),p=document.getElementById('pProj');if(t)t.classList.remove('on');if(p)p.style.display='none';}
+function visible(){var p=document.getElementById('pProj');return p&&p.style.display!=='none'}
+function wrap(name){var f=window[name];if(typeof f!=='function'||f._projWrapped)return;
+  var w=function(){hide();return f.apply(this,arguments)};w._projWrapped=true;window[name]=w;}
+function mount(){
+  if(document.getElementById('pProj'))return;
+  var tabs=document.querySelector('nav.tabs'),main=document.querySelector('main');if(!tabs||!main)return;
+  var btn=document.createElement('button');btn.className='tab';btn.id='tabProj';btn.innerHTML='🏗️ Project Status';btn.onclick=function(){PROJ.open()};
+  tabs.appendChild(btn);
+  var sec=document.createElement('section');sec.className='panel';sec.id='pProj';sec.style.display='none';sec.innerHTML='<div id="projArea"></div>';
+  main.appendChild(sec);
+  ['setTab','dlyOpenTab','rptOpenTab'].forEach(wrap);
+  /* keep the page in step with year changes and cloud loads */
+  var ay=window.applyYear;if(typeof ay==='function'&&!ay._projWrapped){window.applyYear=function(){var r=ay.apply(this,arguments);if(visible())render();return r};window.applyYear._projWrapped=true;}
+  window.addEventListener('rsd-backup-applied',function(){if(visible())setTimeout(render,0)});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(mount,300)});else setTimeout(mount,300);
+
+/* ---------------- Section 03 for the DLO presentation ---------------- */
+window.PROJ.slides=function(p,H){
+  var b=book(),C=H.C,F=H.F,list=b.list;if(!list.length&&!b.incoming.length)return;
+  var colOf=function(x){return {done:C.navy,track:C.gold,delay:C.red}[state(x)]};
+  /* divider */
+  var d=p.addSlide();d.background={color:C.bg};
+  d.addShape('ellipse',{x:9.75,y:1.85,w:3.6,h:3.6,fill:{color:C.circ2},line:{color:C.gold,width:2.5}});
+  d.addImage({data:KASSET.trainGold,x:10.95,y:3.0,w:1.2,h:1.2});
+  H.pill(d,.6,.5,1.15);
+  d.addText('SECTION 03',{x:.6,y:2.85,w:5,h:.3,fontSize:11,bold:true,color:C.gold,charSpacing:4,fontFace:F});
+  d.addText('PROJECT STATUS & RELIABILITY',{x:.55,y:3.2,w:9,h:.75,fontSize:34,bold:true,color:C.white,fontFace:F});
+  d.addText('Project Status, Reliability Program ('+H.PLc+')',{x:.6,y:4.05,w:8,h:.4,fontSize:12,color:C.sky,fontFace:F});
+  d.addText('KTM INTERCITY  |  DLO ROLLING STOCK PERFORMANCE REPORT',{x:.6,y:7.1,w:8,h:.25,fontSize:7.5,color:C.sky,charSpacing:1,fontFace:F});
+  /* portfolio summary */
+  var ongoing=list.filter(function(x){return state(x)!=='done'});
+  var nDone=list.length-ongoing.length;
+  var chunks=[];for(var i=0;i<Math.max(ongoing.length,1);i+=12)chunks.push(ongoing.slice(i,i+12));
+  chunks.forEach(function(ch,ci){
+    var sl=p.addSlide();H.header(sl,'PROJECT STATUS','RSME Intercity Project Portfolio — Coach & PGC, '+H.PLc+(chunks.length>1?' ('+(ci+1)+' of '+chunks.length+')':''));
+    [[String(list.length),'TOTAL PROJECTS TRACKED','Coach & PGC, '+H.PLc,C.navy],[String(nDone),'PROJECTS COMPLETED','100% — fully closed out',C.navy],
+     [String(ongoing.length),'ONGOING / DELAYED',ongoing.filter(function(x){return state(x)==='delay'}).length+' delayed · '+ongoing.filter(function(x){return state(x)==='track'}).length+' on track',C.red]]
+      .forEach(function(k,j){var x=.5+j*4.18;
+        H.card(sl,x,1.3,3.95,1.1,{eyebrow:k[1],value:k[0],big:26,color:k[3],fill:C.white,sub:k[2]});});
+    H.label(sl,'ONGOING / DELAYED PROJECTS — STATUS ('+ongoing.length+')',.5,2.55);
+    var half=[ch.slice(0,6),ch.slice(6,12)];
+    half.forEach(function(rows,hi){if(!rows.length)return;
+      var body=rows.map(function(x,k){var no=ci*12+hi*6+k+1,fill=k%2?C.light:C.white;
+        return [H.td(no,{bold:true,fill:fill}),H.td((x.contractor?x.contractor.replace(/ Sdn Bhd| Berhad| SME/gi,'')+' — ':'')+x.title,{bold:true,align:'left',fill:fill}),
+          H.td(String(x.ref||'').replace(/^(Tender No\.|PO No\.)\s*/i,''),{fill:fill}),
+          H.td(pct(x)+(x.short?' — '+x.short:''),{bold:true,color:state(x)==='delay'?C.red:C.ink,align:'left',fill:fill})];});
+      sl.addTable([[H.th('No.'),H.th('Contractor / Project'),H.th('Tender / PO No.'),H.th('Status')]].concat(body),
+        {x:.5+hi*6.25,y:2.85,w:6.05,colW:[.45,2.75,1.35,1.5],fontSize:7.5,border:{pt:.5,color:C.line},valign:'middle',autoPage:false});});
+    H.foot(sl,'PROJECT STATUS');
+  });
+  /* one slide per slide-title group (max 3 projects per slide) */
+  var groups=[],byKey={};
+  list.forEach(function(x){var key=(x.slide||x.title);if(!byKey[key]){byKey[key]={title:key,items:[]};groups.push(byKey[key])}byKey[key].items.push(x)});
+  var pages=[];groups.forEach(function(g){for(var i=0;i<g.items.length;i+=3)pages.push({title:g.title,items:g.items.slice(i,i+3)})});
+  var perC={},seenC={};pages.forEach(function(pg){var c=pg.items.map(function(x){return x.contractor||'Other'}).filter(function(v,i,a){return a.indexOf(v)===i}).join(' & ');pg.c=c;perC[c]=(perC[c]||0)+1;});
+  pages.forEach(function(pg){
+    seenC[pg.c]=(seenC[pg.c]||0)+1;
+    var sl=p.addSlide();
+    H.header(sl,('PROJECT STATUS — '+pg.c).toUpperCase()+(perC[pg.c]>1?' ('+seenC[pg.c]+' of '+perC[pg.c]+')':''),pg.title,(function(n){var z=24;while(n*z*.0078>10.4&&z>15)z--;return z})(pg.title.length));
+    var n=pg.items.length,gap=.18,top=1.35,availH=5.55,h=(availH-(n-1)*gap)/n;
+    pg.items.forEach(function(x,k){var y=top+k*(h+gap);
+      H.panel(sl,.5,y,12.33,h);
+      sl.addShape('roundRect',{x:11.45,y:y+.18,w:1.18,h:.46,fill:{color:colOf(x)},rectRadius:.23,line:{color:colOf(x)}});
+      sl.addText(pct(x),{x:11.45,y:y+.18,w:1.18,h:.46,fontSize:12,bold:true,color:C.white,align:'center',valign:'middle',fontFace:F,margin:0});
+      sl.addText(x.title,{x:.72,y:y+.14,w:10.6,h:.34,fontSize:x.title.length>110?10:11.5,bold:true,color:C.ink,fontFace:F,valign:'top'});
+      var line=[x.ref,x.start?'Start '+x.start:'',x.due?'Due '+x.due:'',x.eot?'EOT: '+x.eot:''].filter(Boolean).join('   |   ');
+      var yy=y+.5;
+      if(x.value){sl.addText(x.value,{x:.72,y:yy,w:6,h:.24,fontSize:9.5,bold:true,color:C.mut,fontFace:F});yy+=.27;}
+      sl.addText(line,{x:.72,y:yy,w:10.6,h:.22,fontSize:8,color:C.gray,fontFace:F});yy+=.3;
+      var notes=(x.notes||[]);
+      if(notes.length&&y+h-yy>.25)sl.addText(notes.map(function(t,ii){return {text:'•  '+t,options:{breakLine:ii<notes.length-1}}}),
+        {x:.72,y:yy,w:11.9,h:Math.max(.3,y+h-yy-.08),fontSize:n===1?12:(n===2?11:9.5),color:C.ink,fontFace:F,valign:'top',lineSpacingMultiple:1.15,fit:'shrink'});
+    });
+    H.foot(sl,'PROJECT STATUS — '+pg.c.toUpperCase());
+  });
+  /* incoming pipeline */
+  if(b.incoming.length){
+    var sl=p.addSlide();H.header(sl,'INCOMING PROJECTS','CAPEX & OPEX Pipeline — Coach & PGC, FY'+H.Y);
+    [['coach','COACH'],['pgc','PGC']].forEach(function(f,fi){
+      var x0=.5+fi*6.3,w=6.0,rows=b.incoming.filter(function(r){return r.fleet===f[0]});
+      var cap=rows.filter(function(r){return r.type==='CAPEX'}),opx=rows.filter(function(r){return r.type!=='CAPEX'});
+      H.tag(sl,f[1],x0,1.28,1.5);
+      sl.addText(cap.length+' CAPEX  ·  '+opx.length+' OPEX',{x:x0+1.65,y:1.28,w:3,h:.34,fontSize:9,color:C.mut,valign:'middle',fontFace:F});
+      var y=1.75;
+      [['CAPEX',cap],['OPEX',opx]].forEach(function(t){if(!t[1].length)return;
+        sl.addText(t[0],{x:x0,y:y,w:2,h:.24,fontSize:9,bold:true,color:C.eyebrow,charSpacing:1,fontFace:F});y+=.26;
+        var body=t[1].map(function(r,k){var fill=k%2?C.light:C.white;
+          return [H.td(k+1,{bold:true,color:C.eyebrow,fill:fill}),H.td(r.title,{bold:true,align:'left',fill:fill}),
+            H.td(r.status,{bold:true,align:'left',fill:fill,color:r.tone==='good'?C.green:r.tone==='bad'?C.red:C.mut})];});
+        var rh=.3;sl.addTable([[H.th('No.'),H.th('Title Project'),H.th('Status Progress')]].concat(body),
+          {x:x0,y:y,w:w,colW:[.5,3.0,2.5],fontSize:8,rowH:rh,border:{pt:.5,color:C.line},valign:'middle',autoPage:false});
+        y+=rh*(t[1].length+1)+.2;});
+    });
+    H.foot(sl,'INCOMING PROJECTS');
+  }
+};
+})();
+</script>
+
 
 
 <!-- ============================================================================
