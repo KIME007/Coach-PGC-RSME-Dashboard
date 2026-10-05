@@ -1414,7 +1414,7 @@ function renderData(){const area=document.getElementById('dataArea');
     area.innerHTML=`<h3 style="color:var(--navy);margin-bottom:10px">${sec().name} — System Failure & 4M Elements (USW = failures in workshop scope, FIS = failures in service)</h3>
       <div class="tblwrap"><table><thead><tr><th>4M Element</th><th>Type</th>${MONTHS.map(m=>`<th>${m}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="note">These figures also feed the “Monthly Failures / 4M” summary in the workbook — both are updated on save.</div>`;}
-  else if(dataTab==='avail'){ renderAvail(area); }
+  else if(dataTab==='avail'){ if(window.AVX)AVX.render(area); else renderAvail(area); }
   else{let mk=(lab,arrT,arrA,key)=>{let r1=`<tr><td class="rowlab">${lab} Target</td>`,r2=`<tr><td class="rowlab">${lab} Actual</td>`,r3=`<tr class="totrow"><td>Completion %</td>`;
       for(let m=0;m<12;m++){r1+=`<td>${numIn(arrT[m],`updPm('${key}T',${m},this.value)`)}</td>`;r2+=`<td>${numIn(arrA[m],`updPm('${key}A',${m},this.value)`)}</td>`;
         r3+=`<td style="text-align:center">${arrT[m]?fmtPct(nz(arrA[m])/arrT[m]):'—'}</td>`;}
@@ -5124,6 +5124,7 @@ function mount(){
   if(typeof tab==='undefined'||tab!=='data')return;
   if(typeof dataTab==='undefined'||dataTab!=='avail')return;
   var area=document.getElementById('dataArea'); if(!area)return;
+  if(window.AVX){runSync();return;}            /* the smart availability screen shows sources itself */
   annotate();
   if(area.querySelector('.sav-wrap'))return;
   runSync();
@@ -5136,6 +5137,8 @@ function wrap(name){
   var w=function(){var r=f.apply(this,arguments);try{mount()}catch(e){console.warn('availability sync',e)}return r;};
   w._savWrapped=true; window[name]=w;
 }
+window.SAV={sourceMap:sourceMap,dsVal:dsVal,ovHas:ovHas,ovDel:ovDel,ovClear:ovClear,ovCount:ovCount,markEdit:markEdit,
+  autoOn:autoOn,setAuto:setAuto,runSync:runSync};
 function boot(){
   guardAll();
   wrap('renderData'); wrap('renderAll'); wrap('setDataTab'); wrap('setTab'); wrap('setSection');
@@ -5159,6 +5162,312 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 else setTimeout(boot,120);
 })();
 </script>
+<style id="avxCss">
+/* ================= SMART AVAILABILITY (Data Manager → Availability) ================= */
+.avx{display:flex;flex-direction:column;gap:14px}
+.avx-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+.avx-month{display:flex;align-items:center;gap:8px}
+.avx-month h3{font-size:1.15rem;color:var(--navy);min-width:150px;text-align:center}
+.avx-nav{width:34px;height:34px;border-radius:50%;background:#22252e;color:#e4e6ef;font-size:1.2rem;font-weight:700;border:1px solid var(--line)}
+.avx-nav:hover{background:#AF1763;border-color:#AF1763}
+.avx-btn{padding:8px 13px;border-radius:10px;font-weight:700;font-size:.8rem;background:#22252e;color:#e4e6ef;border:1px solid var(--line);white-space:nowrap}
+.avx-btn:hover{background:#2d303b}
+.avx-btn.p{background:#AF1763;border-color:#AF1763;color:#fff}.avx-btn.p:hover{background:#c41c71}
+.avx-btn.g{background:#198754;border-color:#198754;color:#fff}.avx-btn.g:hover{background:#1fa065}
+.avx-auto{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--mut);font-weight:600}
+.avx-tgt{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#1d2029}
+.avx-tgt b{font-size:.72rem;letter-spacing:.6px;text-transform:uppercase;color:var(--mut)}
+.avx-tgt label{display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:#e4e6ef}
+.avx-tgt input{width:70px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);text-align:center;font-weight:800;font-size:.95rem}
+.avx-tgt .hint{font-size:.72rem;color:var(--mut);flex-basis:100%}
+.avx-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.avx-k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.avx-k .v{font-size:1.35rem;font-weight:800;color:#fff;line-height:1.1}
+.avx-k .l{font-size:.66rem;letter-spacing:.6px;text-transform:uppercase;color:var(--mut);font-weight:700;margin-top:4px}
+.avx-k.ok .v{color:#3ddc84}.avx-k.bad .v{color:#ff6b7a}.avx-k.warn .v{color:#ffc107}
+.avx-cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
+.avx-day{border-radius:10px;padding:6px 2px;text-align:center;border:1px solid var(--line);background:#1d2029;cursor:pointer;transition:.12s;line-height:1.15}
+.avx-day:hover{transform:translateY(-1px);border-color:#6c7293}
+.avx-day .n{font-size:.92rem;font-weight:800;color:#e4e6ef}.avx-day .w{font-size:.58rem;color:var(--mut);font-weight:700;text-transform:uppercase}
+.avx-day.met{background:rgba(25,135,84,.25);border-color:rgba(25,135,84,.6)}
+.avx-day.low{background:rgba(171,46,60,.28);border-color:rgba(171,46,60,.7)}
+.avx-day.part{background:rgba(255,193,7,.14);border-color:rgba(255,193,7,.5)}
+.avx-day.miss{background:#15171e;border-style:dashed;border-color:#3b4050}
+.avx-day.fut{opacity:.38}
+.avx-day.today{box-shadow:0 0 0 2px #0DCAF0}
+.avx-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.72rem;color:var(--mut);font-weight:600}
+.avx-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.avx-tbl{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:620px}
+.avx-tbl table{font-size:.84rem;min-width:760px}
+.avx-tbl thead th{text-align:center}
+.avx-tbl thead tr:first-child th{font-size:.74rem}
+.avx-tbl th.grp-c{background:#2a1b26!important;color:#f06aa8!important}
+.avx-tbl th.grp-p{background:#16233a!important;color:#6ea8fe!important}
+.avx-tbl td{text-align:center;vertical-align:middle;padding:5px 6px}
+.avx-tbl td.d{font-weight:800;color:#fff;white-space:nowrap}
+.avx-tbl td.d small{display:block;font-size:.6rem;color:var(--mut);font-weight:700;text-transform:uppercase}
+.avx-tbl tr.fut td{opacity:.45}
+.avx-tbl tr.flash td{animation:avxFlash 1.4s ease}
+@keyframes avxFlash{0%,40%{background:rgba(13,202,240,.25)}100%{background:transparent}}
+.avx-in{width:66px;padding:6px 6px;border-radius:8px;border:1px solid var(--line);text-align:center;font-weight:700;font-size:.9rem}
+.avx-in:focus{outline:none;border-color:#AF1763;box-shadow:0 0 0 3px rgba(175,23,99,.25)}
+.avx-auto-val{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:.95rem;color:#fff}
+.avx-tag{font-size:.58rem;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:2px 6px;border-radius:99px}
+.avx-tag.a{background:rgba(25,135,84,.25);color:#3ddc84}
+.avx-tag.e{background:rgba(255,193,7,.18);color:#ffc107}
+.avx-mini{background:none;border:0;cursor:pointer;font-size:.8rem;padding:2px 4px;border-radius:6px;color:#a3a8c3}
+.avx-mini:hover{background:#2d303b;color:#fff}
+.avx-pct{font-weight:800;font-size:.82rem}
+.avx-pct.ok{color:#3ddc84}.avx-pct.lo{color:#ff6b7a}.avx-pct.na{color:#6c7293}
+.avx-dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.avx-dot.met{background:#3ddc84}.avx-dot.low{background:#ff6b7a}.avx-dot.part{background:#ffc107}.avx-dot.miss{background:transparent;border:2px dashed #6c7293}.avx-dot.fut{background:#3b4050}
+.avx-note{font-size:.74rem;color:var(--mut);line-height:1.55;background:#1d2029;border:1px dashed var(--line);border-radius:10px;padding:9px 12px}
+.avx-note b{color:#e4e6ef}
+@media(max-width:760px){.avx-month h3{min-width:0;font-size:1rem}.avx-tgt input{width:60px}}
+</style>
+<script id="avxJs">
+/* =====================================================================
+   SMART AVAILABILITY — one screen for COACH + PGC, month at a glance
+   • month target set once  • colour calendar  • Daily Status figures shown
+     as "auto" (edit only exceptions)  • Enter / ↑ ↓ move between days
+   • copy previous day  • paste a column straight from Excel
+   Data stays in S.coachAvail / S.pgcAvail exactly as before.
+   ===================================================================== */
+(function(){
+'use strict';
+var FLEETS=[{k:'coach',name:'COACH',arr:function(){return S.coachAvail}},{k:'pgc',name:'PGC',arr:function(){return S.pgcAvail}}];
+var month=null, editing={}, focusNext=null, flashDay=null;
+var WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function yr(){return typeof RS_YEAR!=='undefined'?RS_YEAR:new Date().getFullYear()}
+function dimOf(m){var y=yr(),leap=(y%4===0&&y%100!==0)||y%400===0;return [31,leap?29:28,31,30,31,30,31,31,30,31,30,31][m]}
+function todayRef(){var d=new Date();return d.getFullYear()===yr()?{m:d.getMonth(),d:d.getDate()}:(d.getFullYear()>yr()?{m:12,d:0}:{m:-1,d:0})}
+function isFuture(m,d){var t=todayRef();return m>t.m||(m===t.m&&d>t.d)}
+function isToday(m,d){var t=todayRef();return m===t.m&&d===t.d}
+function curMonth(){if(month==null){var t=todayRef();month=(t.m>=0&&t.m<12)?t.m:0;}return month}
+function fleetMonth(f,m){var a=f.arr();return a&&a[m]}
+function val(f,m,i,fld){var mo=fleetMonth(f,m);var v=mo&&mo[fld]?mo[fld][i]:null;return typeof v==='number'?v:null}
+function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toN(v){v=String(v==null?'':v).trim();if(v==='')return null;var n=+v.replace(/,/g,'');return isFinite(n)?Math.max(0,n):null}
+function sav(){return window.SAV||null}
+function srcMap(){try{return sav()?sav().sourceMap():{}}catch(e){return {}}}
+/* source of one actual figure: a = from Daily Status, e = edited over it, m = typed, n = empty */
+function srcOf(f,m,i,map){
+  var ds=map[m+'|'+i], on=sav()?sav().autoOn():false, ov=sav()?sav().ovHas(f.k,m,i):false;
+  if(ds&&ov)return 'e';
+  if(ds&&on)return 'a';
+  return val(f,m,i,'actual')!=null?'m':'n';
+}
+function pct(a,t){return (a!=null&&t)?a/t:null}
+function dayStatus(m,i){
+  var st=[],j,f,a,t;
+  for(j=0;j<FLEETS.length;j++){f=FLEETS[j];a=val(f,m,i,'actual');t=val(f,m,i,'target');st.push(a==null?'miss':(t?(a>=t?'met':'low'):'nt'));}
+  if(isFuture(m,i+1)&&st.every(function(x){return x==='miss'}))return 'fut';
+  if(st.indexOf('low')>=0)return 'low';
+  if(st.every(function(x){return x==='met'}))return 'met';
+  if(st.every(function(x){return x==='miss'}))return 'miss';
+  return 'part';
+}
+function commonTarget(f,m){
+  var cnt={},best=null,i,t;
+  for(i=0;i<dimOf(m);i++){t=val(f,m,i,'target');if(t!=null){cnt[t]=(cnt[t]||0)+1;if(best==null||cnt[t]>cnt[best])best=t;}}
+  if(best!=null)return best;
+  for(var mm=m-1;mm>=0;mm--)for(i=dimOf(mm)-1;i>=0;i--){t=val(f,mm,i,'target');if(t!=null)return t;}
+  return null;
+}
+function changed(){if(typeof touched==='function')touched();else if(typeof persist==='function')persist();}
+function refreshCharts(){/* overview recalculates next time it is opened */}
+
+/* ---------------- writes ---------------- */
+function setActual(fk,m,i,v){
+  var f=FLEETS[fk==='pgc'?1:0],mo=fleetMonth(f,m);if(!mo)return;
+  mo.actual[i]=v;
+  try{if(sav())sav().markEdit(f.k,m,i,v)}catch(e){}
+}
+function setTarget(fk,m,i,v){var f=FLEETS[fk==='pgc'?1:0],mo=fleetMonth(f,m);if(mo)mo.target[i]=v}
+
+/* ---------------- render ---------------- */
+function render(area){
+  if(typeof S==='undefined'||!S||!S.coachAvail)return;
+  var m=curMonth(), dm=dimOf(m), map=srcMap();
+  var MF=typeof MFULL!=='undefined'?MFULL:[];
+  var y=yr(), i, j, f, h='';
+  /* stats */
+  var filled=0,met=0,low=0,miss=0,sum={coach:[0,0],pgc:[0,0]},tsum={coach:[0,0],pgc:[0,0]},fromDS=0,edited=0;
+  for(i=0;i<dm;i++){
+    var ds=dayStatus(m,i);
+    if(ds==='met')met++; if(ds==='low')low++; if(ds==='miss')miss++;
+    if(ds!=='miss'&&ds!=='fut')filled++;
+    FLEETS.forEach(function(f){var a=val(f,m,i,'actual'),t=val(f,m,i,'target');
+      if(a!=null){sum[f.k][0]+=a;sum[f.k][1]++;} if(t!=null){tsum[f.k][0]+=t;tsum[f.k][1]++;}
+      var sc=srcOf(f,m,i,map); if(sc==='a')fromDS++; if(sc==='e')edited++;});
+  }
+  var avg=function(k){return sum[k][1]?sum[k][0]/sum[k][1]:null}, tavg=function(k){return tsum[k][1]?tsum[k][0]/tsum[k][1]:null};
+  var pastDays=0;for(i=0;i<dm;i++)if(!isFuture(m,i+1))pastDays++;
+
+  h+='<div class="avx">';
+  /* header */
+  h+='<div class="avx-top"><div class="avx-month">'
+    +'<button class="avx-nav" onclick="AVX.month(-1)" title="Previous month">‹</button>'
+    +'<h3>'+(MF[m]||'')+' '+y+'</h3>'
+    +'<button class="avx-nav" onclick="AVX.month(1)" title="Next month">›</button>'
+    +'<button class="avx-btn" onclick="AVX.thisMonth()">This month</button></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+    +'<label class="avx-auto"><input type="checkbox" '+(sav()&&sav().autoOn()?'checked':'')+' onchange="AVX.auto(this.checked)"> Auto-fill actuals from Daily Status</label>'
+    +'<button class="avx-btn" onclick="AVX.sync()" title="Take the latest Daily Status figures now">⟳ Sync now</button>'
+    +(edited?'<button class="avx-btn" onclick="AVX.revertAll()" title="Drop hand-typed figures this month and use Daily Status again">↺ Undo my edits ('+edited+')</button>':'')
+    +'</div></div>';
+  /* monthly target */
+  var tc=commonTarget(FLEETS[0],m), tp=commonTarget(FLEETS[1],m);
+  h+='<div class="avx-tgt"><b>🎯 Target for '+(MF[m]||'')+'</b>'
+    +'<label>COACH <input id="avxTc" type="number" min="0" value="'+(tc==null?'':tc)+'" placeholder="e.g. 60"></label>'
+    +'<label>PGC <input id="avxTp" type="number" min="0" value="'+(tp==null?'':tp)+'" placeholder="e.g. 11"></label>'
+    +'<button class="avx-btn p" onclick="AVX.applyTarget(false)">Apply to every day</button>'
+    +'<button class="avx-btn" onclick="AVX.applyTarget(true)">Only days without a target</button>'
+    +'<span class="hint">Type the target once for the whole month. You can still change a single day in the table below.</span></div>';
+  /* KPIs */
+  var pc=function(k){var a=avg(k),t=tavg(k);return (a!=null&&t)?Math.round(a/t*100)+'%':'—'};
+  h+='<div class="avx-kpis">'
+    +'<div class="avx-k"><div class="v">'+filled+' / '+pastDays+'</div><div class="l">Days filled so far</div></div>'
+    +'<div class="avx-k ok"><div class="v">'+met+'</div><div class="l">🟢 Days on target</div></div>'
+    +'<div class="avx-k bad"><div class="v">'+low+'</div><div class="l">🔴 Days below target</div></div>'
+    +'<div class="avx-k warn"><div class="v">'+Math.max(0,miss-(dm-pastDays))+'</div><div class="l">⚪ Missing days</div></div>'
+    +'<div class="avx-k"><div class="v">'+(avg('coach')==null?'—':Math.round(avg('coach')))+' <small style="font-size:.7rem;color:var(--mut)">'+pc('coach')+'</small></div><div class="l">COACH avg / day</div></div>'
+    +'<div class="avx-k"><div class="v">'+(avg('pgc')==null?'—':Math.round(avg('pgc')))+' <small style="font-size:.7rem;color:var(--mut)">'+pc('pgc')+'</small></div><div class="l">PGC avg / day</div></div>'
+    +'</div>';
+  /* calendar */
+  h+='<div class="avx-cal">';
+  for(i=0;i<dm;i++){
+    var st=dayStatus(m,i), wd=new Date(y,m,i+1).getDay();
+    h+='<div class="avx-day '+st+(isToday(m,i+1)?' today':'')+'" onclick="AVX.go('+i+')" title="'+(i+1)+' '+(MF[m]||'')+' — '
+      +({met:'on target',low:'below target',part:'partly filled / no target',miss:'missing',fut:'upcoming'}[st])+'">'
+      +'<div class="w">'+WD[wd]+'</div><div class="n">'+(i+1)+'</div></div>';
+  }
+  h+='</div><div class="avx-legend"><span><i style="background:#3ddc84"></i>On target</span><span><i style="background:#ff6b7a"></i>Below target</span>'
+    +'<span><i style="background:#ffc107"></i>Part filled / no target</span><span><i style="border:2px dashed #6c7293"></i>Missing</span>'
+    +'<span><i style="box-shadow:0 0 0 2px #0DCAF0;background:transparent"></i>Today</span></div>';
+  /* table */
+  h+='<div class="avx-tbl" id="avxTbl"><table><thead>'
+    +'<tr><th rowspan="2">Day</th><th colspan="3" class="grp-c">COACH</th><th colspan="3" class="grp-p">PGC</th><th rowspan="2">Status</th><th rowspan="2"></th></tr>'
+    +'<tr><th class="grp-c">Actual</th><th class="grp-c">Target</th><th class="grp-c">%</th><th class="grp-p">Actual</th><th class="grp-p">Target</th><th class="grp-p">%</th></tr>'
+    +'</thead><tbody>';
+  for(i=0;i<dm;i++){
+    var wd2=new Date(y,m,i+1).getDay(), st2=dayStatus(m,i);
+    h+='<tr id="avxR'+i+'" class="'+(isFuture(m,i+1)?'fut':'')+(flashDay===i?' flash':'')+'"><td class="d">'+(i+1)+'<small>'+WD[wd2]+'</small></td>';
+    for(j=0;j<FLEETS.length;j++){
+      f=FLEETS[j];
+      var a=val(f,m,i,'actual'), t=val(f,m,i,'target'), sc=srcOf(f,m,i,map), key=f.k+'|'+m+'|'+i, p=pct(a,t);
+      if(sc==='a'&&!editing[key]){
+        h+='<td><span class="avx-auto-val">'+(a==null?'—':a)+' <span class="avx-tag a" title="Filled automatically from Daily Status">auto</span>'
+          +'<button class="avx-mini" title="Type a different figure for this day" onclick="AVX.edit(\''+key+'\')">✏️</button></span></td>';
+      }else{
+        h+='<td><input class="avx-in" data-f="'+f.k+'" data-fld="actual" data-i="'+i+'" type="text" inputmode="numeric" value="'+(a==null?'':a)+'" placeholder="—">'
+          +(sc==='e'?' <span class="avx-tag e" title="Typed by hand over the Daily Status figure">edited</span><button class="avx-mini" title="Use the Daily Status figure again" onclick="AVX.revert(\''+f.k+'\','+m+','+i+')">↺</button>':'')+'</td>';
+      }
+      h+='<td><input class="avx-in" data-f="'+f.k+'" data-fld="target" data-i="'+i+'" type="text" inputmode="numeric" value="'+(t==null?'':t)+'" placeholder="—"></td>';
+      h+='<td><span class="avx-pct '+(p==null?'na':(p>=1?'ok':'lo'))+'">'+(p==null?'—':Math.round(p*100)+'%')+'</span></td>';
+    }
+    h+='<td><span class="avx-dot '+st2+'" title="'+st2+'"></span></td>'
+      +'<td>'+(i>0?'<button class="avx-mini" title="Copy the previous day into empty boxes of this day" onclick="AVX.copyPrev('+i+')">⇩ prev</button>':'')+'</td></tr>';
+  }
+  h+='</tbody></table></div>';
+  h+='<div class="avx-note"><b>How it works:</b> actual figures come <b>automatically from Daily Status</b> (marked <span class="avx-tag a">auto</span>) — only use ✏️ when a day needs a different number '
+    +'(it is then marked <span class="avx-tag e">edited</span> and kept; ↺ puts the Daily Status figure back). '
+    +'<b>Enter</b> or <b>↓</b> moves to the next day, <b>↑</b> to the previous day. '
+    +'To back-fill, copy a column of numbers in Excel, click the first day and press <b>Cmd/Ctrl+V</b> — it fills downwards (two columns fill actual + target). '
+    +'Remember to click <b>💾 Save</b> to send changes to the cloud.</div>';
+  h+='</div>';
+  area.innerHTML=h;
+  flashDay=null;
+  wire(area);
+  if(focusNext){var fn=focusNext;focusNext=null;var el=area.querySelector('.avx-in[data-f="'+fn.f+'"][data-fld="'+fn.fld+'"][data-i="'+fn.i+'"]');if(el){el.focus();el.select();}}
+}
+function rerender(){var area=document.getElementById('dataArea');if(area&&typeof dataTab!=='undefined'&&dataTab==='avail')render(area);}
+
+/* ---------------- keyboard + paste ---------------- */
+function commitInput(el){
+  var f=el.getAttribute('data-f'),fld=el.getAttribute('data-fld'),i=+el.getAttribute('data-i'),m=curMonth(),v=toN(el.value);
+  var mo=fleetMonth(FLEETS[f==='pgc'?1:0],m);if(!mo)return false;
+  if(mo[fld][i]===v)return false;
+  if(fld==='actual')setActual(f,m,i,v);else setTarget(f,m,i,v);
+  delete editing[f+'|'+m+'|'+i];
+  return true;
+}
+function wire(area){
+  area.querySelectorAll('.avx-in').forEach(function(el){
+    el.addEventListener('keydown',function(e){
+      var i=+el.getAttribute('data-i'),dm=dimOf(curMonth()),k=e.key;
+      if(k==='Enter'||k==='ArrowDown'||k==='ArrowUp'){
+        e.preventDefault();
+        var ni=(k==='ArrowUp')?Math.max(0,i-1):Math.min(dm-1,i+1);
+        focusNext={f:el.getAttribute('data-f'),fld:el.getAttribute('data-fld'),i:ni};
+        var ch=commitInput(el);if(ch)changed();
+        /* if the next cell shows an "auto" figure, open it for typing only when moving within actuals by keyboard */
+        if(el.getAttribute('data-fld')==='actual'){var key=focusNext.f+'|'+curMonth()+'|'+ni;var map=srcMap();if(srcOf(FLEETS[focusNext.f==='pgc'?1:0],curMonth(),ni,map)==='a')focusNext.fld='target';}
+        rerender();
+      }else if(k==='Escape'){el.blur();rerender();}
+    });
+    el.addEventListener('change',function(){if(commitInput(el)){changed();rerender();}});
+    el.addEventListener('paste',function(e){
+      var txt=(e.clipboardData||window.clipboardData).getData('text');
+      if(!txt||!/[\n\t]/.test(txt.trim()))return;          /* single value: normal paste */
+      e.preventDefault();
+      var rows=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n'), m=curMonth(), dm=dimOf(m);
+      var f=el.getAttribute('data-f'), fld=el.getAttribute('data-fld'), i0=+el.getAttribute('data-i'), n=0;
+      rows.forEach(function(r,ri){
+        var i=i0+ri; if(i>=dm)return;
+        var cells=r.split('\t');
+        var put=function(fl,v){var x=toN(v);if(x==null&&String(v).trim()!=='')return;if(fl==='actual')setActual(f,m,i,x);else setTarget(f,m,i,x);n++;};
+        put(fld,cells[0]);
+        if(cells.length>1&&fld==='actual')put('target',cells[1]);
+      });
+      changed();rerender();
+      if(typeof toast==='function')toast('Pasted '+rows.length+' day'+(rows.length===1?'':'s')+' from the clipboard ✔');
+    });
+  });
+}
+
+/* ---------------- public actions ---------------- */
+window.AVX={
+  render:render,
+  month:function(n){month=Math.min(11,Math.max(0,curMonth()+n));editing={};rerender();},
+  thisMonth:function(){month=null;editing={};rerender();var t=todayRef();if(t.m===curMonth())AVX.go(t.d-1);},
+  go:function(i){flashDay=i;rerender();var r=document.getElementById('avxR'+i),box=document.getElementById('avxTbl');
+    if(r&&box){box.scrollTop=r.offsetTop-box.clientHeight/2+r.offsetHeight;r.scrollIntoView({block:'nearest'});}
+    var el=r&&r.querySelector('.avx-in');if(el)el.focus();},
+  edit:function(key){editing[key]=true;var p=key.split('|');focusNext={f:p[0],fld:'actual',i:+p[2]};rerender();},
+  revert:function(fk,m,i){
+    var map=srcMap(),ds=map[m+'|'+i];
+    try{if(sav())sav().ovDel(fk,m,i)}catch(e){}
+    if(ds){var mo=fleetMonth(FLEETS[fk==='pgc'?1:0],m);if(mo)mo.actual[i]=sav().dsVal(ds,fk);}
+    if(typeof persist==='function')persist();rerender();
+    if(typeof toast==='function')toast('Day '+(i+1)+' uses the Daily Status figure again');},
+  revertAll:function(){
+    var m=curMonth(),map=srcMap(),n=0;
+    FLEETS.forEach(function(f){for(var i=0;i<dimOf(m);i++)if(sav()&&sav().ovHas(f.k,m,i)){sav().ovDel(f.k,m,i);var ds=map[m+'|'+i];if(ds){fleetMonth(f,m).actual[i]=sav().dsVal(ds,f.k);}n++;}});
+    if(!n)return;
+    if(typeof persist==='function')persist();rerender();
+    if(typeof toast==='function')toast(n+' hand-typed figure'+(n===1?'':'s')+' replaced by Daily Status');},
+  applyTarget:function(onlyEmpty){
+    var m=curMonth(),dm=dimOf(m),tc=toN(document.getElementById('avxTc').value),tp=toN(document.getElementById('avxTp').value),n=0;
+    if(tc==null&&tp==null){if(typeof toast==='function')toast('Type a COACH and/or PGC target first');return;}
+    for(var i=0;i<dm;i++){
+      if(tc!=null&&(!onlyEmpty||val(FLEETS[0],m,i,'target')==null)){setTarget('coach',m,i,tc);n++;}
+      if(tp!=null&&(!onlyEmpty||val(FLEETS[1],m,i,'target')==null)){setTarget('pgc',m,i,tp);n++;}
+    }
+    changed();rerender();
+    if(typeof toast==='function')toast('Target set on '+n+' day'+(n===1?'':'s')+' — click 💾 Save to keep it');},
+  copyPrev:function(i){
+    var m=curMonth(),n=0;
+    FLEETS.forEach(function(f){['actual','target'].forEach(function(fld){
+      if(val(f,m,i,fld)==null&&val(f,m,i-1,fld)!=null){if(fld==='actual')setActual(f.k,m,i,val(f,m,i-1,fld));else setTarget(f.k,m,i,val(f,m,i-1,fld));n++;}});});
+    if(n){changed();rerender();}
+    if(typeof toast==='function')toast(n?('Day '+(i+1)+' filled from day '+i):'Nothing to copy — day '+(i+1)+' is already filled');},
+  auto:function(on){if(typeof savToggle==='function')savToggle(on);rerender();},
+  sync:function(){if(typeof savSyncNow==='function')savSyncNow();rerender();}
+};
+})();
+</script>
+
 <!-- ================= END SYSTEM AVAILABILITY (DAILY) MODULE ================= -->
 
 <style id="darkCss">
