@@ -5312,9 +5312,7 @@ function render(area){
     +'<button class="avx-nav" onclick="AVX.month(1)" title="Next month">›</button>'
     +'<button class="avx-btn" onclick="AVX.thisMonth()">This month</button></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
-    +'<label class="avx-auto"><input type="checkbox" '+(sav()&&sav().autoOn()?'checked':'')+' onchange="AVX.auto(this.checked)"> Auto-fill actuals from Daily Status</label>'
-    +'<button class="avx-btn" onclick="AVX.sync()" title="Take the latest Daily Status figures now">⟳ Sync now</button>'
-    +(edited?'<button class="avx-btn" onclick="AVX.revertAll()" title="Drop hand-typed figures this month and use Daily Status again">↺ Undo my edits ('+edited+')</button>':'')
+    +'<button class="avx-btn" onclick="AVX.sync()" title="Take the latest Daily Status figures now">⟳ Update from Daily Status</button>'
     +'</div></div>';
   /* monthly target */
   var tc=commonTarget(FLEETS[0],m), tp=commonTarget(FLEETS[1],m);
@@ -5356,13 +5354,7 @@ function render(area){
     for(j=0;j<FLEETS.length;j++){
       f=FLEETS[j];
       var a=val(f,m,i,'actual'), t=val(f,m,i,'target'), sc=srcOf(f,m,i,map), key=f.k+'|'+m+'|'+i, p=pct(a,t);
-      if(sc==='a'&&!editing[key]){
-        h+='<td><span class="avx-auto-val">'+(a==null?'—':a)+' <span class="avx-tag a" title="Filled automatically from Daily Status">auto</span>'
-          +'<button class="avx-mini" title="Type a different figure for this day" onclick="AVX.edit(\''+key+'\')">✏️</button></span></td>';
-      }else{
-        h+='<td><input class="avx-in" data-f="'+f.k+'" data-fld="actual" data-i="'+i+'" type="text" inputmode="numeric" value="'+(a==null?'':a)+'" placeholder="—">'
-          +(sc==='e'?' <span class="avx-tag e" title="Typed by hand over the Daily Status figure">edited</span><button class="avx-mini" title="Use the Daily Status figure again" onclick="AVX.revert(\''+f.k+'\','+m+','+i+')">↺</button>':'')+'</td>';
-      }
+      h+='<td><input class="avx-in" data-f="'+f.k+'" data-fld="actual" data-i="'+i+'" type="text" inputmode="numeric" value="'+(a==null?'':a)+'" placeholder="—"></td>';
       h+='<td><input class="avx-in" data-f="'+f.k+'" data-fld="target" data-i="'+i+'" type="text" inputmode="numeric" value="'+(t==null?'':t)+'" placeholder="—"></td>';
       h+='<td><span class="avx-pct '+(p==null?'na':(p>=1?'ok':'lo'))+'">'+(p==null?'—':Math.round(p*100)+'%')+'</span></td>';
     }
@@ -5370,8 +5362,7 @@ function render(area){
       +'<td>'+(i>0?'<button class="avx-mini" title="Copy the previous day into empty boxes of this day" onclick="AVX.copyPrev('+i+')">⇩ prev</button>':'')+'</td></tr>';
   }
   h+='</tbody></table></div>';
-  h+='<div class="avx-note"><b>How it works:</b> actual figures come <b>automatically from Daily Status</b> (marked <span class="avx-tag a">auto</span>) — only use ✏️ when a day needs a different number '
-    +'(it is then marked <span class="avx-tag e">edited</span> and kept; ↺ puts the Daily Status figure back). '
+  h+='<div class="avx-note"><b>How it works:</b> actual figures fill in <b>automatically from Daily Status</b>; type over any day to use your own number. '
     +'<b>Enter</b> or <b>↓</b> moves to the next day, <b>↑</b> to the previous day. '
     +'To back-fill, copy a column of numbers in Excel, click the first day and press <b>Cmd/Ctrl+V</b> — it fills downwards (two columns fill actual + target). '
     +'Remember to click <b>💾 Save</b> to send changes to the cloud.</div>';
@@ -5401,8 +5392,6 @@ function wire(area){
         var ni=(k==='ArrowUp')?Math.max(0,i-1):Math.min(dm-1,i+1);
         focusNext={f:el.getAttribute('data-f'),fld:el.getAttribute('data-fld'),i:ni};
         var ch=commitInput(el);if(ch)changed();
-        /* if the next cell shows an "auto" figure, open it for typing only when moving within actuals by keyboard */
-        if(el.getAttribute('data-fld')==='actual'){var key=focusNext.f+'|'+curMonth()+'|'+ni;var map=srcMap();if(srcOf(FLEETS[focusNext.f==='pgc'?1:0],curMonth(),ni,map)==='a')focusNext.fld='target';}
         rerender();
       }else if(k==='Escape'){el.blur();rerender();}
     });
