@@ -676,27 +676,30 @@ async function authToken(){
   if(Date.now()>_auth.exp-120000)await authRefresh();
   return _auth&&_auth.access;
 }
-function showLogin(msg){
+function showLogin(msg,info){
   const ov=document.getElementById("loginOv");if(!ov)return;
   try{                                    /* KTM logo + train photos already built into this page */
     const lg=document.getElementById("loginLogo");
     if(typeof KASSET!=="undefined"&&lg&&!lg.src)lg.src=KASSET.logo;
   }catch(e){}
   ov.classList.add("show");
-  const er=document.getElementById("loginErr");if(er)er.textContent=msg||"";
+  const er=document.getElementById("loginErr");if(er){er.textContent=msg||"";er.classList.toggle("info",!!info);}
   const id=document.getElementById("loginId");if(id&&!id.value)setTimeout(()=>id.focus(),50);
 }
 async function doLogin(){
   const id=(document.getElementById("loginId").value||"").trim(), pw=document.getElementById("loginPw").value||"";
   const er=document.getElementById("loginErr"), btn=document.getElementById("loginBtn");
   if(!id||!pw){er.textContent="Enter your ID and password";return;}
-  btn.disabled=true;btn.textContent="Logging in…";er.textContent="";
+  btn.disabled=true;btn.textContent="Logging in…";er.textContent="";er.classList.remove("info");
   try{
     await authLogin(id,pw);
     document.getElementById("loginPw").value="";
     document.getElementById("loginOv").classList.remove("show");
     if(_loginResolve){const r=_loginResolve;_loginResolve=null;r();}
+    else if(_keepAfterLock){_keepAfterLock=false;markActive(true);renderUserBox();
+      toast("Welcome back "+authId()+" — your unsaved changes are still here. Click 💾 Save.",7000);}
     else{await cloudHydrate();if(typeof applyYear==="function")applyYear();toast("Logged in as "+authId()+" ✔");}
+    markActive(true);
   }catch(e){
     er.textContent=e.network?e.message:(/invalid|credentials|not found|400/i.test(e.message)?"Wrong ID or password":("Could not log in: "+e.message));
   }finally{btn.disabled=false;btn.textContent="Log in";}
@@ -708,9 +711,63 @@ async function ensureLogin(){
     try{await authToken();if(_auth)return;}
     catch(e){if(_auth)return;}          /* offline: keep the saved session, saving will retry later */
   }
-  showLogin();
+  let why=null;try{why=localStorage.getItem(IDLE_MSG_KEY);localStorage.removeItem(IDLE_MSG_KEY)}catch(e){}
+  showLogin(why==='saved'?"You were logged out after 15 minutes without activity. Your changes were saved to the cloud."
+           :why?"You were logged out after 15 minutes without activity.":"",true);
   await new Promise(res=>{_loginResolve=res});
+  markActive(true);
 }
+
+/* ================= AUTO LOG-OUT after 15 minutes without activity =================
+   Activity = mouse, keys, touch, scroll in any open dashboard tab (shared through localStorage).
+   A banner warns 1 minute before. Unsaved changes are saved to the cloud first; if that is not
+   possible the screen is locked instead, and the changes are still there after logging in again. */
+const IDLE_MS=15*60*1000, IDLE_WARN_MS=60*1000, ACT_KEY="rsd_last_active_v1", IDLE_MSG_KEY="rsd_idle_msg_v1";
+let _lastAct=Date.now(), _idleBusy=false, _keepAfterLock=false, _idleTick=null;
+function idleLimit(){return window.RSD_IDLE_MS||IDLE_MS}
+function markActive(force){
+  const n=Date.now();
+  if(!force&&n-_lastAct<3000){if(_idleTick)hideIdleWarn();return;}
+  _lastAct=n;try{localStorage.setItem(ACT_KEY,String(n))}catch(e){}
+  hideIdleWarn();
+}
+function lastActive(){let t=_lastAct;try{t=Math.max(t,+localStorage.getItem(ACT_KEY)||0)}catch(e){}return t}
+function showIdleWarn(){
+  let el=document.getElementById("idleWarn");
+  if(!el){el=document.createElement("div");el.id="idleWarn";el.className="idlewarn";document.body.appendChild(el);}
+  const draw=()=>{const left=Math.max(0,Math.ceil((idleLimit()-(Date.now()-lastActive()))/1000));
+    el.innerHTML="⏳ No activity — you will be logged out in <b>"+left+" s</b>. Move the mouse or press a key to stay logged in.";
+    if(Date.now()-lastActive()<idleLimit()-IDLE_WARN_MS)hideIdleWarn();};
+  draw();el.classList.add("show");
+  if(!_idleTick)_idleTick=setInterval(draw,1000);
+}
+function hideIdleWarn(){if(_idleTick){clearInterval(_idleTick);_idleTick=null;}const el=document.getElementById("idleWarn");if(el)el.classList.remove("show");}
+async function checkIdle(){
+  if(!_auth||_idleBusy||!sbEnabled())return;
+  const idle=Date.now()-lastActive();
+  if(idle>=idleLimit())return idleLogout();
+  if(idle>=idleLimit()-IDLE_WARN_MS)showIdleWarn();else hideIdleWarn();
+}
+async function idleLogout(){
+  _idleBusy=true;hideIdleWarn();
+  let saved=false,keep=false;
+  if(typeof dirty!=="undefined"&&dirty){
+    try{await cloudPushAll();if(typeof setDirty==="function")setDirty(false);saved=true;}
+    catch(e){keep=true;}
+  }
+  try{await authCall("logout",{},_auth&&_auth.access);}catch(e){}
+  if(keep){                                         /* could not save: lock the screen, keep the work */
+    authSave(null);_keepAfterLock=true;_idleBusy=false;
+    showLogin("Logged out after 15 minutes without activity. Your unsaved changes are still here — log in and click 💾 Save.",true);
+    return;
+  }
+  try{localStorage.setItem(IDLE_MSG_KEY,saved?"saved":"idle");
+    [AUTH_KEY,"rsd_years_v1","rsd_state_v2","rsd_wb_b64_v2",DAILY_EKEY,DAILY_RKEY,"rsd_avail_manual_v1","rptDocSeq_v1"].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  location.reload();
+}
+["mousemove","mousedown","keydown","touchstart","wheel","scroll"].forEach(ev=>window.addEventListener(ev,()=>markActive(),{passive:true,capture:true}));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkIdle();});
+setInterval(checkIdle,10000);
 function renderUserBox(){
   const el=document.getElementById("userBox");if(!el)return;
   if(!_auth){el.innerHTML="";return;}
@@ -5577,7 +5634,10 @@ a{color:#6ea8fe}
 .logincard input:focus{background:#12151c;border-color:#AF1763;box-shadow:0 0 0 4px rgba(175,23,99,.22)}
 .logincard button[type=submit]{background:linear-gradient(120deg,#AF1763,#d63384);box-shadow:0 10px 26px rgba(175,23,99,.4)}
 .logincard button[type=submit]:hover{box-shadow:0 14px 30px rgba(175,23,99,.5)}
-.loginerr{color:#ff6b7a}
+.loginerr{color:#ff6b7a}.loginerr.info{color:#ffc107}
+.idlewarn{position:fixed;left:50%;top:14px;transform:translate(-50%,-140%);z-index:400;max-width:calc(100% - 24px);padding:12px 18px;border-radius:12px;
+  background:#2a2d37;border:1px solid rgba(255,193,7,.55);color:#ffe08a;font-size:.86rem;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.5);transition:transform .25s}
+.idlewarn.show{transform:translate(-50%,0)}.idlewarn b{color:#fff}
 .loginfoot{border-top-color:#2c2e33;color:#6c7293}.loginfoot b{color:#a3a8c3}
 /* Daily Status: total bars and figures whose colours are written inline by the code */
 .dly-tot:not(#dlySheet *){background-color:#22252e!important;border-color:#2c2e33!important;color:#e4e6ef!important}
