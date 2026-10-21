@@ -2682,10 +2682,11 @@ function build(p,data){
     /* system failures + 4M: period months side by side, 2 per slide */
     for(var c0=0;c0<ms.length;c0+=2){
       var grp=ms.slice(c0,c0+2),n=grp.length,colW=n===1?12.33:6.05,gapX=.23;
-      /* system failures */
-      sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','FAILURE ANALYSIS BY SYSTEM & MONTHLY TREND');
-      grp.forEach(function(m,gi){
-        var x=.5+gi*(colW+gapX),rowsM=sysMonth(sn,m),tot=rowsM.reduce(function(a,r){return a+r.total},0);
+      /* system failures: one slide per month, full width */
+      grp.forEach(function(m){
+        var colW=12.33,x=.5;
+        sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','FAILURE ANALYSIS BY SYSTEM & MONTHLY TREND');
+        var rowsM=sysMonth(sn,m),tot=rowsM.reduce(function(a,r){return a+r.total},0);
         tag(sl,MF[m]+' '+Y+'  ·  '+tot+' CASES',x,1.28,Math.min(colW,3.6));
         panel(sl,x,1.72,colW,3.28);
         sl.addImage({data:im.sys[m],x:x+.12,y:1.8,w:colW-.24,h:3.12});
@@ -2698,9 +2699,9 @@ function build(p,data){
         var top4=rowsM.slice(0,4);
         sl.addText([{text:'MOST CASES'+(topCls&&topCls[1]?'  ·  '+topCls[0]:'')+'   ',options:{bold:true,color:C.eyebrow,charSpacing:1}}].concat(
           top4.length?top4.map(function(r,i){return {text:'▪ '+r.system+' – '+r.total+(i<top4.length-1?'     ':''),options:{bold:true,color:C.ink}}}):[{text:'No failures recorded',options:{color:C.mut}}]),
-          {x:x,y:5.98,w:colW,h:.62,fontSize:8.5,fontFace:F,valign:'top'});
+          {x:x,y:5.98,w:colW,h:.62,fontSize:9.5,fontFace:F,valign:'top'});
+        foot(sl,f[1]+' FAILURE ANALYSIS');
       });
-      foot(sl,f[1]+' FAILURE ANALYSIS');
 
       /* 4M */
       sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','4M Failure Classification — Method, Material, Manpower, Machine');
@@ -2775,7 +2776,7 @@ window.DLO={
         var k=FLEETS[fi][0],sn=snapSec(S,k),ms=months(),im={sys:{},fm:{}},colW=ms.length>1?6.05:12.33;
         im.avail=await imgAvail(sn);im.pe=await imgPe(sn);
         for(var i=0;i<ms.length;i++){
-          im.sys[ms[i]]=await imgSys(sn,ms[i],Math.round(colW*150),468);
+          im.sys[ms[i]]=await imgSys(sn,ms[i],Math.round(12.33*150),468);
           im.fm[ms[i]]=await img4m(sn,ms[i],Math.round(colW*150),312);}
         data[k]={sn:sn,im:im};
       }
