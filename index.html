@@ -436,6 +436,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
       <span class="emo">💾</span><span id="btnSaveLabel">Save</span></button>
     <span class="cpill off" id="cloudPill" onclick="openCloudModal()" title="Cloud save status">☁ Cloud off</span>
     <span class="ubox" id="userBox"></span>
+    <button class="hbtn" id="btnFull" onclick="toggleFullScreen()" title="Full screen on/off (Esc to exit)"><span class="emo">⛶</span><span id="btnFullLabel">Full screen</span></button>
     <button class="hbtn" id="btnDownload" onclick="downloadExcel()" title="Download the latest saved data as an Excel workbook (original formatting preserved)">
       <span class="emo">📥</span><span id="btnDownloadLabel">Download Excel</span></button>
     <button class="hbtn accent" onclick="generatePpt()" title="Generate a PowerPoint for the current section from live data">
@@ -1336,6 +1337,17 @@ function resetAll(){if(!confirm("Discard the edits for "+RS_YEAR+" and restore t
   else S=blankYear();
   lastSaved=null;yrSrcLabel=null;setDirty(false);applyYear();toast("Reporting year "+RS_YEAR+" reset");
   if(sbEnabled())cloudPushQuiet();}
+/* full screen on/off — hides the browser bars so the dashboard fills the whole display */
+function toggleFullScreen(){
+  const d=document,el=d.documentElement,on=d.fullscreenElement||d.webkitFullscreenElement;
+  try{if(on)(d.exitFullscreen||d.webkitExitFullscreen).call(d);
+      else (el.requestFullscreen||el.webkitRequestFullscreen).call(el);}
+  catch(e){toast('Press Ctrl+Cmd+F (Mac) or F11 (Windows) for full screen');}
+}
+["fullscreenchange","webkitfullscreenchange"].forEach(ev=>document.addEventListener(ev,()=>{
+  const on=!!(document.fullscreenElement||document.webkitFullscreenElement),l=document.getElementById('btnFullLabel');
+  if(l)l.textContent=on?'Exit full screen':'Full screen';
+  setTimeout(()=>{try{Object.values(charts||{}).forEach(c=>c&&c.resize&&c.resize())}catch(e){}},300);}));
 function toast(m,ms){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),ms||2600);}
 
 /* ================= ACCESSORS / DERIVED ================= */
@@ -6646,6 +6658,24 @@ td input[type=number]:not(.rpt-doc *):not(#dlySheet *){background-color:#191C24}
 .sav-dhint:not(.rpt-doc *):not(#dlySheet *){background-color:#22252e}
 .sav-dhint.live:not(.rpt-doc *):not(#dlySheet *){background-color:#22252e;border-color:rgba(25,135,84,.6);color:#3ddc84}
 .sav-dhint.ovr:not(.rpt-doc *):not(#dlySheet *){background-color:#22252e;border-color:rgba(255,193,7,.45);color:#ffc107}
+</style>
+<style id="fitCss">
+/* ================= FIT THE SCREEN =================
+   Desktop and large monitors: use the full width, let tables and charts grow with the window height.
+   Phones/tablets keep their own layout (rules below only apply from 1100px wide). */
+@media (min-width:1100px){
+  .tabs,main{max-width:none}
+  main{padding-left:clamp(16px,1.6vw,40px);padding-right:clamp(16px,1.6vw,40px)}
+  .tabs{padding-left:clamp(16px,1.6vw,40px);padding-right:clamp(16px,1.6vw,40px)}
+  .tblwrap{max-height:calc(100vh - 290px)}
+  .avx-tbl{max-height:calc(100vh - 300px)}
+  .chartbox{height:clamp(280px,30vh,560px)}
+  .chartbox.tall{height:clamp(330px,36vh,640px)}
+}
+/* bigger text on big monitors so it stays readable from a normal distance */
+@media (min-width:1900px){html{font-size:16px}}
+@media (min-width:2400px){html{font-size:17.5px}}
+@media (min-width:3000px){html{font-size:19px}}
 </style>
 </body>
 </html>
