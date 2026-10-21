@@ -2679,62 +2679,69 @@ function build(p,data){
       ['PE COMPLETION (%)',MN.map(function(_,m){var v=pct(sn.peM[m]);return m<=last&&v!=null?v:''}),function(v){return good(v)}]],5.82,.27);
     foot(sl,f[1]+' PREVENTIVE MAINTENANCE');
 
-    /* system failures + 4M: period months side by side, 2 per slide */
-    for(var c0=0;c0<ms.length;c0+=2){
-      var grp=ms.slice(c0,c0+2),n=grp.length,colW=n===1?12.33:6.05,gapX=.23;
-      /* system failures: one slide per month, full width */
-      grp.forEach(function(m){
-        var colW=12.33,x=.5;
-        sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','FAILURE ANALYSIS BY SYSTEM & MONTHLY TREND');
-        var rowsM=sysMonth(sn,m),tot=rowsM.reduce(function(a,r){return a+r.total},0);
-        tag(sl,MF[m]+' '+Y+'  ·  '+tot+' CASES',x,1.28,Math.min(colW,3.6));
-        panel(sl,x,1.72,colW,3.28);
-        sl.addImage({data:im.sys[m],x:x+.12,y:1.8,w:colW-.24,h:3.12});
-        /* class counts */
-        var cw=(colW-(sn.classes.length-1)*.12)/sn.classes.length;
-        sn.classes.forEach(function(cl,ci){var v=rowsM.reduce(function(a,r){return a+(r.by[cl]||0)},0);
-          card(sl,x+ci*(cw+.12),5.1,cw,.78,{eyebrow:cl,value:String(v),big:18,color:v?C.navy:C.gray,fill:ci===0?C.light:C.white});});
-        /* most cases */
-        var topCls=sn.classes.map(function(cl){return [cl,rowsM.reduce(function(a,r){return a+(r.by[cl]||0)},0)]}).sort(function(a,b){return b[1]-a[1]})[0];
-        var top4=rowsM.slice(0,4);
-        sl.addText([{text:'MOST CASES'+(topCls&&topCls[1]?'  ·  '+topCls[0]:'')+'   ',options:{bold:true,color:C.eyebrow,charSpacing:1}}].concat(
-          top4.length?top4.map(function(r,i){return {text:'▪ '+r.system+' – '+r.total+(i<top4.length-1?'     ':''),options:{bold:true,color:C.ink}}}):[{text:'No failures recorded',options:{color:C.mut}}]),
-          {x:x,y:5.98,w:colW,h:.62,fontSize:9.5,fontFace:F,valign:'top'});
-        foot(sl,f[1]+' FAILURE ANALYSIS');
-      });
+    /* system failures + 4M: one month per slide, layout of the DLO report */
+    ms.forEach(function(m){
+      var MY=MF[m]+' '+Y,rowsM=sysMonth(sn,m),tot=rowsM.reduce(function(a,r){return a+r.total},0);
+      var clsTot=sn.classes.map(function(cl){return [cl,rowsM.reduce(function(a,r){return a+(r.by[cl]||0)},0)]});
+      var lbl=function(t,x,y,w){sl.addText(t,{x:x,y:y,w:w,h:.3,fontSize:11,bold:true,color:C.navy,charSpacing:1,fontFace:F});};
+      var inner=function(t,x,y,w){sl.addText(t,{x:x,y:y,w:w,h:.25,fontSize:9,bold:true,color:C.navy,charSpacing:1,fontFace:F});};
+      /* ---- failure analysis ---- */
+      sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','FAILURE ANALYSIS BY SYSTEM & MONTHLY TREND');
+      lbl('SYSTEM FAILURES — ('+MY+')',.5,1.3,6.9);
+      panel(sl,.5,1.65,6.9,3.75);
+      inner(f[1]+' SYSTEM FAILURE TREND BY CLASS — '+MY,.75,1.8,6.5);
+      sl.addImage({data:im.sys[m],x:.62,y:2.1,w:6.66,h:3.22});
+      sl.addText('MONTHLY FAILURES TREND & FAILURE IN SERVICE ('+MY+')',{x:7.7,y:1.3,w:5.2,h:.3,fontSize:9.5,bold:true,color:C.navy,charSpacing:.5,fontFace:F,fit:'shrink'});
+      panel(sl,7.7,1.65,5.13,3.75);
+      tag(sl,MY+' (MOST CASES)',7.95,1.85,3.3);
+      var y=2.35,shown=clsTot.filter(function(c){return c[1]>0}).sort(function(a,b){return b[1]-a[1]}).slice(0,2);
+      if(!shown.length)sl.addText('No failures recorded this month.',{x:7.95,y:y,w:4.7,h:.3,fontSize:10,color:C.mut,fontFace:F});
+      shown.forEach(function(c){
+        var top=rowsM.filter(function(r){return r.by[c[0]]}).sort(function(a,b){return b.by[c[0]]-a.by[c[0]]}).slice(0,4);
+        sl.addText(c[0],{x:7.95,y:y,w:4.6,h:.26,fontSize:10.5,bold:true,color:C.eyebrow,fontFace:F});y+=.3;
+        sl.addText(top.map(function(r,k){return {text:'▪   '+r.system+' – '+r.by[c[0]],options:{breakLine:k<top.length-1}}}),
+          {x:8.1,y:y,w:4.6,h:top.length*.26,fontSize:10,bold:true,color:C.ink,fontFace:F,valign:'top',paraSpaceAfter:2});
+        y+=top.length*.26+.18;});
+      lbl(MY+' ('+tot+' CASES)',.5,5.55,8);
+      var cw=(12.33-(sn.classes.length-1)*.22)/sn.classes.length;
+      clsTot.forEach(function(c,ci){card(sl,.5+ci*(cw+.22),5.9,cw,1.0,{eyebrow:c[0],value:String(c[1]),big:22,color:c[1]?C.navy:C.gray,fill:C.white});});
+      foot(sl,f[1]+' FAILURE ANALYSIS');
 
-      /* 4M */
+      /* ---- 4M ---- */
+      var keys=Object.keys(sn.fm);
+      var U=keys.map(function(kk){return +sn.fm[kk].usw[m]||0}),Fv=keys.map(function(kk){return +sn.fm[kk].fis[m]||0});
+      var topEl=function(arr){var mx=Math.max.apply(null,arr);return mx>0?keys[arr.indexOf(mx)].toUpperCase():'MATERIAL'};
       sl=p.addSlide();header(sl,f[1]+' — SYSTEM FAILURES','4M Failure Classification — Method, Material, Manpower, Machine');
-      grp.forEach(function(m,gi){
-        var x=.5+gi*(colW+gapX),keys=Object.keys(sn.fm);
-        tag(sl,'4M ELEMENT · '+MF[m]+' '+Y,x,1.28,Math.min(colW,3.6));
-        panel(sl,x,1.72,colW,2.2);
-        sl.addImage({data:im.fm[m],x:x+.12,y:1.78,w:colW-.24,h:2.08});
-        var U=keys.map(function(kk){return +sn.fm[kk].usw[m]||0}),Fv=keys.map(function(kk){return +sn.fm[kk].fis[m]||0});
-        sl.addTable([[th('4M')].concat(keys.map(th)),
-          [td('USW',{bold:true})].concat(U.map(function(v){return td(v,{bold:!!v})})),
-          [td('FIS',{bold:true,fill:C.light})].concat(Fv.map(function(v){return td(v,{bold:!!v,fill:C.light})})),
-          [td('SUM',{bold:true})].concat(U.map(function(v,i){return td(v+Fv[i],{bold:true,color:v+Fv[i]?C.navy:C.ink})}))],
-          {x:x,y:4.02,w:colW,colW:[colW*.2].concat(keys.map(function(){return colW*.8/keys.length})),fontSize:8.5,rowH:.24,border:{pt:.5,color:C.line},valign:'middle',autoPage:false});
-        /* FIS — from incident reports of that month */
-        var inc=sn.inc.filter(function(i){var d=String(i.date||'');return d.slice(0,4)===String(Y)&&+d.slice(5,7)===m+1});
-        var fis=inc.length?inc.slice(0,2).map(function(i,ii){return {text:'▪  '+(i.date||'')+'  ·  '+(i.unit||'—')+'  —  '+trunc(String(i.failure||'').replace(/\s+/g,' '),colW>7?190:105),
-              options:{breakLine:ii<Math.min(inc.length,2)-1||inc.length>2}}})
-          .concat(inc.length>2?[{text:'+ '+(inc.length-2)+' more in Incident Reports',options:{italic:true,color:C.mut}}]:[])
-          :[{text:'No failure-in-service incident reported this month.',options:{color:C.mut}}];
-        panel(sl,x,5.1,colW,.95);
-        sl.addText('FIS  ·  FAILURE IN SERVICE',{x:x+.15,y:5.14,w:colW-.3,h:.22,fontSize:8,bold:true,color:C.eyebrow,charSpacing:1,fontFace:F});
-        sl.addText(fis,{x:x+.15,y:5.36,w:colW-.3,h:.66,fontSize:7.5,color:C.ink,fontFace:F,valign:'top',lineSpacing:10});
-        /* USW — typed in the dialog */
-        var usw=String(notes().usw[k][m]||'').split(/\n+/).map(function(t){return t.trim()}).filter(Boolean);
-        panel(sl,x,6.12,colW,.88);
-        sl.addText('USW  ·  COMPONENTS',{x:x+.15,y:6.16,w:colW-.3,h:.22,fontSize:8,bold:true,color:C.eyebrow,charSpacing:1,fontFace:F});
-        sl.addText(usw.length?usw.slice(0,4).map(function(t,ii){return {text:'➢  '+t.toUpperCase(),options:{bold:true,breakLine:ii<Math.min(usw.length,4)-1}}})
-            :[{text:'Add component details in the Generate window (optional).',options:{color:C.mut,italic:true}}],
-          {x:x+.15,y:6.38,w:colW-.3,h:.6,fontSize:7.5,color:C.ink,fontFace:F,valign:'top',lineSpacing:10});
-      });
-      foot(sl,f[1]+' 4M ANALYSIS');
-    }
+      lbl('SYSTEM FAILURES — 4M ('+MY+')',.5,1.3,6.6);
+      panel(sl,.5,1.65,6.6,3.0);
+      inner('4M ELEMENT IN '+MY+' – '+(k==='pgc'?'PGC':'COACHES'),.75,1.8,6.2);
+      sl.addImage({data:im.fm[m],x:.62,y:2.1,w:6.36,h:2.48});
+      sl.addTable([[th('4M ELEMENT')].concat(keys.map(function(kk){return th(kk.toUpperCase())})),
+        [td('USW',{bold:true})].concat(U.map(function(v){return td(v,{bold:!!v,color:v?C.navy:C.ink})})),
+        [td('FIS',{bold:true,fill:C.light})].concat(Fv.map(function(v){return td(v,{bold:!!v,color:v?C.navy:C.ink,fill:C.light})})),
+        [td('SUM',{bold:true})].concat(U.map(function(v,i){return td(v+Fv[i],{bold:true,color:v+Fv[i]?C.navy:C.ink})}))],
+        {x:.5,y:4.85,w:6.6,colW:[1.6].concat(keys.map(function(){return 5.0/keys.length})),fontSize:9.5,rowH:.34,border:{pt:.5,color:C.line},valign:'middle',autoPage:false});
+      /* FIS box: incidents of the month */
+      panel(sl,7.35,1.5,5.48,2.75);
+      tag(sl,topEl(Fv)+'  ·  FIS  ·  '+MY,7.6,1.7,3.6);
+      var inc=sn.inc.filter(function(i){var d=String(i.date||'');return d.slice(0,4)===String(Y)&&+d.slice(5,7)===m+1});
+      if(inc.length){
+        var parts=[];inc.slice(0,2).forEach(function(i,ii){
+          parts.push({text:((i.unit||'')+(i.system?' — '+i.system:'')+(i.date?' ('+i.date+')':'')).toUpperCase(),options:{bold:true,color:C.navy,breakLine:true}});
+          parts.push({text:'▪  '+trunc(String(i.failure||'').replace(/\s+/g,' ')+(i.causes?'. '+String(i.causes).replace(/\s+/g,' '):''),inc.length>1?150:330),
+            options:{bold:true,color:C.ink,breakLine:ii<Math.min(inc.length,2)-1||inc.length>2}});});
+        if(inc.length>2)parts.push({text:'+ '+(inc.length-2)+' more in Incident Reports',options:{italic:true,color:C.mut}});
+        sl.addText(parts,{x:7.6,y:2.15,w:5.05,h:2.0,fontSize:9.5,fontFace:F,valign:'top',paraSpaceAfter:4,fit:'shrink'});
+      }else sl.addText('No failure-in-service incident reported this month.',{x:7.6,y:2.15,w:5.05,h:.4,fontSize:10,color:C.mut,fontFace:F});
+      /* USW box: component notes */
+      panel(sl,7.35,4.4,5.48,2.3);
+      tag(sl,topEl(U)+'  ·  USW  ·  '+MY,7.6,4.6,3.6);
+      var usw=String(notes().usw[k][m]||'').split(/\n+/).map(function(t){return t.trim()}).filter(Boolean);
+      sl.addText(usw.length?usw.slice(0,6).map(function(t,ii){return {text:'❖  '+t.toUpperCase(),options:{bold:true,breakLine:ii<Math.min(usw.length,6)-1}}})
+          :[{text:'Add component details in the Generate window (optional).',options:{color:C.mut,italic:true}}],
+        {x:7.6,y:5.05,w:5.05,h:1.55,fontSize:10.5,color:C.ink,fontFace:F,valign:'top',paraSpaceAfter:3,fit:'shrink'});
+      foot(sl,f[1]+' FAILURE ANALYSIS');
+    });
   });
 
   /* ---------- section 03: project status (Project Status tab) ---------- */
@@ -2776,8 +2783,8 @@ window.DLO={
         var k=FLEETS[fi][0],sn=snapSec(S,k),ms=months(),im={sys:{},fm:{}},colW=ms.length>1?6.05:12.33;
         im.avail=await imgAvail(sn);im.pe=await imgPe(sn);
         for(var i=0;i<ms.length;i++){
-          im.sys[ms[i]]=await imgSys(sn,ms[i],Math.round(12.33*150),468);
-          im.fm[ms[i]]=await img4m(sn,ms[i],Math.round(colW*150),312);}
+          im.sys[ms[i]]=await imgSys(sn,ms[i],1000,484);
+          im.fm[ms[i]]=await img4m(sn,ms[i],954,372);}
         data[k]={sn:sn,im:im};
       }
       Chart.defaults.font.family=old;
