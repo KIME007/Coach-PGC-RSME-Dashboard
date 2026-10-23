@@ -3002,7 +3002,7 @@ function field(lab,id,val,o){o=o||{};
   return '<div class="'+(o.full?'full':'')+'"><label for="'+id+'">'+lab+'</label>'
     +(o.area?'<textarea id="'+id+'">'+esc(val)+'</textarea>':o.opts?'<select id="'+id+'">'+o.opts.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===val?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select>'
       :'<input id="'+id+'" value="'+esc(val)+'"'+(o.type?' type="'+o.type+'" step="any" min="0" max="100"':'')+(o.list?' list="'+o.list+'"':'')+'>')
-    +(o.hint?'<div class="hint">'+o.hint+'</div>':'')+'</div>';
+    +(o.hint&&!/^e\.g\./i.test(o.hint)?'<div class="hint">'+o.hint+'</div>':'')+'</div>';
 }
 function contractorList(){var s={};book().list.forEach(function(p){if(p.contractor)s[p.contractor]=1});return Object.keys(s)}
 function slideList(){var s={};book().list.forEach(function(p){if(p.slide)s[p.slide]=1});return Object.keys(s)}
@@ -3058,7 +3058,7 @@ window.PROJ={
       var t=v('pfTitle');if(!t){toast('Type a project title');return;}
       var p={id:editing!=null?b.list[editing].id:uid(),title:t,contractor:v('pfContractor'),fleet:v('pfFleet'),value:v('pfValue'),ref:v('pfRef'),start:v('pfStart'),due:v('pfDue'),eot:v('pfEot'),
         progress:Math.max(0,Math.min(100,+v('pfProgress')||0)),health:v('pfHealth'),short:v('pfShort'),slide:v('pfSlide'),
-        notes:v('pfNotes').split(/\n+/).map(function(s){return s.trim()}).filter(Boolean)};
+        notes:v('pfNotes').split(/\n+/).map(function(s){return s.replace(/^\s*[•▪\-\*]\s*/,'').trim()}).filter(Boolean)};
       if(editing!=null)b.list[editing]=p;else b.list.push(p);
     }else{
       var ti=v('piTitle');if(!ti){toast('Type a project title');return;}
