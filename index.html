@@ -3004,6 +3004,22 @@ function field(lab,id,val,o){o=o||{};
       :'<input id="'+id+'" value="'+esc(val)+'"'+(o.type?' type="'+o.type+'" step="any" min="0" max="100"':'')+(o.list?' list="'+o.list+'"':'')+'>')
     +(o.hint&&!/^e\.g\./i.test(o.hint)?'<div class="hint">'+o.hint+'</div>':'')+'</div>';
 }
+/* the details box shows a "• " in front of every point; Enter starts the next point with one */
+function bulletBox(ta){
+  if(!ta)return;
+  var fix=function(){var pos=ta.selectionStart,before=ta.value.length;
+    ta.value=ta.value.split('\n').map(function(l){var t=l.replace(/^\s*[•▪\-\*]\s*/,'');return t||l.trim()?'• '+t:l}).join('\n');
+    var d=ta.value.length-before;try{ta.setSelectionRange(pos+d,pos+d)}catch(e){}};
+  ta.addEventListener('focus',function(){if(!ta.value.trim()){ta.value='• ';}});
+  ta.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();
+      var a=ta.selectionStart,b=ta.selectionEnd;ta.value=ta.value.slice(0,a)+'\n• '+ta.value.slice(b);ta.setSelectionRange(a+3,a+3);}
+    else if(e.key==='Backspace'){var a2=ta.selectionStart;if(a2===ta.selectionEnd&&ta.value.slice(Math.max(0,a2-3),a2)==='\n• '){e.preventDefault();
+      ta.value=ta.value.slice(0,a2-3)+ta.value.slice(a2);ta.setSelectionRange(a2-3,a2-3);}}
+  });
+  ta.addEventListener('paste',function(){setTimeout(fix,0)});
+  ta.addEventListener('blur',fix);
+}
 function contractorList(){var s={};book().list.forEach(function(p){if(p.contractor)s[p.contractor]=1});return Object.keys(s)}
 function slideList(){var s={};book().list.forEach(function(p){if(p.slide)s[p.slide]=1});return Object.keys(s)}
 function openForm(title,html,canDelete){
@@ -3034,11 +3050,12 @@ window.PROJ={
       +field('Progress %','pfProgress',p.progress,{type:'number',hint:'100% = completed'})
       +field('Status','pfHealth',p.health,{opts:[['track','On track (yellow)'],['delay','Delayed (red)']],hint:'Shown in navy automatically when progress is 100%'})
       +field('Short status for the summary table','pfShort',p.short,{hint:'e.g. 6/16 done, 5 handed over'})
-      +field('Status details — one point per line','pfNotes',(p.notes||[]).join('\n'),{area:true,full:true})
+      +field('Status details — one point per line (press Enter for a new bullet)','pfNotes',(p.notes||[]).map(function(t){return '• '+t}).join('\n'),{area:true,full:true})
       +field('Slide title (projects with the same title share one slide)','pfSlide',p.slide,{full:true,list:'pjSlides',hint:'Leave empty to use the project title'})
       +'</div><datalist id="pjContractors">'+contractorList().map(function(c){return '<option value="'+esc(c)+'">'}).join('')+'</datalist>'
       +'<datalist id="pjSlides">'+slideList().map(function(c){return '<option value="'+esc(c)+'">'}).join('')+'</datalist>';
     openForm(editing!=null?'Edit project':'New project',h,editing!=null);
+    bulletBox(document.getElementById('pfNotes'));
   },
   editInc:function(i){
     editKind='incoming';editing=(typeof i==='number')?i:null;
