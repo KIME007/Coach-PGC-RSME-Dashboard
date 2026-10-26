@@ -6206,6 +6206,8 @@ else setTimeout(boot,120);
 .avx-tbl td.d small{display:block;font-size:.6rem;color:var(--mut);font-weight:700;text-transform:uppercase}
 .avx-tbl tr.fut td{opacity:.45}
 .avx-tbl tr.flash td{animation:avxFlash 1.4s ease}
+.avx-tbl tfoot td{position:sticky;bottom:0;z-index:4;background:#2a1b26;border-top:2px solid #AF1763;padding:9px 6px;font-size:.95rem;color:#fff;text-align:center}
+.avx-tbl tfoot td.d{color:#f06aa8}
 @keyframes avxFlash{0%,40%{background:rgba(13,202,240,.25)}100%{background:transparent}}
 .avx-in{width:66px;padding:6px 6px;border-radius:8px;border:1px solid var(--line);text-align:center;font-weight:700;font-size:.9rem}
 .avx-in:focus{outline:none;border-color:#AF1763;box-shadow:0 0 0 3px rgba(175,23,99,.25)}
@@ -6359,7 +6361,14 @@ function render(area){
     h+='<td><span class="avx-dot '+st2+'" title="'+st2+'"></span></td>'
       +'<td>'+(i>0?'<button class="avx-mini" title="Copy the previous day into empty boxes of this day" onclick="AVX.copyPrev('+i+')">⇩ prev</button>':'')+'</td></tr>';
   }
-  h+='</tbody></table></div>';
+  /* monthly average: average actual ÷ average target × 100% */
+  h+='</tbody><tfoot><tr class="avx-avg"><td class="d">AVG<small>'+(MF[m]||'').slice(0,3)+'</small></td>';
+  FLEETS.forEach(function(f){
+    var A=avg(f.k),T=tavg(f.k),P=(A!=null&&T)?A/T:null;
+    h+='<td><b>'+(A==null?'—':(Math.round(A*10)/10))+'</b></td><td><b>'+(T==null?'—':(Math.round(T*10)/10))+'</b></td>'
+      +'<td><span class="avx-pct '+(P==null?'na':(P>=1?'ok':'lo'))+'" title="average actual ÷ average target × 100%">'+(P==null?'—':(Math.round(P*1000)/10)+'%')+'</span></td>';
+  });
+  h+='<td></td><td></td></tr></tfoot></table></div>';
   h+='<div class="avx-note"><b>How it works:</b> actual figures fill in <b>automatically from Daily Status</b>; type over any day to use your own number. '
     +'<b>Enter</b> or <b>↓</b> moves to the next day, <b>↑</b> to the previous day. '
     +'To back-fill, copy a column of numbers in Excel, click the first day and press <b>Cmd/Ctrl+V</b> — it fills downwards (two columns fill actual + target). '
