@@ -2945,7 +2945,7 @@ function book(){
 function state(p){return +p.progress>=100?'done':(p.health==='delay'?'delay':'track')}
 function stateLabel(s){return {done:'Completed',track:'On track',delay:'Delayed'}[s]}
 function changed(){if(typeof touched==='function')touched();render();}
-function pct(p){var v=+p.progress;return (Math.round(v*100)/100)+'%'}
+function pct(p){return Math.round(+p.progress||0)+'%'}
 function money(v){var m=String(v||'').replace(/,/g,'').match(/([\d.]+)\s*(million|mil|m)?/i);if(!m)return 0;var n=+m[1];return /million|mil|^m$/i.test(m[2]||'')?n*1e6:n}
 function fmtRM(n){return n>=1e6?'RM '+(n/1e6).toFixed(1)+' mil':'RM '+Math.round(n).toLocaleString('en-MY')}
 
