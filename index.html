@@ -1363,7 +1363,7 @@ function monthTotal(m,cls){return sec().summary.reduce((t,s)=>t+(cls||sec().clas
 function systemTotals(range,cls){return sec().summary.map(s=>({system:s.system,total:monthsIn(range).reduce((t,m)=>t+(cls||sec().classes).reduce((u,c)=>u+nz(s.classes[c]&&s.classes[c][m]),0),0)}));}
 function classTotals(range){const o={};sec().classes.forEach(c=>o[c]=0);sec().summary.forEach(s=>sec().classes.forEach(c=>monthsIn(range).forEach(m=>o[c]+=nz(s.classes[c]&&s.classes[c][m]))));return o;}
 function availMonthly(){return sec().avail.map(mo=>{const a=mo.actual.filter(v=>typeof v==="number"),t=mo.target.filter(v=>typeof v==="number");
-  return{actual:a.length?a.reduce((x,y)=>x+y,0)/a.length:null,target:t.length?t.reduce((x,y)=>x+y,0)/t.length:null};});}
+  return{actual:a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null,target:t.length?Math.round(t.reduce((x,y)=>x+y,0)/t.length):null};});}
 function latestMonth(){for(let m=11;m>=0;m--){if(monthTotal(m)>0||nz(sec().pmA[m])>0)return m;
   const av=sec().avail[m].actual.some(v=>typeof v==="number");if(av)return m;}return 0;}
 function incMonth(i){const d=new Date(i.date+"T00:00:00");return isNaN(d)?-1:d.getMonth();}
@@ -2024,7 +2024,7 @@ function snapSec(S,key){
   o.sysTotals=o.summary.map(s=>({system:s.system,total:MONTHS_P.reduce((t,_,m)=>t+o.classes.reduce((u,c)=>u+nzp(s.classes[c]&&s.classes[c][m]),0),0)})).sort((a,b)=>b.total-a.total);
   o.classTotals={};o.classes.forEach(c=>o.classTotals[c]=o.summary.reduce((t,s)=>t+MONTHS_P.reduce((u,_,m)=>u+nzp(s.classes[c]&&s.classes[c][m]),0),0));
   o.availM=o.avail.map(mo=>{const a=mo.actual.filter(v=>typeof v==='number'),t=mo.target.filter(v=>typeof v==='number');
-    return{act:a.length?a.reduce((x,y)=>x+y,0)/a.length:null,tgt:t.length?t.reduce((x,y)=>x+y,0)/t.length:null};});
+    return{act:a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null,tgt:t.length?Math.round(t.reduce((x,y)=>x+y,0)/t.length):null};});
   o.availPct=o.availM.map(x=>x.act!=null&&x.tgt?x.act/x.tgt:null);
   const ap=o.availPct.filter(v=>v!=null);
   o.availYtd=ap.length?ap.reduce((a,b)=>a+b,0)/ap.length:null;
@@ -3319,7 +3319,7 @@ function rptSnap(St,key,m0,m1){
   o.top=o.sysTotals[0]&&o.sysTotals[0].total>0?o.sysTotals[0]:null;
   o.classTotals={};classes.forEach(c=>o.classTotals[c]=sum.reduce((t,s)=>t+M.reduce((u,m)=>u+nzp(s.classes[c]&&s.classes[c][m]),0),0));
   o.availM=avail.map(mo=>{const a=mo.actual.filter(v=>typeof v==='number'),t=mo.target.filter(v=>typeof v==='number');
-    return{act:a.length?a.reduce((x,y)=>x+y,0)/a.length:null,tgt:t.length?t.reduce((x,y)=>x+y,0)/t.length:null};});
+    return{act:a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null,tgt:t.length?Math.round(t.reduce((x,y)=>x+y,0)/t.length):null};});
   o.availPct=o.availM.map(x=>x.act!=null&&x.tgt?x.act/x.tgt:null);
   const ap=M.map(m=>o.availPct[m]).filter(v=>v!=null);
   o.availAvg=ap.length?ap.reduce((a,b)=>a+b,0)/ap.length:null;
@@ -6323,7 +6323,7 @@ function render(area){
     +'<button class="avx-btn" onclick="AVX.applyTarget(true)">Only days without a target</button>'
     +'<span class="hint">Type the target once for the whole month. You can still change a single day in the table below.</span></div>';
   /* KPIs */
-  var pc=function(k){var a=avg(k),t=tavg(k);return (a!=null&&t)?Math.round(a/t*100)+'%':'—'};
+  var pc=function(k){var a=avg(k),t=tavg(k);return (a!=null&&t)?Math.round(Math.round(a)/Math.round(t)*100)+'%':'—'};
   h+='<div class="avx-kpis">'
     +'<div class="avx-k"><div class="v">'+filled+' / '+pastDays+'</div><div class="l">Days filled so far</div></div>'
     +'<div class="avx-k ok"><div class="v">'+met+'</div><div class="l">🟢 Days on target</div></div>'
@@ -6364,7 +6364,7 @@ function render(area){
   /* monthly average: average actual ÷ average target × 100% */
   h+='</tbody><tfoot><tr class="avx-avg"><td class="d">AVG<small>'+(MF[m]||'').slice(0,3)+'</small></td>';
   FLEETS.forEach(function(f){
-    var A=avg(f.k),T=tavg(f.k),P=(A!=null&&T)?A/T:null;
+    var A=avg(f.k),T=tavg(f.k);A=A==null?null:Math.round(A);T=T==null?null:Math.round(T);var P=(A!=null&&T)?A/T:null;
     h+='<td><b>'+(A==null?'—':Math.round(A))+'</b></td><td><b>'+(T==null?'—':Math.round(T))+'</b></td>'
       +'<td><span class="avx-pct '+(P==null?'na':(P>=1?'ok':'lo'))+'" title="average actual ÷ average target × 100%">'+(P==null?'—':Math.round(P*100)+'%')+'</span></td>';
   });
