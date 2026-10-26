@@ -6365,8 +6365,8 @@ function render(area){
   h+='</tbody><tfoot><tr class="avx-avg"><td class="d">AVG<small>'+(MF[m]||'').slice(0,3)+'</small></td>';
   FLEETS.forEach(function(f){
     var A=avg(f.k),T=tavg(f.k),P=(A!=null&&T)?A/T:null;
-    h+='<td><b>'+(A==null?'—':(Math.round(A*10)/10))+'</b></td><td><b>'+(T==null?'—':(Math.round(T*10)/10))+'</b></td>'
-      +'<td><span class="avx-pct '+(P==null?'na':(P>=1?'ok':'lo'))+'" title="average actual ÷ average target × 100%">'+(P==null?'—':(Math.round(P*1000)/10)+'%')+'</span></td>';
+    h+='<td><b>'+(A==null?'—':Math.round(A))+'</b></td><td><b>'+(T==null?'—':Math.round(T))+'</b></td>'
+      +'<td><span class="avx-pct '+(P==null?'na':(P>=1?'ok':'lo'))+'" title="average actual ÷ average target × 100%">'+(P==null?'—':Math.round(P*100)+'%')+'</span></td>';
   });
   h+='<td></td><td></td></tr></tfoot></table></div>';
   h+='<div class="avx-note"><b>How it works:</b> actual figures fill in <b>automatically from Daily Status</b>; type over any day to use your own number. '
