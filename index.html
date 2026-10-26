@@ -6183,6 +6183,16 @@ else setTimeout(boot,120);
 .avx-k .v{font-size:1.35rem;font-weight:800;color:#fff;line-height:1.1}
 .avx-k .l{font-size:.66rem;letter-spacing:.6px;text-transform:uppercase;color:var(--mut);font-weight:700;margin-top:4px}
 .avx-k.ok .v{color:#3ddc84}.avx-k.bad .v{color:#ff6b7a}.avx-k.warn .v{color:#ffc107}
+.avx-mon{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.avx-mon-h{font-weight:800;color:#fff;font-size:.9rem;margin-bottom:8px}.avx-mon-h span{font-weight:600;color:var(--mut);font-size:.72rem;margin-left:8px}
+.avx-mon-wrap{overflow-x:auto}
+.avx-mon table{width:100%;min-width:760px;border-collapse:separate;border-spacing:0;font-size:.82rem}
+.avx-mon th{background:#22252e;color:#c9cde0;padding:6px 4px;text-align:center;cursor:pointer;position:static;font-size:.72rem}
+.avx-mon td{padding:5px 4px;text-align:center;border-bottom:1px solid #2c2e33;color:#e4e6ef;cursor:pointer;font-weight:700}
+.avx-mon td.lab{text-align:left;color:#a3a8c3;font-weight:700;cursor:default;white-space:nowrap;padding-left:8px}
+.avx-mon tr.g td{color:#f06aa8;font-weight:800;font-size:.74rem;letter-spacing:.6px;background:transparent;border-bottom:none;padding-top:9px}
+.avx-mon .cur{background:rgba(175,23,99,.18)}.avx-mon th.cur{background:#AF1763;color:#fff}
+.avx-mon td.ok{color:#3ddc84}.avx-mon td.lo{color:#ff6b7a}
 .avx-cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
 .avx-day{border-radius:10px;padding:6px 2px;text-align:center;border:1px solid var(--line);background:#1d2029;cursor:pointer;transition:.12s;line-height:1.15}
 .avx-day:hover{transform:translateY(-1px);border-color:#6c7293}
@@ -6332,6 +6342,23 @@ function render(area){
     +'<div class="avx-k"><div class="v">'+(avg('coach')==null?'—':Math.round(avg('coach')))+' <small style="font-size:.7rem;color:var(--mut)">'+pc('coach')+'</small></div><div class="l">COACH avg / day</div></div>'
     +'<div class="avx-k"><div class="v">'+(avg('pgc')==null?'—':Math.round(avg('pgc')))+' <small style="font-size:.7rem;color:var(--mut)">'+pc('pgc')+'</small></div><div class="l">PGC avg / day</div></div>'
     +'</div>';
+  /* monthly averages Jan–Dec (same figures as the slides) */
+  var monAvg=function(f,mm){var mo=fleetMonth(f,mm);if(!mo)return {a:null,t:null,p:null};
+    var a=mo.actual.filter(function(v){return typeof v==='number'}),t=mo.target.filter(function(v){return typeof v==='number'});
+    var A=a.length?Math.round(a.reduce(function(x,y){return x+y},0)/a.length):null,T=t.length?Math.round(t.reduce(function(x,y){return x+y},0)/t.length):null;
+    return {a:A,t:T,p:(A!=null&&T)?Math.round(A/T*100):null};};
+  var MS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  h+='<div class="avx-mon"><div class="avx-mon-h">📊 Monthly average — '+y+' <span>average actual ÷ average target × 100% · click a month to open it</span></div>'
+    +'<div class="avx-mon-wrap"><table><thead><tr><th></th>'+MS.map(function(x,mm){return '<th class="'+(mm===m?'cur':'')+'" onclick="AVX.goMonth('+mm+')">'+x+'</th>'}).join('')+'</tr></thead><tbody>';
+  FLEETS.forEach(function(f){
+    var r=MS.map(function(_,mm){return monAvg(f,mm)});
+    var cell=function(v,mm,cls){return '<td class="'+(mm===m?'cur ':'')+(cls||'')+'" onclick="AVX.goMonth('+mm+')">'+(v==null?'':v)+'</td>'};
+    h+='<tr class="g"><td class="lab" colspan="13">'+f.name+'</td></tr>'
+      +'<tr><td class="lab">Target</td>'+r.map(function(x,mm){return cell(x.t,mm)}).join('')+'</tr>'
+      +'<tr><td class="lab">Actual (average)</td>'+r.map(function(x,mm){return cell(x.a,mm)}).join('')+'</tr>'
+      +'<tr><td class="lab">Availability (%)</td>'+r.map(function(x,mm){return cell(x.p==null?null:x.p+'%',mm,x.p==null?'':(x.p>=100?'ok':'lo'))}).join('')+'</tr>';
+  });
+  h+='</tbody></table></div></div>';
   /* calendar */
   h+='<div class="avx-cal">';
   for(i=0;i<dm;i++){
@@ -6426,6 +6453,7 @@ function wire(area){
 window.AVX={
   render:render,
   month:function(n){month=Math.min(11,Math.max(0,curMonth()+n));editing={};rerender();},
+  goMonth:function(mm){month=mm;editing={};rerender();},
   thisMonth:function(){month=null;editing={};rerender();var t=todayRef();if(t.m===curMonth())AVX.go(t.d-1);},
   go:function(i){flashDay=i;rerender();var r=document.getElementById('avxR'+i),box=document.getElementById('avxTbl');
     if(r&&box){box.scrollTop=r.offsetTop-box.clientHeight/2+r.offsetHeight;r.scrollIntoView({block:'nearest'});}
