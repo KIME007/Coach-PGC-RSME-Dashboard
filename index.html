@@ -3090,8 +3090,8 @@ window.PROJ={
     arr.splice(editing,1);closeOv('ovProj');changed();toast('Project deleted');
   },
   open:function(){
-    ['tabOverview','tabData','tabIncidents','tabDaily','tabReport'].forEach(function(id){var el=document.getElementById(id);if(el)el.classList.remove('on')});
-    ['pOverview','pData','pIncidents','dlyDaily','pReport'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none'});
+    ['tabOverview','tabData','tabIncidents','tabDaily','tabReport','tabFleet'].forEach(function(id){var el=document.getElementById(id);if(el)el.classList.remove('on')});
+    ['pOverview','pData','pIncidents','dlyDaily','pReport','pFleet'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none'});
     document.getElementById('tabProj').classList.add('on');document.getElementById('pProj').style.display='';
     render();
   }
@@ -3199,6 +3199,307 @@ window.PROJ.slides=function(p,H){
 };
 })();
 </script>
+<div class="overlay" id="ovFleet"><div class="modal" style="max-width:720px">
+  <div class="mhead"><h3 id="fbFormTitle">Column</h3><button class="iconb" onclick="closeOv('ovFleet')">✕</button></div>
+  <div class="mbody" id="fbForm"></div>
+  <div class="mfoot">
+    <button class="btn danger" type="button" id="fbDel" onclick="FLEET.delCol()">Delete column</button>
+    <button class="btn ghost" type="button" onclick="FLEET.moveCol(-1)">◀ Move</button>
+    <button class="btn ghost" type="button" onclick="FLEET.moveCol(1)">Move ▶</button>
+    <span style="flex:1"></span>
+    <button class="btn ghost" type="button" onclick="closeOv('ovFleet')">Cancel</button>
+    <button class="btn primary" type="button" onclick="FLEET.saveCol()">💾 Save column</button>
+  </div>
+</div></div>
+<input type="file" id="fbFile" accept=".xlsx,.xls" style="display:none" onchange="FLEET.importFile(this)">
+<style id="fleetCss">
+.fb-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.fb-top h2{font-size:1.12rem;color:#fff}.fb-top small{display:block;color:var(--mut);font-size:.74rem;font-weight:600;margin-top:2px}
+.fb-asof{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;color:#a3a8c3}
+.fb-asof input{width:210px;padding:7px 10px;border-radius:9px;border:1px solid var(--line);font-weight:800;color:#fff}
+.fb-btn{padding:8px 13px;border-radius:10px;font-weight:700;font-size:.8rem;background:#22252e;color:#e4e6ef;border:1px solid var(--line)}
+.fb-btn:hover{background:#2d303b}.fb-btn.p{background:#AF1763;border-color:#AF1763;color:#fff}
+.fb-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.fb-k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.fb-k .v{font-size:1.45rem;font-weight:800;color:#fff;line-height:1.1}.fb-k .l{font-size:.64rem;letter-spacing:.6px;text-transform:uppercase;color:var(--mut);font-weight:700;margin-top:3px}
+.fb-k.a .v{color:#3ddc84}.fb-k.b .v{color:#0DCAF0}.fb-k.c .v{color:#ffc107}
+.fb-legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.fb-legend span{font-size:.72rem;font-weight:800;padding:4px 10px;border-radius:99px}
+.fb-legend label{margin-left:auto;font-size:.76rem;color:#a3a8c3;font-weight:600;display:flex;gap:6px;align-items:center}
+.fb-sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.fb-sec>h3{display:flex;align-items:center;gap:10px;font-size:.86rem;letter-spacing:.6px;text-transform:uppercase;color:#fff;margin-bottom:10px}
+.fb-sec>h3 .ct{font-size:.72rem;color:#a3a8c3;font-weight:700;letter-spacing:0;text-transform:none}
+.fb-sec>h3 button{margin-left:auto}
+.fb-grp{font-size:.74rem;font-weight:800;letter-spacing:.7px;color:#f06aa8;margin:10px 0 6px;text-transform:uppercase}
+.fb-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.fb-col{background:#1d2029;border:1px solid #2c2e33;border-radius:11px;display:flex;flex-direction:column;min-height:96px}
+.fb-col.empty{opacity:.55}
+.fb-col .h{padding:7px 8px 6px;border-bottom:1px solid #2c2e33;cursor:pointer;text-align:center}
+.fb-col .h:hover{background:#252935;border-radius:11px 11px 0 0}
+.fb-col .h b{display:block;font-size:.82rem;color:#fff;line-height:1.15}
+.fb-col .h small{display:block;font-size:.6rem;color:var(--mut);font-weight:600;margin-top:2px;line-height:1.2}
+.fb-col .u{padding:7px;display:flex;flex-direction:column;gap:4px;flex:1}
+.fb-chip{position:relative;display:block;text-align:center;font-weight:800;font-size:.8rem;padding:4px 2px;border-radius:6px;cursor:default}
+.fb-chip.n{cursor:help}.fb-chip.n::after{content:"";position:absolute;right:0;top:0;border-style:solid;border-width:0 7px 7px 0;border-color:transparent #ff3b3b transparent transparent;border-top-right-radius:6px}
+.fb-col .f{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-top:1px solid #2c2e33;font-size:.7rem;color:#a3a8c3;font-weight:700}
+.fb-col .f b{color:#fff;font-size:.86rem}
+.fb-col .p{padding:5px 7px 7px;border-top:1px dashed #2c2e33;display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.fb-col .p .fb-chip{flex:1;min-width:44px}
+.fb-col .p i{font-style:normal;font-size:.58rem;color:var(--mut);width:100%;text-align:center;font-weight:800;letter-spacing:.5px}
+.fb-sum{overflow-x:auto}.fb-sum table{min-width:760px;font-size:.82rem}
+.fb-sum th{text-align:center;position:static}.fb-sum td{text-align:center;font-weight:700}
+.fb-sum td.l{text-align:left}.fb-sum tr.t td{background:#2a1b26;color:#fff;font-size:.95rem;font-weight:800;border-top:2px solid #AF1763}
+.fb-cal-h{display:flex;align-items:center;gap:8px;margin:2px 0 8px}.fb-cal-h b{color:#fff;min-width:130px;text-align:center}.fb-cal-h span{font-size:.74rem;color:var(--mut);font-weight:600;margin-left:6px}
+.fb-cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px;margin-bottom:14px}
+.fb-day{border:1px dashed #3b4050;border-radius:10px;padding:5px 2px;text-align:center;cursor:pointer;background:#15171e;line-height:1.1}
+.fb-day i{display:block;font-style:normal;font-size:.56rem;color:var(--mut);font-weight:700;text-transform:uppercase}
+.fb-day b{display:block;color:#e4e6ef;font-size:.9rem}.fb-day small{display:block;font-size:.6rem;color:#6c7293;font-weight:700}
+.fb-day.has{border-style:solid;border-color:rgba(25,135,84,.6);background:rgba(25,135,84,.22)}.fb-day.has small{color:#3ddc84}
+.fb-day.fut{opacity:.4}.fb-day.today{box-shadow:0 0 0 2px #0DCAF0}.fb-day.cur{background:#AF1763;border-color:#AF1763}.fb-day.cur b,.fb-day.cur small,.fb-day.cur i{color:#fff}
+.fb-new p{color:#a3a8c3;font-size:.84rem;margin:0 0 10px}
+.fb-form label{display:block;font-size:.7rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);margin:10px 0 4px}
+.fb-form input,.fb-form textarea{width:100%;padding:8px 11px;border-radius:9px;border:1px solid var(--line);font-size:.86rem}
+.fb-form textarea{min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:.82rem}
+.fb-form .hint{font-size:.7rem;color:var(--mut);margin-top:3px}
+</style>
+<script id="fleetJs">
+/* =====================================================================
+   FLEET DEPLOYMENT — coaches & PGC on train services, spare at depots,
+   detained (refurbishment / minor / major services). Data in S.fleetBoard,
+   saved to the cloud with the year's data. Import from the daily Excel.
+   ===================================================================== */
+(function(){
+'use strict';
+var SEED={"asOf": "27-28 OCTOBER 2026", "service": [{"name": "T26", "note": "JB SENTRAL - TUMPAT", "units": [{"id": "1412", "note": ""}, {"id": "2148", "note": ""}, {"id": "2137", "note": ""}, {"id": "2165", "note": ""}, {"id": "4011", "note": ""}, {"id": "2151", "note": ""}, {"id": "2615", "note": ""}, {"id": "2619", "note": ""}], "pgc": [{"id": "213", "note": "ENGINE: 1"}]}, {"name": "T27", "note": "TUMPAT - JB SENTRAL", "units": [{"id": "1414", "note": ""}, {"id": "2147", "note": ""}, {"id": "2161", "note": ""}, {"id": "2144", "note": ""}, {"id": "4008", "note": ""}, {"id": "2159", "note": ""}, {"id": "2635", "note": ""}, {"id": "2624", "note": ""}], "pgc": [{"id": "215", "note": "ENGINE: 2"}]}, {"name": "S/T 1", "note": "TEBRAU", "units": [{"id": "2158", "note": ""}, {"id": "2179", "note": ""}, {"id": "2186", "note": ""}, {"id": "2189", "note": ""}], "pgc": [{"id": "225", "note": "ENGINE: 2"}]}, {"name": "S/T 2", "note": "TEBRAU", "units": [{"id": "2160", "note": ""}, {"id": "2174", "note": ""}, {"id": "2185", "note": ""}, {"id": "2173", "note": ""}], "pgc": [{"id": "222", "note": "ENGINE:2"}]}, {"name": "SWD", "note": "TREN KHAS", "units": [], "pgc": []}, {"name": "RTSM", "note": "", "units": [], "pgc": []}, {"name": "CHART", "note": "", "units": [{"id": "2178", "note": "PROPOSE FOR CONVERSION TO ASC"}, {"id": "AKC 2", "note": "CHILLEX 2 ASC 2164"}, {"id": "1417", "note": ""}], "pgc": [{"id": "211", "note": "ENGINE: 2"}]}, {"name": "ELA (U)", "note": "", "units": [], "pgc": []}, {"name": "ELA (PT)", "note": "", "units": [], "pgc": []}, {"name": "S/S 1", "note": "", "units": [{"id": "2175", "note": ""}, {"id": "2131", "note": ""}, {"id": "2132", "note": ""}, {"id": "2140", "note": ""}, {"id": "2138", "note": ""}], "pgc": [{"id": "203", "note": "ENGINE: 1"}]}, {"name": "S/S 2", "note": "", "units": [{"id": "2403", "note": ""}, {"id": "2409", "note": ""}, {"id": "2406", "note": ""}, {"id": "2401", "note": ""}, {"id": "2136", "note": "BOGIE SWAP ADNS 2615 PD 9HB / 1 / 25 PAKAGE ( U & S ) TELAH DI BAIKI PD 05.08.25 SOLONOID VALVE DI AMBIL TANDAS DUDUK & CANGKUNG SAFTY VALVE MR TIADA 5WAY VALVE TIADA Dv tiada.. pasang pada koc asc 2177( 16.4.12 ) MODUL & MOTOR AUTO DOOR ( U & S ) TIADA.. PASANG PD ASC 2174 (28.06.24 ) BOGIE U & S TELAH DI TUKAR/PASANG PADA ADNS 2615 ( 09.01.25) TRANSFORMER & CHARGER BATERY DI AMBIL PASANG PADA ASC 2148 PD 25.07.25 ATURAN KE KLSD MAJOR"}], "pgc": [{"id": "218", "note": "ENGINE: 1"}]}, {"name": "S/S 3", "note": "", "units": [], "pgc": []}, {"name": "KOM HYBRID", "note": "", "units": [], "pgc": [{"id": "219", "note": "ENGINE: 1"}]}, {"name": "DMU 55/56", "note": "", "units": [{"id": "2139", "note": ""}, {"id": "2177", "note": ""}, {"id": "2141", "note": ""}, {"id": "2181", "note": ""}], "pgc": [{"id": "221", "note": "ENGINE: 1"}]}, {"name": "DMU 34/39", "note": "", "units": [{"id": "2163", "note": ""}, {"id": "2303", "note": ""}, {"id": "4003", "note": ""}, {"id": "2302", "note": ""}, {"id": "2304", "note": ""}], "pgc": [{"id": "209", "note": "ENGINE: 2"}]}], "spare": [{"name": "SPECIAL COACH", "note": "", "units": [{"id": "AKE 2", "note": "EVENT 2 ASC 2180"}, {"id": "SK 1", "note": ""}, {"id": "SK 3", "note": "SK3 ASC 2402"}, {"id": "ACC 2", "note": "CONFERENCE ASC 2410"}, {"id": "AKB 1", "note": "BASIKAL 3 ASC 2142"}, {"id": "AKE 1", "note": "EVENT 1 ASC 2190"}, {"id": "AKC 1", "note": "CHILLEX 1 ASC 2152"}, {"id": "AXC 1", "note": "ASC 2146"}, {"id": "AXC 2", "note": "ASC 2162"}], "pgc": [{"id": "220", "note": "ENGINE: 2"}]}, {"name": "KLSD ASC", "note": "", "units": [{"id": "2301", "note": "KIV RESULT A/C TRIP K.L CABLE SAMBUNG 2132"}, {"id": "2182", "note": "PROPOSE FOR CONVERSION TO ASC"}, {"id": "2183", "note": "PROPOSE FOR CONVERSION TO ASC"}, {"id": "2157", "note": ""}, {"id": "2167", "note": ""}, {"id": "2154", "note": ""}, {"id": "2187", "note": "PROPOSE FOR CONVERSION TO AFC"}], "pgc": []}, {"name": "KLSD ABC", "note": "", "units": [{"id": "4005", "note": ""}, {"id": "4010", "note": ""}, {"id": "4001", "note": ""}], "pgc": []}, {"name": "KLSD ADNS", "note": "", "units": [{"id": "2620", "note": ""}, {"id": "2639", "note": ""}, {"id": "2606", "note": ""}], "pgc": []}, {"name": "KLSD AFC", "note": "", "units": [], "pgc": []}, {"name": "TUMD ASC", "note": "", "units": [{"id": "2172", "note": ""}, {"id": "2155", "note": ""}, {"id": "2169", "note": ""}, {"id": "2407", "note": ""}], "pgc": []}, {"name": "TUMD ABC", "note": "", "units": [{"id": "4012", "note": ""}, {"id": "4009", "note": ""}], "pgc": [{"id": "202", "note": "ENGINE: 2"}]}, {"name": "TUMD ADNS", "note": "", "units": [{"id": "2631", "note": ""}, {"id": "2618", "note": ""}], "pgc": []}, {"name": "TUMD AFC", "note": "", "units": [{"id": "1411", "note": ""}], "pgc": []}, {"name": "KEMD ASC", "note": "", "units": [], "pgc": []}, {"name": "KEMD ASC", "note": "", "units": [{"id": "2166", "note": ""}, {"id": "2405", "note": "P.A SISTEM ROSAK HANDLE END DOOR UTARA DAN SELATAN TIADA SERVIS A/C OLEH PERENCHANA 5/3/26"}, {"id": "2408", "note": ""}, {"id": "2184", "note": ""}, {"id": "2171", "note": ""}, {"id": "2150", "note": ""}], "pgc": []}, {"name": "KEMD ADNS", "note": "", "units": [{"id": "2629", "note": ""}, {"id": "2627", "note": ""}], "pgc": []}, {"name": "KEMD ABC", "note": "", "units": [{"id": "4013", "note": ""}, {"id": "4015", "note": ""}, {"id": "4102", "note": ""}, {"id": "4007", "note": ""}], "pgc": []}, {"name": "KEMD AFC", "note": "", "units": [], "pgc": []}, {"name": "K.LIPISD ASC", "note": "", "units": [], "pgc": []}, {"name": "GEMD ASC", "note": "", "units": [], "pgc": []}, {"name": "GEMD ABC", "note": "", "units": [], "pgc": []}], "detained": [{"name": "REFURBISHMENT", "cols": [{"name": "PADU SEDIA", "note": "", "units": [{"id": "2134", "note": "PROPOSE FOR CONVERSION TO AFC"}, {"id": "2135", "note": "PROPOSE FOR CONVERSION TO AFC"}, {"id": "2156", "note": "PROPOSE FOR CONVERSION TO ASC"}, {"id": "2170", "note": "PROPOSE FOR CONVERSION TO AFC"}, {"id": "2602", "note": "IN PROGRESS BY PADU SEDIA"}, {"id": "2614", "note": "IN PROGRESS BY PADU SEDIA"}, {"id": "2621", "note": "IN PROGRESS BY PADU SEDIA"}, {"id": "2625", "note": "IN PROGRESS BY PADU SEDIA"}]}, {"name": "PADU SEDIA", "note": "", "units": [{"id": "2305", "note": "IN PROGRESS BY PADU SEDIA"}, {"id": "2306", "note": "IN PROGRESS BY PADU SEDIA"}, {"id": "2307", "note": "IN PROGRESS BY PADU SEDIA"}, {"id": "2308", "note": "IN PROGRESS BY PADU SEDIA"}]}, {"name": "KLSD", "note": "", "units": [{"id": "ACC 1", "note": "ASC 2119"}, {"id": "1016", "note": ""}, {"id": "1410", "note": "UNDERFRAME, AIRCOND, INTERIOR, KERUSI"}, {"id": "1418", "note": "UNDERFRAME, AIRCOND, INTERIOR, KERUSI"}]}, {"name": "KLSD", "note": "", "units": [{"id": "2309", "note": "Cannabalize koc 1) Step lamp - LED, 3W, VDC : 8 unit 2) Wall lamp : 2 unit 3) Corridor lamp : 1 unit 4) Toilet control panel cover : 2 unit 5) Toilet indicator lamp : 6 unit 6) Bateri : 2 unit 7) Cermin side door : 4 unit 8) DED lock : 2 unit 9) DSD lock : 4 unit 10) Lantai rosak : Utara & selatan 11) Seat knob : xxxxx 12) Cermin saloon : 2 unit 13) Toilet Male (SN : 110926) 14) Toilet Female (SN : 110929) 15) Brake hanger tiada"}, {"id": "2310", "note": "6/12/22 A/C BOCOR Air menitik masuk dalam koc pada retune filter setelah ACU package utara dan selatan di off kan"}, {"id": "2311", "note": "6/12/22 Air menitik masuk dalam koc pada retune filter setelah ACU package utara dan selatan di off kan"}, {"id": "2312", "note": "1) Step lamp - LED, 3W, VDC : 8 unit 2) Toilet indicator lamp : 4 unit 3) Toilet control panel cover : 2 unit 4) Reading light : 1 unit 5) Autodoor control : 1 unit 6) PA system : 1 unit 7) Bateri : 2 unit 8) Ablution spray : 2 unit 9)Cover box pemadam api : 2 unit 10) Lantai koridor : utara & selatan 11) window Glass : 1 unit 12) DED lock : 2 unit 13) DSD lock : 3 unit 14) Toilet Male (SN : 110914) 15) Toilet Female (SN : 110903)"}, {"id": "2632", "note": "PLAN FOR REFURBISHMENT"}, {"id": "2634", "note": "PLAN FOR REFURBISHMENT"}, {"id": "2637", "note": "PLAN FOR REFURBISHMENT"}]}, {"name": "KLSD", "note": "", "units": [{"id": "2220", "note": ""}, {"id": "4002", "note": ""}, {"id": "4004", "note": ""}, {"id": "4006", "note": ""}, {"id": "4014", "note": ""}, {"id": "4101", "note": ""}]}, {"name": "KLSD", "note": "", "units": [{"id": "204", "note": ""}, {"id": "205", "note": ""}, {"id": "206", "note": ""}, {"id": "210", "note": ""}, {"id": "212", "note": ""}, {"id": "223", "note": ""}, {"id": "224", "note": ""}]}, {"name": "CWBG", "note": "", "units": [{"id": "201", "note": "OVERHAUL"}, {"id": "208", "note": "OVERHAUL GEN 1- OK GEN 2-ROSAK"}, {"id": "207", "note": ""}, {"id": "214", "note": ""}]}]}, {"name": "MINOR SERVICES", "cols": [{"name": "KLSD", "note": "", "units": [{"id": "2176", "note": "SHANK GUARD PATAH & REPUT"}]}, {"name": "TUMP", "note": "", "units": []}, {"name": "KEMPD", "note": "", "units": [{"id": "2145", "note": ""}]}, {"name": "KLSD", "note": "", "units": []}, {"name": "TUMP", "note": "", "units": []}, {"name": "KEMPD", "note": "", "units": [{"id": "226", "note": "ENGINE: 1"}]}]}, {"name": "MAJOR SERVICES", "cols": [{"name": "PADU SEDIA", "note": "", "units": [{"id": "2604", "note": ""}, {"id": "2609", "note": ""}, {"id": "2626", "note": ""}, {"id": "2616", "note": ""}, {"id": "2603", "note": ""}]}, {"name": "KLSD", "note": "", "units": [{"id": "1409", "note": "-TAPAK CENTRE PIVOT PATAH - AIRCOND MOUNTING SENGET MAJOR"}, {"id": "2404", "note": "PACKAGE U' & S' TIADA SAMBIL PUSH BUTTON FLUSH SISTEM 1 UNIT O/DUE PT JUMPER CABLE (U) TIADA AMBIL PASANG ABC 4003 CERMIN TELAH DI PASANG OLEH PSSB ( 11.02.25 ) - 1 UNIT CERMIN TANDAS TIADA KNUCKLE (U) TIDAK BERFUNGSI DGN BAIK PUSH TAB SINKI KEDUA TANDAS TIADA DV TIADA.. PASANG PADA ASC 2141 ( 18.4.24) HANDLE LOCK DOOR TELAH DI AMBIL BRAKE CYLINDER SELATAN TIADA, PASANG PADA ASC 2141( 12.06.24) SAB SELATAN TIADA. PASANG PD KOC ASC 2148( 12.06.24) TIMER COMP NO2 DI AMBIL PASANG PD ASC 2403 ( 19.09.24 ) FOOT PLATE TELAH DI AMBIL ACU PACKAGE UTARA & SELATAN TIADA ACU SELATAN PASANG PADA ASC 2405 PADA 17.03.25 TIE ROD RODA NO 7 TELAH DI AMBIL KIV KE KLSD MAJOR"}, {"id": "2168", "note": "1)air dryer tersumbat 2)compressor no 2 trip 3)pemeriksaan sedang dijalankan oleh pssb 4)brek cylinder utara telah di ambil 5)D.V sudah ambil pasang asc 2158(dv tiada) 6)air regulator valve tiada 7)cermin emergency pecah 1st layer 8)solonaid valve tandas duduk telah diambil pasang asc 2180 9)paip angin tandas cangkung di ambil 10)swab roda dengan abc4015 pada 15/3/22 11)relay tandas cangkung di ambil pasang asc2144 12)telah diambil cover seat reylining knob seat 1A ke asc 2180 MAJOR"}]}, {"name": "CWBG", "note": "", "units": []}]}]};
+var SHOW_EMPTY=false, ED=null, CUR=null, VM=null;
+var MNAMES=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+var WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function p2(n){return String(n).padStart(2,'0')}
+function isoOf(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+/* "27-28 OCTOBER 2026" → 2026-10-28 (last day of the range) */
+function dateFromAsOf(t){var m=String(t||'').toUpperCase().match(/(\d{1,2})\s*(?:[-–]\s*\d{1,2}\s*)?([A-Z]+)\s+(\d{4})/);
+  if(!m)return null;var dd=String(t).match(/(\d{1,2})\s*[-–]\s*(\d{1,2})/);var day=dd?+dd[2]:+m[1],mi=MNAMES.findIndex(function(x){return x.indexOf(m[2].slice(0,3))===0});
+  return mi<0?null:m[3]+'-'+p2(mi+1)+'-'+p2(day);}
+function labelOf(iso){var p=iso.split('-');return (+p[2])+' '+MNAMES[+p[1]-1]+' '+p[0]}
+function boards(){
+  if(typeof S==='undefined'||!S)return {};
+  if(!S.fleetBoards){S.fleetBoards={};
+    var old=S.fleetBoard||((typeof RS_YEAR==='undefined'||RS_YEAR===2026)?JSON.parse(JSON.stringify(SEED)):null);
+    if(old){S.fleetBoards[dateFromAsOf(old.asOf)||isoOf(new Date())]=old;}
+    delete S.fleetBoard;if(typeof persist==='function')persist();}
+  return S.fleetBoards;
+}
+function dates(){return Object.keys(boards()).sort()}
+function curDate(){if(!CUR){var t=isoOf(new Date()),d=dates();CUR=boards()[t]?t:(d.length?d[d.length-1]:t);}return CUR}
+function emptyLike(src){var cp=function(c){var o={name:c.name,note:c.note,units:[]};if(c.pgc)o.pgc=[];return o};
+  if(!src)return {asOf:'',service:[],spare:[],detained:[{name:'REFURBISHMENT',cols:[]},{name:'MINOR SERVICES',cols:[]},{name:'MAJOR SERVICES',cols:[]}]};
+  return {asOf:'',service:src.service.map(cp),spare:src.spare.map(cp),detained:src.detained.map(function(g){return {name:g.name,cols:g.cols.map(cp)}})};}
+function prevDate(iso){var d=dates().filter(function(x){return x<iso});return d.length?d[d.length-1]:null}
+var CLS=[['ABC','#ffd60a','#1a1a1a'],['ADNF','#9437ff','#fff'],['ADNS','#2f7fe0','#fff'],['AFC','#2ecc40','#0b1a0d'],['ASC','#e5383b','#fff'],['SPECIAL','#ff9300','#1a1a1a']];
+var PGCC=['PGC','#5ad1f0','#06222b'];
+function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function classOf(id){
+  var s=String(id).trim();if(!/^\d+$/.test(s))return 'SPECIAL';
+  var n=+s;if(n>=200&&n<300)return 'PGC';if(n>4000&&n<=5000)return 'ABC';if(n>1000&&n<=1100)return 'ADNF';
+  if(n>2600&&n<=2700)return 'ADNS';if(n>1400&&n<=1500)return 'AFC';if(n>2000&&n<=2600)return 'ASC';return 'OTHER';
+}
+function colr(c){if(c==='PGC')return PGCC;for(var i=0;i<CLS.length;i++)if(CLS[i][0]===c)return CLS[i];return ['OTHER','#6c7293','#fff']}
+function board(){return boards()[curDate()]||emptyLike(null)}
+function changed(){if(typeof touched==='function')touched();render();}
+function chip(u){var c=classOf(u.id),k=colr(c);
+  return '<span class="fb-chip'+(u.note?' n':'')+'" style="background:'+k[1]+';color:'+k[2]+'" title="'+esc(c+(u.note?' — '+u.note:''))+'"'
+    +(u.note?' onclick="toast(this.title,7000)"':'')+'>'+esc(u.id)+'</span>';}
+function coaches(list){return list.filter(function(u){return classOf(u.id)!=='PGC'})}
+function pgcs(list){return list.filter(function(u){return classOf(u.id)==='PGC'})}
+function allDet(b){var a=[];b.detained.forEach(function(g){g.cols.forEach(function(c){a=a.concat(c.units)})});return a}
+
+/* ---------------- counts ---------------- */
+function counts(b){
+  var opC=0,spC=0,opP=0,spP=0;
+  b.service.forEach(function(c){opC+=coaches(c.units).length;opP+=(c.pgc||[]).length+pgcs(c.units).length});
+  b.spare.forEach(function(c){spC+=coaches(c.units).length;spP+=(c.pgc||[]).length+pgcs(c.units).length});
+  var det=allDet(b);
+  return {opC:opC,spC:spC,opP:opP,spP:spP,detC:coaches(det).length,detP:pgcs(det).length};
+}
+function summary(b){
+  var rows=[],grp=function(n){var g=b.detained.find(function(x){return x.name.toUpperCase().indexOf(n)>=0});
+    var a=[];if(g)g.cols.forEach(function(c){a=a.concat(c.units)});return {units:a,pgc:[]}};
+  var flat=function(sec){var a=[],p=[];b[sec].forEach(function(c){a=a.concat(c.units);p=p.concat(c.pgc||[])});return {units:a,pgc:p}};
+  [['A','REFURBISHMENT / OVERHAUL',grp('REFURB')],['B','MAJOR SERVICES',grp('MAJOR')],['C','MINOR SERVICES',grp('MINOR')],
+   ['D','OPERATION; EXPRESS / SHUTTLE / SPECIAL',flat('service')],['E','SPARE STOCK; EXPRESS / SHUTTLE / SPECIAL',flat('spare')]].forEach(function(r){
+    var per=CLS.map(function(k){return r[2].units.filter(function(u){return classOf(u.id)===k[0]}).length});
+    var tot=per.reduce(function(a,b){return a+b},0);
+    var pg=pgcs(r[2].units).length+r[2].pgc.length;
+    rows.push({code:r[0],name:r[1],per:per,tot:tot,pgc:pg});
+  });
+  return rows;
+}
+
+/* ---------------- render ---------------- */
+function colCard(sec,gi,ci,c){
+  var cc=coaches(c.units),pp=(c.pgc||[]).concat(pgcs(c.units)),empty=!c.units.length&&!pp.length;
+  if(empty&&!SHOW_EMPTY)return '';
+  return '<div class="fb-col'+(empty?' empty':'')+'"><div class="h" onclick="FLEET.edit(\''+sec+'\','+gi+','+ci+')" title="Click to edit this column">'
+    +'<b>'+esc(c.name||'—')+'</b>'+(c.note?'<small>'+esc(c.note)+'</small>':'')+'</div>'
+    +'<div class="u">'+c.units.filter(function(u){return classOf(u.id)!=='PGC'}).map(chip).join('')+'</div>'
+    +(sec==='detained'&&pgcs(c.units).length?'<div class="p">'+pgcs(c.units).map(chip).join('')+'</div>':'')
+    +(sec!=='detained'&&(pp.length||sec==='service')?'<div class="p"><i>'+(sec==='service'?'PGC ON TRAIN':'SPARE PGC')+'</i>'+(pp.length?pp.map(chip).join(''):'<i style="color:#4a4f63">—</i>')+'</div>':'')
+    +'<div class="f"><span>'+(sec==='service'?'Operation':sec==='spare'?'Spare':'Detained')+'</span><b>'+cc.length+'</b></div></div>';
+}
+function render(){
+  var el=document.getElementById('fleetArea');if(!el)return;
+  var iso=curDate(),has=!!boards()[iso],b=board(),n=counts(b),h='';
+  var y=+iso.slice(0,4),m=VM!=null?VM:(+iso.slice(5,7)-1),dim=new Date(y,m+1,0).getDate(),today=isoOf(new Date());
+  var cal='<div class="fb-cal-h"><button class="fb-btn" onclick="FLEET.month(-1)">‹</button><b>'+MNAMES[m]+' '+y+'</b><button class="fb-btn" onclick="FLEET.month(1)">›</button>'
+    +'<span>'+Object.keys(boards()).filter(function(d){return d.slice(0,7)===y+'-'+p2(m+1)}).length+' of '+dim+' days recorded · click a day</span></div><div class="fb-cal">';
+  for(var d=1;d<=dim;d++){var di=y+'-'+p2(m+1)+'-'+p2(d),bd=boards()[di],c=bd?counts(bd):null;
+    cal+='<div class="fb-day'+(bd?' has':'')+(di===iso?' cur':'')+(di===today?' today':'')+(di>today?' fut':'')+'" onclick="FLEET.go(\''+di+'\')" title="'+labelOf(di)+(c?' — '+c.opC+' operation · '+c.spC+' spare coaches':' — not recorded')+'">'
+      +'<i>'+WD[new Date(y,m,d).getDay()]+'</i><b>'+d+'</b><small>'+(c?(c.opC+c.spC):'—')+'</small></div>';}
+  cal+='</div>';
+  h+='<div class="fb-top"><div><h2>Coaches Revenue, Non-Revenue &amp; PGC Utilized</h2><small>Train services · spare at depots · detained coaches — click a column title to edit it</small></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="fb-asof">AS ON <input id="fbAsOf" value="'+esc(b.asOf)+'" onchange="FLEET.asOf(this.value)"></span>'
+    +'<button class="fb-btn p" onclick="document.getElementById(\'fbFile\').click()" title="Load the daily deployment Excel (same layout as Book1) into this day">⬆ Import Excel</button>'
+    +(has?'<button class="fb-btn" onclick="FLEET.clearDay()" title="Delete this day\'s board">🗑 Clear day</button>':'')+'</div></div>'+cal;
+  if(!has){var pv=prevDate(iso);
+    h+='<div class="fb-sec fb-new"><h3>📅 '+labelOf(iso)+' — not recorded yet</h3><p>Start this day\'s board:</p><div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +(pv?'<button class="fb-btn p" onclick="FLEET.newDay(\'copy\')">⧉ Copy from '+labelOf(pv)+'</button>':'')
+      +'<button class="fb-btn" onclick="document.getElementById(\'fbFile\').click()">⬆ Import Excel for this day</button>'
+      +'<button class="fb-btn" onclick="FLEET.newDay(\'empty\')">＋ Start empty (same columns)</button></div></div>';
+    el.innerHTML=h;return;}
+  h+='<div class="fb-kpis">'
+    +'<div class="fb-k a"><div class="v">'+n.opC+'</div><div class="l">Operation coach</div></div>'
+    +'<div class="fb-k b"><div class="v">'+n.spC+'</div><div class="l">Spare coach</div></div>'
+    +'<div class="fb-k"><div class="v">'+(n.opC+n.spC)+'</div><div class="l">Total available coach</div></div>'
+    +'<div class="fb-k a"><div class="v">'+n.opP+'</div><div class="l">Operation PGC</div></div>'
+    +'<div class="fb-k b"><div class="v">'+n.spP+'</div><div class="l">Spare PGC</div></div>'
+    +'<div class="fb-k"><div class="v">'+(n.opP+n.spP)+'</div><div class="l">Total available PGC</div></div>'
+    +'<div class="fb-k c"><div class="v">'+n.detC+'</div><div class="l">Detained coaches</div></div>'
+    +'<div class="fb-k c"><div class="v">'+n.detP+'</div><div class="l">Detained PGC</div></div></div>';
+  h+='<div class="fb-legend">'+CLS.concat([PGCC]).map(function(k){return '<span style="background:'+k[1]+';color:'+k[2]+'">'+k[0]+'</span>'}).join('')
+    +'<span style="background:transparent;color:#a3a8c3;border:1px dashed #3b4050">▸ red corner = has a note (hover or tap)</span>'
+    +'<label><input type="checkbox" '+(SHOW_EMPTY?'checked':'')+' onchange="FLEET.empty(this.checked)"> Show empty columns</label></div>';
+  var secBox=function(key,title,cnt,inner){return '<div class="fb-sec"><h3>'+title+' <span class="ct">'+cnt+'</span>'
+    +'<button class="fb-btn" onclick="FLEET.addCol(\''+key+'\')">＋ Add column</button></h3>'+inner+'</div>';};
+  h+=secBox('service','🚆 Coaches &amp; PGC on train services',n.opC+' coaches · '+n.opP+' PGC',
+    '<div class="fb-cols">'+b.service.map(function(c,i){return colCard('service',0,i,c)}).join('')+'</div>');
+  h+=secBox('spare','🏠 Spare coaches &amp; PGC at depots',n.spC+' coaches · '+n.spP+' PGC',
+    '<div class="fb-cols">'+b.spare.map(function(c,i){return colCard('spare',0,i,c)}).join('')+'</div>');
+  h+=secBox('detained','🔧 Detained coaches',n.detC+' coaches · '+n.detP+' PGC',
+    b.detained.map(function(g,gi){var cnt=0;g.cols.forEach(function(c){cnt+=c.units.length});
+      return '<div class="fb-grp">'+esc(g.name)+' · '+cnt+' <button class="fb-btn" style="padding:3px 9px;font-size:.68rem;margin-left:6px" onclick="FLEET.addCol(\'detained\','+gi+')">＋ Add</button></div>'
+        +'<div class="fb-cols">'+g.cols.map(function(c,ci){return colCard('detained',gi,ci,c)}).join('')+'</div>'}).join(''));
+  /* status summary */
+  var rows=summary(b),tot=CLS.map(function(_,i){return rows.reduce(function(a,r){return a+r.per[i]},0)});
+  h+='<div class="fb-sec"><h3>📋 Status summary by class</h3><div class="fb-sum tblwrap"><table><thead><tr><th>Code</th><th>Status descriptions</th>'
+    +CLS.map(function(k){return '<th style="background:'+k[1]+';color:'+k[2]+'">'+(k[0]==='SPECIAL'?'SPECIAL COACH':k[0])+'</th>'}).join('')
+    +'<th>Total coaches</th><th>Total PGC</th></tr></thead><tbody>'
+    +rows.map(function(r){return '<tr><td><b>'+r.code+'</b></td><td class="l">'+r.name+'</td>'+r.per.map(function(v){return '<td>'+v+'</td>'}).join('')
+      +'<td><b>'+r.tot+'</b></td><td><b>'+r.pgc+'</b></td></tr>'}).join('')
+    +'<tr class="t"><td colspan="2" class="l">TOTAL EACH ASSET</td>'+tot.map(function(v){return '<td>'+v+'</td>'}).join('')
+    +'<td>'+rows.reduce(function(a,r){return a+r.tot},0)+'</td><td>'+rows.reduce(function(a,r){return a+r.pgc},0)+'</td></tr></tbody></table></div></div>';
+  el.innerHTML=h;
+}
+
+/* ---------------- edit ---------------- */
+function colRef(){var b=board();return ED.sec==='detained'?b.detained[ED.gi].cols:b[ED.sec]}
+function toLines(list){return (list||[]).map(function(u){return u.id+(u.note?'  |  '+u.note:'')}).join('\n')}
+function fromLines(t){return String(t||'').split(/\n+/).map(function(l){var p=l.split('|');var id=p.shift().trim();return id?{id:id,note:p.join('|').trim()}:null}).filter(Boolean)}
+window.FLEET={
+  render:render,board:board,classOf:classOf,
+  empty:function(on){SHOW_EMPTY=!!on;render();},
+  asOf:function(v){board().asOf=String(v).trim();changed();},
+  go:function(iso){CUR=iso;VM=null;render();},
+  month:function(d){var iso=curDate(),y=+iso.slice(0,4),m=(VM!=null?VM:+iso.slice(5,7)-1)+d;if(m<0){m=11;y--}if(m>11){m=0;y++}
+    VM=null;CUR=y+'-'+p2(m+1)+'-'+(boards()[y+'-'+p2(m+1)+'-01']?'01':p2(Math.min(new Date().getDate(),new Date(y,m+1,0).getDate())));render();},
+  newDay:function(how){var iso=curDate(),pv=prevDate(iso),src=pv?boards()[pv]:null;
+    var nb=how==='copy'&&src?JSON.parse(JSON.stringify(src)):emptyLike(src);nb.asOf=labelOf(iso);boards()[iso]=nb;changed();
+    toast(how==='copy'?'Copied from '+labelOf(pv)+' — edit what changed, then click 💾 Save':'New empty board — click a column title to fill it',6000);},
+  clearDay:function(){var iso=curDate();if(!confirm('Delete the board for '+labelOf(iso)+'?'))return;delete boards()[iso];changed();},
+  addCol:function(sec,gi){var b=board(),arr=sec==='detained'?b.detained[gi||0].cols:b[sec];
+    arr.push(sec==='detained'?{name:'NEW',note:'',units:[]}:{name:'NEW',note:'',units:[],pgc:[]});
+    SHOW_EMPTY=true;changed();FLEET.edit(sec,gi||0,arr.length-1);},
+  edit:function(sec,gi,ci){ED={sec:sec,gi:gi,ci:ci};var c=colRef()[ci];
+    document.getElementById('fbFormTitle').textContent=(sec==='service'?'Train service':sec==='spare'?'Depot (spare)':'Detained — '+board().detained[gi].name)+' column';
+    document.getElementById('fbForm').innerHTML='<div class="fb-form">'
+      +'<label>Column title</label><input id="fbName" value="'+esc(c.name)+'">'
+      +'<label>'+(sec==='service'?'Route / description':'Note')+'</label><input id="fbNote" value="'+esc(c.note)+'">'
+      +'<label>'+(sec==='detained'?'Coaches / PGC detained':'Coaches')+' — one per line</label><textarea id="fbUnits">'+esc(toLines(c.units))+'</textarea>'
+      +'<div class="hint">Write the coach number, e.g. 2301. Add a note after a "|", e.g. 2301 | KIV result A/C trip. The colour (ASC, ADNS, ABC…) is set automatically from the number.</div>'
+      +(sec==='detained'?'':'<label>'+(sec==='service'?'PGC on this train':'Spare PGC at this depot')+' — one per line</label><textarea id="fbPgc" style="min-height:70px">'+esc(toLines(c.pgc))+'</textarea><div class="hint">e.g. 213 | ENGINE: 1</div>')
+      +'</div>';
+    document.getElementById('ovFleet').classList.add('show');},
+  saveCol:function(){var arr=colRef(),c=arr[ED.ci];
+    c.name=document.getElementById('fbName').value.trim();c.note=document.getElementById('fbNote').value.trim();
+    c.units=fromLines(document.getElementById('fbUnits').value);
+    var p=document.getElementById('fbPgc');if(p)c.pgc=fromLines(p.value);
+    closeOv('ovFleet');changed();toast('Column saved — click 💾 Save to send it to the cloud');},
+  delCol:function(){var arr=colRef();if(!confirm('Delete column "'+(arr[ED.ci].name||'')+'"?'))return;arr.splice(ED.ci,1);closeOv('ovFleet');changed();},
+  moveCol:function(d){var arr=colRef(),j=ED.ci+d;if(j<0||j>=arr.length)return;var t=arr[ED.ci];arr[ED.ci]=arr[j];arr[j]=t;ED.ci=j;changed();},
+  importFile:function(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;
+    var rd=new FileReader();rd.onload=function(){try{
+      var wb=XLSX.read(new Uint8Array(rd.result),{type:'array'});var nb=parse(wb.Sheets[wb.SheetNames[0]]);
+      if(!nb.service.length&&!nb.spare.length)throw new Error('could not find the train service / depot columns');
+      if(!confirm('Load "'+(nb.asOf||f.name)+'"?\n'+counts(nb).opC+' operation coaches, '+counts(nb).spC+' spare, '+counts(nb).detC+' detained.'))return;
+      var di=dateFromAsOf(nb.asOf),iso=curDate();
+      if(di&&di!==iso&&confirm('The Excel is for '+labelOf(di)+'. Put it on that day?\n(Cancel = put it on '+labelOf(iso)+')'))iso=di;
+      boards()[iso]=nb;CUR=iso;VM=null;changed();toast('Imported '+f.name+' into '+labelOf(iso)+' — click 💾 Save to send it to the cloud',6000);
+    }catch(e){toast('Import failed: '+e.message,7000)}};rd.readAsArrayBuffer(f);},
+  open:function(){
+    ['tabOverview','tabData','tabIncidents','tabDaily','tabReport','tabProj'].forEach(function(id){var el=document.getElementById(id);if(el)el.classList.remove('on')});
+    ['pOverview','pData','pIncidents','dlyDaily','pReport','pProj'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none'});
+    document.getElementById('tabFleet').classList.add('on');document.getElementById('pFleet').style.display='';render();}
+};
+
+/* ---------------- Excel import (same layout as the daily deployment sheet) ---------------- */
+function parse(ws){
+  var M=ws['!merges']||[],ref=XLSX.utils.decode_range(ws['!ref']);
+  var cell=function(r,c){return ws[XLSX.utils.encode_cell({r:r,c:c})]};
+  var val=function(r,c){var x=cell(r,c);if(!x||x.v==null||x.f)return '';return String(x.w!=null&&typeof x.v==='number'?x.v:x.v).trim()};
+  var note=function(r,c){var x=cell(r,c);return x&&x.c&&x.c.length?x.c.map(function(k){return k.t}).join(' ').replace(/\s+/g,' ').trim():''};
+  var cover=function(r,c){for(var i=0;i<M.length;i++){var m=M[i];if(m.s.r<=r&&r<=m.e.r&&m.s.c<=c&&c<=m.e.c)return m}return null};
+  var title=val(0,0),mm=title.match(/AS ON\s+(.+)$/i);
+  var hdr=-1;for(var r=0;r<8&&hdr<0;r++)if(/^NO\.?$/i.test(val(r,0)))hdr=r;if(hdr<0)hdr=3;
+  var end=hdr+1;while(end<=ref.e.r&&!/OPERATION|SPARE|TOTAL/i.test(val(end,0)))end++;
+  var opP=[],spP=[];
+  for(r=end;r<=Math.min(ref.e.r,end+12);r++){var a=val(r,0);
+    if(/OPERATION/i.test(a)&&/PGC/i.test(a)){var m0=cover(r,0);for(var k=r;k<=(m0?m0.e.r:r);k++)opP.push(k);}
+    if(/SPARE/i.test(a)&&/PGC/i.test(a))spP.push(r);}
+  var b={asOf:mm?mm[1].trim():'',service:[],spare:[],detained:[]},grp={};
+  for(var c=1;c<=ref.e.c;c++){
+    var m=cover(0,c);if(!m)continue;var sec=val(m.s.r,m.s.c).toUpperCase();if(!sec)continue;      /* totals column has no title */
+    var name=val(hdr,c).replace(/\s+/g,' ').trim(),units=[];
+    for(r=hdr+1;r<end;r++){var v=val(r,c);if(v)units.push({id:v,note:note(r,c)})}
+    if(sec.indexOf('DETAINED')>=0){
+      var g=cover(1,c),gn=g?val(g.s.r,g.s.c):'DETAINED';if(!name&&!units.length)continue;
+      if(!grp[gn]){grp[gn]={name:gn,cols:[]};b.detained.push(grp[gn])}
+      grp[gn].cols.push({name:name,note:note(hdr,c),units:units});continue;}
+    var key=sec.indexOf('SPARE')>=0?'spare':'service';
+    var pg=(key==='service'?opP:spP).map(function(rr){var v=val(rr,c);return v?{id:v,note:note(rr,c)}:null}).filter(Boolean);
+    if(!name&&!units.length&&!pg.length)continue;
+    b[key].push({name:name,note:note(hdr,c),units:units,pgc:pg});
+  }
+  return b;
+}
+
+/* ---------------- mount ---------------- */
+function hide(){var t=document.getElementById('tabFleet'),p=document.getElementById('pFleet');if(t)t.classList.remove('on');if(p)p.style.display='none';}
+function visible(){var p=document.getElementById('pFleet');return p&&p.style.display!=='none'}
+function wrap(name){var f=window[name];if(typeof f!=='function'||f._fleetWrapped)return;var w=function(){hide();return f.apply(this,arguments)};w._fleetWrapped=true;window[name]=w;}
+function mount(){
+  if(document.getElementById('pFleet'))return;
+  var tabs=document.querySelector('nav.tabs'),main=document.querySelector('main');if(!tabs||!main)return;
+  var btn=document.createElement('button');btn.className='tab';btn.id='tabFleet';btn.innerHTML='🚆 Fleet Deployment';btn.onclick=function(){FLEET.open()};
+  var pt=document.getElementById('tabProj');if(pt)tabs.insertBefore(btn,pt);else tabs.appendChild(btn);
+  var sec=document.createElement('section');sec.className='panel';sec.id='pFleet';sec.style.display='none';sec.innerHTML='<div id="fleetArea"></div>';main.appendChild(sec);
+  ['setTab','dlyOpenTab','rptOpenTab'].forEach(wrap);
+  if(window.PROJ&&PROJ.open&&!PROJ.open._fleetWrapped){var po=PROJ.open;PROJ.open=function(){hide();return po.apply(this,arguments)};PROJ.open._fleetWrapped=true;}
+  var ay=window.applyYear;if(typeof ay==='function'&&!ay._fleetWrapped){window.applyYear=function(){var r=ay.apply(this,arguments);if(visible())render();return r};window.applyYear._fleetWrapped=true;}
+  window.addEventListener('rsd-backup-applied',function(){if(visible())setTimeout(render,0)});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(mount,400)});else setTimeout(mount,400);
+})();
+</script>
+
 
 
 
