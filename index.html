@@ -3232,6 +3232,10 @@ window.PROJ.slides=function(p,H){
 .fb-sec>h3 button{margin-left:auto}
 .fb-grp{font-size:.74rem;font-weight:800;letter-spacing:.7px;color:#f06aa8;margin:10px 0 6px;text-transform:uppercase}
 .fb-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.fb-cols.fb-row{display:flex;flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.fb-cols.fb-row>.fb-col{flex:0 0 118px;scroll-snap-align:start}
+.fb-cols.fb-row::-webkit-scrollbar{height:8px}.fb-cols.fb-row::-webkit-scrollbar-thumb{background:#3b4050;border-radius:8px}
+.fb-col .h{min-height:58px;display:flex;flex-direction:column;justify-content:center}
 .fb-col{background:#1d2029;border:1px solid #2c2e33;border-radius:11px;display:flex;flex-direction:column;min-height:96px}
 .fb-col.fb-emp{opacity:.55}
 .fb-col .h{padding:7px 8px 6px;border-bottom:1px solid #2c2e33;cursor:pointer;text-align:center}
@@ -3408,9 +3412,9 @@ function render(){
   var secBox=function(key,title,cnt,inner){return '<div class="fb-sec"><h3>'+title+' <span class="ct">'+cnt+'</span>'
     +'<button class="fb-btn" onclick="FLEET.addCol(\''+key+'\')">＋ Add column</button></h3>'+inner+'</div>';};
   h+=secBox('service','🚆 Coaches &amp; PGC on train services',n.opC+' coaches · '+n.opP+' PGC',
-    '<div class="fb-cols">'+b.service.map(function(c,i){return colCard('service',0,i,c)}).join('')+'</div>');
+    '<div class="fb-cols fb-row">'+b.service.map(function(c,i){return colCard('service',0,i,c)}).join('')+'</div>');
   h+=secBox('spare','🏠 Spare coaches &amp; PGC at depots',n.spC+' coaches · '+n.spP+' PGC',
-    '<div class="fb-cols">'+b.spare.map(function(c,i){return colCard('spare',0,i,c)}).join('')+'</div>');
+    '<div class="fb-cols fb-row">'+b.spare.map(function(c,i){return colCard('spare',0,i,c)}).join('')+'</div>');
   h+=secBox('detained','🔧 Detained coaches',n.detC+' coaches · '+n.detP+' PGC',
     b.detained.map(function(g,gi){var cnt=0;g.cols.forEach(function(c){cnt+=c.units.length});
       return '<div class="fb-grp">'+esc(g.name)+' · '+cnt+' <button class="fb-btn" style="padding:3px 9px;font-size:.68rem;margin-left:6px" onclick="FLEET.addCol(\'detained\','+gi+')">＋ Add</button></div>'
