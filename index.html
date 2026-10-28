@@ -3243,8 +3243,8 @@ window.PROJ.slides=function(p,H){
 .fb-chip.n{cursor:help}.fb-chip.n::after{content:"";position:absolute;right:0;top:0;border-style:solid;border-width:0 7px 7px 0;border-color:transparent #ff3b3b transparent transparent;border-top-right-radius:6px}
 .fb-col .f{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-top:1px solid #2c2e33;font-size:.7rem;color:#a3a8c3;font-weight:700}
 .fb-col .f b{color:#fff;font-size:.86rem}
-.fb-col .p{padding:5px 7px 7px;border-top:1px dashed #2c2e33;display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
-.fb-col .p .fb-chip{flex:1;min-width:44px}
+.fb-col .p{padding:5px 7px 7px;border-top:1px dashed #2c2e33;display:flex;flex-direction:column;gap:4px}
+.fb-col .p .fb-chip{width:100%}
 .fb-col .p i{font-style:normal;font-size:.58rem;color:var(--mut);width:100%;text-align:center;font-weight:800;letter-spacing:.5px}
 .fb-sum{overflow-x:auto}.fb-sum table{min-width:760px;font-size:.82rem}
 .fb-sum th{text-align:center;position:static}.fb-sum td{text-align:center;font-weight:700}
@@ -3350,15 +3350,14 @@ function colCard(sec,gi,ci,c){
   var cc=coaches(c.units),pp=(c.pgc||[]).concat(pgcs(c.units)),empty=!c.units.length&&!pp.length;
   var hid=empty&&!SHOW_EMPTY&&!PICK;
   var at=function(list,i){return [sec,gi,ci,list,i]};
-  var uChips=c.units.map(function(u,i){return classOf(u.id)==='PGC'?'':chip(u,at('units',i))}).join('');
+  var uChips=c.units.map(function(u,i){return (classOf(u.id)==='PGC'&&sec!=='detained')?'':chip(u,at('units',i))}).join('');
   var pChips=(c.pgc||[]).map(function(u,i){return chip(u,at('pgc',i))}).join('')+c.units.map(function(u,i){return classOf(u.id)==='PGC'?chip(u,at('units',i)):''}).join('');
   return '<div class="fb-col'+(empty?' fb-emp':'')+(hid?' hid':'')+'" data-drop="'+[sec,gi,ci].join('|')+'" ondragover="FLEET.over(event)" ondragleave="FLEET.leave(event)" ondrop="FLEET.drop(event)" onclick="FLEET.tapCol(event,this)">'
     +'<div class="h" onclick="event.stopPropagation();FLEET.edit(\''+sec+'\','+gi+','+ci+')" title="Click to edit this column">'
     +'<b>'+esc(c.name||'—')+'</b>'+(c.note?'<small>'+esc(c.note)+'</small>':'')+'</div>'
     +'<div class="u">'+uChips+'</div>'
-    +(sec==='detained'&&pgcs(c.units).length?'<div class="p">'+pChips+'</div>':'')
     +(sec!=='detained'&&(pp.length||sec==='service')?'<div class="p"><i>'+(sec==='service'?'PGC ON TRAIN':'SPARE PGC')+'</i>'+(pp.length?pChips:'<i style="color:#4a4f63">—</i>')+'</div>':'')
-    +'<div class="f"><span>'+(sec==='service'?'Operation':sec==='spare'?'Spare':'Detained')+'</span><b>'+cc.length+'</b></div></div>';
+    +'<div class="f"><span>'+(sec==='service'?'Operation':sec==='spare'?'Spare':'Detained')+'</span><b>'+(sec==='detained'&&!cc.length&&pp.length?pp.length+' PGC':cc.length+(sec==='detained'&&pp.length?' + '+pp.length+' PGC':''))+'</b></div></div>';
 }
 function render(){
   var el=document.getElementById('fleetArea');if(!el)return;
