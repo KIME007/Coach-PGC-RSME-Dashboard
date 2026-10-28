@@ -3583,7 +3583,7 @@ function exportBoard(b,iso){
   var A=function(c){var s='';c++;while(c){var m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=(c-m-1)/26|0}return s};
   var num=function(v){return /^\d+$/.test(String(v))?+v:v};
   var put=function(r,c,v,st,note){cells[r+','+c]={v:v,s:st||0};if(c>maxC)maxC=c;if(r>maxR)maxR=r;if(note)notes.push([A(c)+(r+1),String(v),note]);};
-  var merge=function(r1,c1,r2,c2){if(r1===r2&&c1===c2)return;merges.push(A(c1)+(r1+1)+':'+A(c2)+(r2+1))};
+  var MR=[];var merge=function(r1,c1,r2,c2){if(r1===r2&&c1===c2)return;merges.push(A(c1)+(r1+1)+':'+A(c2)+(r2+1));MR.push([r1,c1,r2,c2]);};
   var ust=function(u){return SX[classOf(u.id)]||SX.OTHER};
   var lens=b.service.concat(b.spare).map(function(c){return coaches(c.units).length}).concat(b.detained.reduce(function(a,g){return a.concat(g.cols.map(function(c){return c.units.length}))},[]));
   var rows=Math.max.apply(null,[15].concat(lens));
@@ -3610,15 +3610,20 @@ function exportBoard(b,iso){
   put(sr,0,'CODE',2);put(sr,1,'STATUS DESCRIPTIONS',2);merge(sr,1,sr,3);
   KS.forEach(function(k,i){put(sr,4+i,k==='SPECIAL'?'SPECIAL COACH':k,SX[k])});put(sr,10,'TOTAL COACHES',2);put(sr,11,'TOTAL PGC',2);
   var sm=summary(b),tot=[0,0,0,0,0,0,0,0];
-  TALL[sr]=30;sm.forEach(function(r,i){var y=sr+1+i;TALL[y]=28;put(y,0,r.code,3);put(y,1,r.name,3);merge(y,1,y,3);r.per.concat([r.tot,r.pgc]).forEach(function(v,j){put(y,4+j,v,3);tot[j]+=v});});
-  var ty=sr+1+sm.length;put(ty,0,'TOTAL EACH ASSET',3);merge(ty,0,ty,3);tot.forEach(function(v,j){put(ty,4+j,v,3)});
+  TALL[sr]=36;sm.forEach(function(r,i){var y=sr+1+i;TALL[y]=32;put(y,0,r.code,3);put(y,1,r.name,3);merge(y,1,y,3);r.per.concat([r.tot,r.pgc]).forEach(function(v,j){put(y,4+j,v,3);tot[j]+=v});});
+  var ty=sr+1+sm.length;TALL[ty]=26;put(ty,0,'TOTAL EACH ASSET',3);merge(ty,0,ty,3);tot.forEach(function(v,j){put(ty,4+j,v,3)});
+  /* every cell inside a merged area gets the same style, so all borders are drawn */
+  MR.forEach(function(m){var top=cells[m[0]+','+m[1]],st=top?top.s:0;for(var r=m[0];r<=m[2];r++)for(var c=m[1];c<=m[3];c++){
+    if(!cells[r+','+c])cells[r+','+c]={v:'',s:st};if(c>maxC)maxC=c;if(r>maxR)maxR=r;}});
+  /* fill gaps in the total / PGC rows so the band has a continuous border */
+  [rOp,rSp,rOpP,rSpP].forEach(function(r){for(var c=0;c<c2;c++)if(!cells[r+','+c])cells[r+','+c]={v:'',s:3};});
   var e=function(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
   var xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
     +'<sheetViews><sheetView workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
-    +'<sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="18" customWidth="1"/><col min="2" max="'+(maxC+1)+'" width="10" customWidth="1"/></cols><sheetData>';
+    +'<sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="'+(maxC+1)+'" width="10" customWidth="1"/></cols><sheetData>';
   for(var r=0;r<=maxR;r++){var line='';for(var c=0;c<=maxC;c++){var k=cells[r+','+c];if(!k)continue;var ref=A(c)+(r+1);
       line+=typeof k.v==='number'?'<c r="'+ref+'" s="'+k.s+'"><v>'+k.v+'</v></c>':(k.v===''?'<c r="'+ref+'" s="'+k.s+'"/>':'<c r="'+ref+'" s="'+k.s+'" t="inlineStr"><is><t>'+e(k.v)+'</t></is></c>');}
-    xml+='<row r="'+(r+1)+'" ht="'+(TALL[r]||(r===R0?30:r<3?16:(r===rOp||r===rSp?26:15)))+'" customHeight="1">'+line+'</row>';}
+    xml+='<row r="'+(r+1)+'" ht="'+(TALL[r]||(r===R0?40:r<3?18:(r===rOp||r===rSp||r===rOpP||r===rSpP?28:r===rTc||r===rTp?20:16)))+'" customHeight="1">'+line+'</row>';}
   xml+='</sheetData>'+(merges.length?'<mergeCells count="'+merges.length+'">'+merges.map(function(m){return '<mergeCell ref="'+m+'"/>'}).join('')+'</mergeCells>':'')+'</worksheet>';
   var cl=function(ref,t,st){return '<c r="'+ref+'"'+(st?' s="'+st+'"':'')+' t="inlineStr"><is><t>'+e(t)+'</t></is></c>'};
   var nx='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="2" width="12" customWidth="1"/><col min="3" max="3" width="100" customWidth="1"/></cols><sheetData>'
