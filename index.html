@@ -3234,6 +3234,10 @@ window.PROJ.slides=function(p,H){
 .fb-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
 .fb-cols.fb-row{display:flex;flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x proximity;scrollbar-width:thin}
 .fb-cols.fb-row>.fb-col{flex:0 0 118px;scroll-snap-align:start}
+.fb-det{gap:14px}.fb-dg{flex:0 0 auto;display:flex;flex-direction:column;padding-left:12px;border-left:2px solid #AF1763;scroll-snap-align:start}
+.fb-dg:first-child{padding-left:0;border-left:none}.fb-dg .fb-grp{margin-top:0;white-space:nowrap}
+.fb-dgc{display:flex;gap:8px;flex:1;width:max-content}.fb-dgc>.fb-col{flex:0 0 118px;width:118px}
+.fb-det>.fb-dg{width:max-content;min-width:max-content}
 .fb-cols.fb-row::-webkit-scrollbar{height:8px}.fb-cols.fb-row::-webkit-scrollbar-thumb{background:#3b4050;border-radius:8px}
 .fb-col .h{min-height:58px;display:flex;flex-direction:column;justify-content:center}
 .fb-col{background:#1d2029;border:1px solid #2c2e33;border-radius:11px;display:flex;flex-direction:column;min-height:96px}
@@ -3416,9 +3420,9 @@ function render(){
   h+=secBox('spare','🏠 Spare coaches &amp; PGC at depots',n.spC+' coaches · '+n.spP+' PGC',
     '<div class="fb-cols fb-row">'+b.spare.map(function(c,i){return colCard('spare',0,i,c)}).join('')+'</div>');
   h+=secBox('detained','🔧 Detained coaches',n.detC+' coaches · '+n.detP+' PGC',
-    b.detained.map(function(g,gi){var cnt=0;g.cols.forEach(function(c){cnt+=c.units.length});
-      return '<div class="fb-grp">'+esc(g.name)+' · '+cnt+' <button class="fb-btn" style="padding:3px 9px;font-size:.68rem;margin-left:6px" onclick="FLEET.addCol(\'detained\','+gi+')">＋ Add</button></div>'
-        +'<div class="fb-cols">'+g.cols.map(function(c,ci){return colCard('detained',gi,ci,c)}).join('')+'</div>'}).join(''));
+    '<div class="fb-cols fb-row fb-det">'+b.detained.map(function(g,gi){var cnt=0;g.cols.forEach(function(c){cnt+=c.units.length});
+      return '<div class="fb-dg"><div class="fb-grp">'+esc(g.name)+' · '+cnt+' <button class="fb-btn" style="padding:3px 9px;font-size:.68rem;margin-left:6px" onclick="FLEET.addCol(\'detained\','+gi+')">＋ Add</button></div>'
+        +'<div class="fb-dgc">'+g.cols.map(function(c,ci){return colCard('detained',gi,ci,c)}).join('')+'</div></div>'}).join('')+'</div>');
   /* status summary */
   var rows=summary(b),tot=CLS.map(function(_,i){return rows.reduce(function(a,r){return a+r.per[i]},0)});
   h+='<div class="fb-sec"><h3>📋 Status summary by class</h3><div class="fb-sum tblwrap"><table><thead><tr><th>Code</th><th>Status descriptions</th>'
