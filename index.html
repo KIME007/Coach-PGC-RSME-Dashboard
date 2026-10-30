@@ -3427,7 +3427,7 @@ function render(){
     +'<div class="fb-k c"><div class="v">'+n.detP+'</div><div class="l">Detained PGC</div></div></div>';
   h+='<div class="fb-search"><span class="ic">🔍</span><input id="fbQ" type="search" placeholder="Find a coach or PGC… e.g. 2301, 213, AKE" value="'+esc(SEARCH)+'" oninput="FLEET.find(this.value)" onkeydown="if(event.key===\'Enter\')FLEET.jump(0)" autocomplete="off">'
     +'<div id="fbRes" class="fb-res"></div></div>';
-  h+='<div class="fb-move"><span>✋ <b>Move coaches:</b> drag a coach/PGC box onto another column — or tap a box, then tap the column. Drop on 🗑 to remove.</span>'
+  h+='<div class="fb-move"><span>✋ <b>Move coaches:</b> <b>click</b> the boxes you want (click again to unselect, Shift+click for a range) → <b>drag</b> any selected box to a column, or <b>tap the column</b>, or use <b>Move to…</b>. Drop on a box to place them above it. Drop on 🗑 to remove.</span>'
     +(SEL.length?'<span class="fb-pick">'+(SEL.length===1?'Moving <b>'+esc(unitAt(SEL[0].split('|')).id)+'</b>':'<b>'+SEL.length+' selected</b>')+' — tap a column, drag, or <select class="fb-moveto" onchange="FLEET.moveTo(this.value)"><option value="">Move to…</option>'+moveOpts()+'</select> <button class="fb-btn" onclick="FLEET.cancelPick()">Cancel</button></span>':'')
     +'<button class="fb-btn" onclick="FLEET.undo()" '+(UNDO.length?'':'disabled')+'>↶ Undo'+(UNDO.length?' ('+UNDO.length+')':'')+'</button>'
     +'<div class="fb-trash" ondragover="FLEET.over(event)" ondragleave="FLEET.leave(event)" ondrop="FLEET.drop(event,true)" onclick="FLEET.tapTrash()">🗑 Remove</div></div>';
@@ -3536,12 +3536,12 @@ window.FLEET={
     if(at&&ch&&many.some(function(l){return ch.getAttribute('data-loc')===l.join('|')})){render();return;}
     if(trash&&!confirm('Remove '+(many.length>1?many.length+' assets':unitAt(loc).id)+' from this day\'s board?')){render();return;}
     doMove(many,t,!!trash,at);},
+  /* click = add / remove that box from the selection; Shift+click = select the range in that column */
   tapChip:function(e,el){e.stopPropagation();var key=el.getAttribute('data-loc'),loc=key.split('|'),k=SEL.indexOf(key);
-    if(e.metaKey||e.ctrlKey||e.shiftKey){if(k>=0)SEL.splice(k,1);else SEL.push(key);render();return;}     /* add / remove from selection */
-    if(SEL.length===1&&k===0){var u=unitAt(loc);SEL=[];render();if(u.note)toast(u.id+' — '+u.note,7000);return;}
-    if(SEL.length&&k<0&&selLocs().every(function(p){return p[0]===loc[0]&&p[1]===loc[1]&&p[2]===loc[2]})){doMove(selLocs(),loc.slice(0,3),false,{list:loc[3],i:+loc[4]});return;}
-    if(SEL.length>1&&k>=0){SEL.splice(k,1);render();return;}
-    SEL=[key];render();},
+    if(e.shiftKey&&SEL.length){var last=SEL[SEL.length-1].split('|');
+      if(last[0]===loc[0]&&last[1]===loc[1]&&last[2]===loc[2]&&last[3]===loc[3]){var a=Math.min(+last[4],+loc[4]),b=Math.max(+last[4],+loc[4]);
+        for(var n=a;n<=b;n++){var kk=loc.slice(0,4).concat([n]).join('|');if(SEL.indexOf(kk)<0)SEL.push(kk);}render();return;}}
+    if(k>=0)SEL.splice(k,1);else SEL.push(key);render();},
   tapCol:function(e,el){if(!SEL.length)return;var t=el.getAttribute('data-drop').split('|');
     if(selLocs().every(function(p){return t[0]===p[0]&&t[1]===p[1]&&t[2]===p[2]})){SEL=[];render();return;}doMove(selLocs(),t,false);},
   tapTrash:function(){if(!SEL.length)return;if(!confirm('Remove '+(SEL.length>1?SEL.length+' assets':unitAt(selLocs()[0]).id)+' from this day\'s board?'))return;doMove(selLocs(),null,true);},
