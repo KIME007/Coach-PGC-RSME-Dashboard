@@ -3535,18 +3535,8 @@ function dailyFrom(b,base){
   var dep={},dorder=(e.spare||[]).map(function(s){return s.depot});
   b.spare.forEach(function(c){var d=depotOf(c.name);dep[d]=dep[d]||[];dep[d]=dep[d].concat(c.units);if(dorder.indexOf(d)<0)dorder.push(d)});
   e.spare=dorder.filter(function(d){return dep[d]}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
-  var old={};(e.pgc||[]).forEach(function(p){old[String(p.no).replace(/\D/g,'')]=p});
-  var pg=[],add=function(u,ok,as){var n=String(u.id).replace(/\D/g,''),o=old[n]||{},m=String(u.note||'').match(/ENGINE\s*:?\s*(\d)/i);
-    pg.push({no:'PGC '+n,eng:m?+m[1]:(o.eng||2),ok:ok,as:as});delete old[n];};
-  b.service.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){add(u,true,c.note?c.name+' ('+c.note+')':c.name)})});
-  b.spare.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){add(u,true,'Spare '+tc(depotOf(c.name)))})});
-  b.detained.forEach(function(g){g.cols.forEach(function(c){pgcs(c.units).forEach(function(u){add(u,false,tc(g.name)+' · '+c.name+(u.note?' — '+u.note:''))})})});
-  e.pgc=pg.sort(function(a,c){return a.no.localeCompare(c.no,undefined,{numeric:true})});
-  var um=[],ump=[];
-  b.detained.forEach(function(g){if(!/MINOR|MAJOR/i.test(g.name))return;g.cols.forEach(function(c){c.units.forEach(function(u){
-    var r=tc(g.name)+' · '+c.name+(u.note?' — '+u.note:'');
-    if(classOf(u.id)==='PGC')ump.push({t:'PGC',n:String(u.id),r:r});else um.push({t:classOf(u.id)==='OTHER'?'SPECIAL':classOf(u.id),n:String(u.id),r:r});})})});
-  e.um=um;e.ump=ump;e.fleetSync=Date.now();
+  /* only operation + spare come from the board; PGC, Minor/Major services stay as keyed in Daily Status */
+  e.fleetSync=Date.now();
   return e;
 }
 function syncDaily(iso,quiet){
