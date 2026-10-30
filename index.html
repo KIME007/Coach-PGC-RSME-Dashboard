@@ -3289,6 +3289,7 @@ window.PROJ.slides=function(p,H){
 .fb-chip.sel{outline:3px solid #0DCAF0;outline-offset:2px;transform:scale(1.05)}
 .fb-col.dropok,.fb-trash.dropok{outline:2px dashed #3b4050;outline-offset:-2px}
 .fb-col{position:relative}
+.fb-auto{display:flex;align-items:center;gap:4px;font-size:.74rem;color:#a3a8c3;font-weight:700}
 .fb-moveto{margin-left:4px;padding:5px 8px;border-radius:8px;border:1px solid #0DCAF0;background:#12151c;color:#fff;font-weight:700;font-size:.78rem;cursor:pointer}
 .fb-grip{position:absolute;top:3px;right:6px;z-index:2;color:#6c7293;font-size:1rem;cursor:grab;padding:0 3px;line-height:1;user-select:none}
 .fb-grip:hover{color:#0DCAF0}
@@ -3346,7 +3347,8 @@ function classOf(id){
 function colr(c){if(c==='PGC')return PGCC;for(var i=0;i<CLS.length;i++)if(CLS[i][0]===c)return CLS[i];return ['OTHER','#6c7293','#fff']}
 function board(){return boards()[curDate()]||emptyLike(null)}
 var FLASH=null;
-function changed(){var y=window.scrollY;if(typeof touched==='function')touched();render();window.scrollTo(0,y);}
+function changed(){var y=window.scrollY;if(typeof touched==='function')touched();render();window.scrollTo(0,y);
+  if(autoSync()&&boards()[curDate()]){clearTimeout(_syncT);var d=curDate();_syncT=setTimeout(function(){syncDaily(d,true)},700);}}
 function chip(u,loc){var c=classOf(u.id),k=colr(c),sel=loc&&SEL.indexOf(loc.join('|'))>=0;
   return '<span class="fb-chip'+(u.note?' n':'')+(sel?' sel':'')+'" style="background:'+k[1]+';color:'+k[2]+'" title="'+esc(u.id+' · '+c+(u.note?' — '+u.note:'')+' · drag to move')+'"'
     +(loc?' draggable="true" data-loc="'+loc.join('|')+'" ondragstart="FLEET.dragStart(event)" ondragend="FLEET.dragEnd(event)" onclick="FLEET.tapChip(event,this)"':'')+'>'+esc(u.id)+'</span>';}
@@ -3408,6 +3410,8 @@ function render(){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="fb-asof">AS ON <input id="fbAsOf" value="'+esc(b.asOf)+'" onchange="FLEET.asOf(this.value)"></span>'
     +'<button class="fb-btn p" onclick="document.getElementById(\'fbFile\').click()" title="Load the daily deployment Excel (same layout as Book1) into this day">⬆ Import Excel</button>'
     +(has?'<button class="fb-btn" onclick="FLEET.exportXlsx()" title="Download this day as an Excel file">⬇ Export Excel</button>'
+      +'<button class="fb-btn" onclick="FLEET.sync()" title="Fill the Daily Status record of this day from the board">⇄ Sync Daily Status</button>'
+      +'<label class="fb-auto" title="Update Daily Status automatically after every change"><input type="checkbox" '+(autoSync()?'checked':'')+' onchange="FLEET.auto(this.checked)"> auto</label>'
       +'<button class="fb-btn sv'+(typeof dirty!=='undefined'&&dirty?' on':'')+'" onclick="FLEET.save(this)" title="Save to the cloud">💾 '+(typeof dirty!=='undefined'&&dirty?'Save changes':'Saved')+'</button>'
       +'<button class="fb-btn" onclick="FLEET.clearDay()" title="Delete this day\'s board">🗑 Clear day</button>':'')+'</div></div>'+cal;
   if(!has){var pv=prevDate(iso);
@@ -3514,6 +3518,53 @@ function moveOpts(){var b=board(),o='';
   var g=function(lab,list,key){o+='<optgroup label="'+lab+'">'+list.map(function(c,ci){return '<option value="'+key+'|'+ci+'">'+esc(c.name||'—')+'</option>'}).join('')+'</optgroup>'};
   g('🚆 Operation',b.service,'service|0');g('🏠 Spare',b.spare,'spare|0');
   b.detained.forEach(function(gr,gi){g('🔧 '+gr.name,gr.cols,'detained|'+gi)});return o}
+/* ================= SYNC → DAILY STATUS =================
+   The board knows every coach, so it fills the Daily Status record of the same day:
+   coaches in operation by type, spare by depot & type, PGC list (where each is, OK / not),
+   unscheduled maintenance = detained in Minor / Major services. */
+var DEPOT={KLSD:'KLSD',TUMD:'TUMPAT',KEMD:'KEMPAS','K.LIPISD':'K.LIPIS',GEMD:'GEMAS',SPECIAL:'KLSD'};
+function depotOf(name){var w=String(name||'').trim().toUpperCase().split(/\s+/)[0];return DEPOT[w]||w||'OTHER'}
+function tc(t){return String(t).toLowerCase().replace(/\b\w/g,function(c){return c.toUpperCase()})}
+function dailyFrom(b,base){
+  var e=JSON.parse(JSON.stringify(base||{}));
+  var order=['ASC','ADNS','AFC','ABC','ADNF','SPECIAL'];
+  var countBy=function(units){var m={};coaches(units).forEach(function(u){var c=classOf(u.id);if(c==='OTHER')c='SPECIAL';m[c]=(m[c]||0)+1});return m};
+  var toItems=function(m,keep){var ts=order.filter(function(t){return m[t]||(keep||[]).indexOf(t)>=0});return ts.map(function(t){return {t:t,q:m[t]||0}})};
+  var all=[];b.service.forEach(function(c){all=all.concat(c.units)});
+  e.operation=toItems(countBy(all),['ASC','ADNS','AFC','ABC']);
+  var dep={},dorder=(e.spare||[]).map(function(s){return s.depot});
+  b.spare.forEach(function(c){var d=depotOf(c.name);dep[d]=dep[d]||[];dep[d]=dep[d].concat(c.units);if(dorder.indexOf(d)<0)dorder.push(d)});
+  e.spare=dorder.filter(function(d){return dep[d]}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
+  var old={};(e.pgc||[]).forEach(function(p){old[String(p.no).replace(/\D/g,'')]=p});
+  var pg=[],add=function(u,ok,as){var n=String(u.id).replace(/\D/g,''),o=old[n]||{},m=String(u.note||'').match(/ENGINE\s*:?\s*(\d)/i);
+    pg.push({no:'PGC '+n,eng:m?+m[1]:(o.eng||2),ok:ok,as:as});delete old[n];};
+  b.service.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){add(u,true,c.note?c.name+' ('+c.note+')':c.name)})});
+  b.spare.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){add(u,true,'Spare '+tc(depotOf(c.name)))})});
+  b.detained.forEach(function(g){g.cols.forEach(function(c){pgcs(c.units).forEach(function(u){add(u,false,tc(g.name)+' · '+c.name+(u.note?' — '+u.note:''))})})});
+  e.pgc=pg.sort(function(a,c){return a.no.localeCompare(c.no,undefined,{numeric:true})});
+  var um=[],ump=[];
+  b.detained.forEach(function(g){if(!/MINOR|MAJOR/i.test(g.name))return;g.cols.forEach(function(c){c.units.forEach(function(u){
+    var r=tc(g.name)+' · '+c.name+(u.note?' — '+u.note:'');
+    if(classOf(u.id)==='PGC')ump.push({t:'PGC',n:String(u.id),r:r});else um.push({t:classOf(u.id)==='OTHER'?'SPECIAL':classOf(u.id),n:String(u.id),r:r});})})});
+  e.um=um;e.ump=ump;e.fleetSync=Date.now();
+  return e;
+}
+function syncDaily(iso,quiet){
+  var b=boards()[iso];if(!b||typeof DAILY_RKEY==='undefined')return false;
+  var recs={},live=null;try{recs=JSON.parse(localStorage.getItem(DAILY_RKEY)||'{}')||{}}catch(x){}
+  try{live=JSON.parse(localStorage.getItem(DAILY_EKEY)||'null')}catch(x){}
+  var base=recs[iso]&&recs[iso].data?recs[iso].data:(live&&live.date===iso?live:null);
+  if(!base){var prev=Object.keys(recs).filter(function(d){return d<iso}).sort().pop();base=prev?recs[prev].data:(live||{});base=JSON.parse(JSON.stringify(base));base.date=iso;}
+  var e=dailyFrom(b,base);e.date=iso;
+  recs[iso]={data:e,ts:Date.now()};
+  try{localStorage.setItem(DAILY_RKEY,JSON.stringify(recs));if(live&&live.date===iso)localStorage.setItem(DAILY_EKEY,JSON.stringify(e));}catch(x){return false}
+  try{window.dispatchEvent(new CustomEvent('rsd-backup-applied',{detail:{fromFleet:true}}))}catch(x){}
+  if(window.rsdAfterDailyStore)try{window.rsdAfterDailyStore()}catch(x){}
+  if(!quiet)toast('Daily Status for '+labelOf(iso)+' updated from the board ✔',4000);
+  return true;
+}
+var AUTOK='rsd_fleet_daily_sync_v1',_syncT=null;
+function autoSync(){try{return localStorage.getItem(AUTOK)!=='0'}catch(x){return true}}
 function selLocs(){return SEL.map(function(k){return k.split('|')})}
 window.FLEET={
   dragStart:function(e){var loc=e.target.getAttribute('data-loc');
@@ -3546,6 +3597,9 @@ window.FLEET={
     if(selLocs().every(function(p){return t[0]===p[0]&&t[1]===p[1]&&t[2]===p[2]})){SEL=[];render();return;}doMove(selLocs(),t,false);},
   tapTrash:function(){if(!SEL.length)return;if(!confirm('Remove '+(SEL.length>1?SEL.length+' assets':unitAt(selLocs()[0]).id)+' from this day\'s board?'))return;doMove(selLocs(),null,true);},
   cancelPick:function(){SEL=[];render();},
+  sync:function(){syncDaily(curDate());},
+  auto:function(on){try{localStorage.setItem(AUTOK,on?'1':'0')}catch(x){}if(on)syncDaily(curDate());else toast('Auto sync to Daily Status is off');},
+  dailyFrom:dailyFrom,syncDaily:syncDaily,
   moveTo:function(v){if(!v||!SEL.length)return;doMove(selLocs(),v.split('|'),false);},
   dragCol:function(e,ck){SEL=colKeys(ck);if(!SEL.length){e.preventDefault();return;}e.dataTransfer.setData('text/plain',SEL.join(';'));e.dataTransfer.effectAllowed='move';DRAGGING=true;},
   selCol:function(ck){var a=colKeys(ck);if(colAllSel(ck))SEL=SEL.filter(function(k){return a.indexOf(k)<0});else a.forEach(function(k){if(SEL.indexOf(k)<0)SEL.push(k)});render();},
