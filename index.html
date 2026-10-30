@@ -3522,7 +3522,7 @@ function moveOpts(){var b=board(),o='';
    The board knows every coach, so it fills the Daily Status record of the same day:
    coaches in operation by type, spare by depot & type, PGC list (where each is, OK / not),
    unscheduled maintenance = detained in Minor / Major services. */
-var DEPOT={KLSD:'KLSD',TUMD:'TUMPAT',KEMD:'KEMPAS','K.LIPISD':'K.LIPIS',GEMD:'GEMAS',SPECIAL:'KLSD'};
+var DEPOT={KLSD:'KL SENTRAL',TUMD:'TUMPAT',KEMD:'KEMPAS BARU','K.LIPISD':'K.LIPIS',GEMD:'GEMAS',SPECIAL:'KL SENTRAL'};
 function depotOf(name){var w=String(name||'').trim().toUpperCase().split(/\s+/)[0];return DEPOT[w]||w||'OTHER'}
 function tc(t){return String(t).toLowerCase().replace(/\b\w/g,function(c){return c.toUpperCase()})}
 function dailyFrom(b,base){
@@ -3531,10 +3531,11 @@ function dailyFrom(b,base){
   var countBy=function(units){var m={};coaches(units).forEach(function(u){var c=classOf(u.id);if(c==='OTHER')c='SPECIAL';m[c]=(m[c]||0)+1});return m};
   var toItems=function(m,keep){var ts=order.filter(function(t){return m[t]||(keep||[]).indexOf(t)>=0});return ts.map(function(t){return {t:t,q:m[t]||0}})};
   var all=[];b.service.forEach(function(c){all=all.concat(c.units)});
-  e.operation=toItems(countBy(all),['ASC','ADNS','AFC','ABC']);
-  var dep={},dorder=(e.spare||[]).map(function(s){return s.depot});
-  b.spare.forEach(function(c){var d=depotOf(c.name);dep[d]=dep[d]||[];dep[d]=dep[d].concat(c.units);if(dorder.indexOf(d)<0)dorder.push(d)});
-  e.spare=dorder.filter(function(d){return dep[d]}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
+  e.operation=toItems(countBy(all),['ASC','ADNS','AFC','ABC','SPECIAL']);
+  /* broadcast order: KEMPAS BARU, TUMPAT, KL SENTRAL, then any other depot that has coaches */
+  var dep={},dorder=['KEMPAS BARU','TUMPAT','KL SENTRAL'];
+  b.spare.forEach(function(c){var d=depotOf(c.name);dep[d]=(dep[d]||[]).concat(c.units);if(dorder.indexOf(d)<0)dorder.push(d)});
+  e.spare=dorder.filter(function(d){return coaches(dep[d]||[]).length}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
   /* only operation + spare come from the board; PGC, Minor/Major services stay as keyed in Daily Status */
   e.fleetSync=Date.now();
   return e;
