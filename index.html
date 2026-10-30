@@ -3289,6 +3289,9 @@ window.PROJ.slides=function(p,H){
 .fb-chip.sel{outline:3px solid #0DCAF0;outline-offset:2px;transform:scale(1.05)}
 .fb-col.dropok,.fb-trash.dropok{outline:2px dashed #3b4050;outline-offset:-2px}
 .fb-col{position:relative}
+.fb-moveto{margin-left:4px;padding:5px 8px;border-radius:8px;border:1px solid #0DCAF0;background:#12151c;color:#fff;font-weight:700;font-size:.78rem;cursor:pointer}
+.fb-grip{position:absolute;top:3px;right:6px;z-index:2;color:#6c7293;font-size:1rem;cursor:grab;padding:0 3px;line-height:1;user-select:none}
+.fb-grip:hover{color:#0DCAF0}
 .fb-all{position:absolute;top:4px;left:5px;z-index:2;background:transparent;border:0;color:#6c7293;font-size:.95rem;cursor:pointer;padding:0 2px;line-height:1}
 .fb-all:hover{color:#0DCAF0}
 .fb-chip.insb{box-shadow:0 -4px 0 0 #0DCAF0}
@@ -3382,13 +3385,16 @@ function colCard(sec,gi,ci,c){
   var pChips=(c.pgc||[]).map(function(u,i){return chip(u,at('pgc',i))}).join('')+c.units.map(function(u,i){return classOf(u.id)==='PGC'?chip(u,at('units',i)):''}).join('');
   return '<div class="fb-col'+(empty?' fb-emp':'')+(hid?' hid':'')+'" data-drop="'+[sec,gi,ci].join('|')+'" ondragover="FLEET.over(event)" ondragleave="FLEET.leave(event)" ondrop="FLEET.drop(event)" onclick="FLEET.tapCol(event,this)">'
     +(empty?'':'<button class="fb-all" title="Select all in this column" onclick="event.stopPropagation();FLEET.selCol(\''+[sec,gi,ci].join('|')+'\')">'+(colAllSel([sec,gi,ci].join('|'))?'☑':'☐')+'</button>')
+    +(empty?'':'<span class="fb-grip" draggable="true" title="Drag to move the whole column\'s coaches" ondragstart="event.stopPropagation();FLEET.dragCol(event,\''+[sec,gi,ci].join('|')+'\')" ondragend="FLEET.dragEnd(event)">⠿</span>')
     +'<div class="h" onclick="event.stopPropagation();FLEET.edit(\''+sec+'\','+gi+','+ci+')" title="Click to edit this column">'
     +'<b>'+esc(c.name||'—')+'</b>'+(c.note?'<small>'+esc(c.note)+'</small>':'')+'</div>'
     +'<div class="u">'+uChips+'</div>'
     +(sec!=='detained'&&(pp.length||sec==='service')?'<div class="p"><i>'+(sec==='service'?'PGC ON TRAIN':'SPARE PGC')+'</i>'+(pp.length?pChips:'<i style="color:#4a4f63">—</i>')+'</div>':'')
     +'<div class="f"><span>'+(sec==='service'?'Operation':sec==='spare'?'Spare':'Detained')+'</span><b>'+(sec==='detained'&&!cc.length&&pp.length?pp.length+' PGC':cc.length+(sec==='detained'&&pp.length?' + '+pp.length+' PGC':''))+'</b></div></div>';
 }
+var PENDING=false;
 function render(){
+  if(DRAGGING){PENDING=true;return;}
   var el=document.getElementById('fleetArea');if(!el)return;
   var iso=curDate(),has=!!boards()[iso],b=board(),n=counts(b),h='';
   var y=+iso.slice(0,4),m=VM!=null?VM:(+iso.slice(5,7)-1),dim=new Date(y,m+1,0).getDate(),today=isoOf(new Date());
@@ -3422,7 +3428,7 @@ function render(){
   h+='<div class="fb-search"><span class="ic">🔍</span><input id="fbQ" type="search" placeholder="Find a coach or PGC… e.g. 2301, 213, AKE" value="'+esc(SEARCH)+'" oninput="FLEET.find(this.value)" onkeydown="if(event.key===\'Enter\')FLEET.jump(0)" autocomplete="off">'
     +'<div id="fbRes" class="fb-res"></div></div>';
   h+='<div class="fb-move"><span>✋ <b>Move coaches:</b> drag a coach/PGC box onto another column — or tap a box, then tap the column. Drop on 🗑 to remove.</span>'
-    +(SEL.length?'<span class="fb-pick">'+(SEL.length===1?'Moving <b>'+esc(unitAt(SEL[0].split('|')).id)+'</b>':'<b>'+SEL.length+' selected</b>')+' — tap a column or drag <button class="fb-btn" onclick="FLEET.cancelPick()">Cancel</button></span>':'')
+    +(SEL.length?'<span class="fb-pick">'+(SEL.length===1?'Moving <b>'+esc(unitAt(SEL[0].split('|')).id)+'</b>':'<b>'+SEL.length+' selected</b>')+' — tap a column, drag, or <select class="fb-moveto" onchange="FLEET.moveTo(this.value)"><option value="">Move to…</option>'+moveOpts()+'</select> <button class="fb-btn" onclick="FLEET.cancelPick()">Cancel</button></span>':'')
     +'<button class="fb-btn" onclick="FLEET.undo()" '+(UNDO.length?'':'disabled')+'>↶ Undo'+(UNDO.length?' ('+UNDO.length+')':'')+'</button>'
     +'<div class="fb-trash" ondragover="FLEET.over(event)" ondragleave="FLEET.leave(event)" ondrop="FLEET.drop(event,true)" onclick="FLEET.tapTrash()">🗑 Remove</div></div>';
   h+='<div class="fb-legend">'+CLS.concat([PGCC]).map(function(k){return '<span style="background:'+k[1]+';color:'+k[2]+'">'+k[0]+'</span>'}).join('')
@@ -3504,6 +3510,10 @@ function doMove(locs,target,remove,at){
   var what=ids.length===1?ids[0]:ids.length+' assets';
   toast(remove?what+' removed from the board':what+' moved to '+(colAt(target).name||'column')+' — click 💾 Save when done',3500);
 }
+function moveOpts(){var b=board(),o='';
+  var g=function(lab,list,key){o+='<optgroup label="'+lab+'">'+list.map(function(c,ci){return '<option value="'+key+'|'+ci+'">'+esc(c.name||'—')+'</option>'}).join('')+'</optgroup>'};
+  g('🚆 Operation',b.service,'service|0');g('🏠 Spare',b.spare,'spare|0');
+  b.detained.forEach(function(gr,gi){g('🔧 '+gr.name,gr.cols,'detained|'+gi)});return o}
 function selLocs(){return SEL.map(function(k){return k.split('|')})}
 window.FLEET={
   dragStart:function(e){var loc=e.target.getAttribute('data-loc');
@@ -3511,7 +3521,7 @@ window.FLEET={
     if(SEL.length>1){e.target.setAttribute('data-count',SEL.length);}
     e.dataTransfer.setData('text/plain',loc);e.dataTransfer.effectAllowed='move';
     DRAGGING=true;setTimeout(function(){document.querySelectorAll('.fb-col').forEach(function(x){x.classList.add('dropok')});var t=document.querySelector('.fb-trash');if(t)t.classList.add('dropok')},0);},
-  dragEnd:function(){DRAGGING=false;document.body.classList.remove('fb-dragging');document.querySelectorAll('.dropok,.dropover').forEach(function(x){x.classList.remove('dropok','dropover')});},
+  dragEnd:function(){DRAGGING=false;if(PENDING){PENDING=false;setTimeout(render,0);}document.body.classList.remove('fb-dragging');document.querySelectorAll('.dropok,.dropover').forEach(function(x){x.classList.remove('dropok','dropover')});},
   over:function(e){e.preventDefault();e.currentTarget.classList.add('dropover');
     var ch=e.target.closest&&e.target.closest('.fb-chip[data-loc]');
     document.querySelectorAll('.fb-chip.insb').forEach(function(x){if(x!==ch)x.classList.remove('insb')});if(ch)ch.classList.add('insb');},
@@ -3536,6 +3546,8 @@ window.FLEET={
     if(selLocs().every(function(p){return t[0]===p[0]&&t[1]===p[1]&&t[2]===p[2]})){SEL=[];render();return;}doMove(selLocs(),t,false);},
   tapTrash:function(){if(!SEL.length)return;if(!confirm('Remove '+(SEL.length>1?SEL.length+' assets':unitAt(selLocs()[0]).id)+' from this day\'s board?'))return;doMove(selLocs(),null,true);},
   cancelPick:function(){SEL=[];render();},
+  moveTo:function(v){if(!v||!SEL.length)return;doMove(selLocs(),v.split('|'),false);},
+  dragCol:function(e,ck){SEL=colKeys(ck);if(!SEL.length){e.preventDefault();return;}e.dataTransfer.setData('text/plain',SEL.join(';'));e.dataTransfer.effectAllowed='move';DRAGGING=true;},
   selCol:function(ck){var a=colKeys(ck);if(colAllSel(ck))SEL=SEL.filter(function(k){return a.indexOf(k)<0});else a.forEach(function(k){if(SEL.indexOf(k)<0)SEL.push(k)});render();},
   undo:function(){if(!UNDO.length)return;boards()[curDate()]=JSON.parse(UNDO.pop());SEL=[];PICK=null;changed();toast('Last move undone');},
   render:render,board:board,classOf:classOf,
