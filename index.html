@@ -3525,6 +3525,39 @@ function moveOpts(){var b=board(),o='';
 var DEPOT={KLSD:'KL SENTRAL',TUMD:'TUMPAT',KEMD:'KEMPAS BARU','K.LIPISD':'K.LIPIS',GEMD:'GEMAS',SPECIAL:'KL SENTRAL'};
 function depotOf(name){var w=String(name||'').trim().toUpperCase().split(/\s+/)[0];return DEPOT[w]||w||'OTHER'}
 function tc(t){return String(t).toLowerCase().replace(/\b\w/g,function(c){return c.toUpperCase()})}
+function trainName(c){var n=String(c.name||'').toUpperCase().replace(/\s+/g,' ').trim(),m;
+  if((m=n.match(/^T\s*(\d+)$/)))return 'TREN '+m[1];
+  if((m=n.match(/^S\/T\s*(\d+)/)))return 'TREN TEBRAU '+m[1];
+  if((m=n.match(/^S\/S\s*(\d+)/)))return 'KOMUTER '+m[1];
+  if((m=n.match(/^DMU\s*([\d\/]+)/)))return 'TREN '+m[1]+' (DMU)';
+  if(/^KOM/.test(n)&&/HYB/.test(n))return 'KOMUTER HYBRID';
+  if(/^CHART/.test(n))return 'TREN CHARTER';
+  return n;}
+function pgcMap(b){var m={},eng=function(u){var x=String(u.note||'').match(/ENGINE\s*:?\s*(\d)/i);return x?+x[1]:null},
+    put=function(u,st,where,col){m[String(u.id).replace(/\D/g,'')]={st:st,where:where,col:col,eng:eng(u)}};
+  b.service.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){put(u,'OP',trainName(c),c.name)})});
+  b.spare.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){put(u,'SP','SPARE '+depotOf(c.name),c.name)})});
+  b.detained.forEach(function(g){g.cols.forEach(function(c){pgcs(c.units).forEach(function(u){put(u,'DET',tc(g.name)+' · '+c.name,c.name)})})});
+  return m;}
+function pgcDep(t){t=String(t||'').toUpperCase();
+  return /KEMP/.test(t)?'KEMPAS':/TUM/.test(t)?'TUMPAT':/LIPIS/.test(t)?'K.LIPIS':/GEM/.test(t)?'GEMAS':/KL|SENTRAL/.test(t)?'KL SENTRAL':t}
+function pgcStOf(p){return !p.ok?'DET':/spare/i.test(String(p.as||''))?'SP':'OP'}
+/* '' = tally, else the reason it does not */
+function pgcSame(p,b){var lab={OP:'operating',SP:'spare',DET:'not available',NO:'not listed'},st=p?pgcStOf(p):'NO';b=b||{st:'NO'};
+  if(st!==b.st)return 'Daily: '+lab[st]+' · Board: '+lab[b.st];
+  if(st==='SP'&&pgcDep(p.as)!==pgcDep(b.where))return 'Different depot';
+  if(st==='OP'){var da=String(p.as||'').replace(/\D/g,''),db=String(b.where||'').replace(/\D/g,''),w=String(b.where||'').toUpperCase().split(/[^A-Z]+/).filter(function(x){return x&&x!=='TREN'})[0]||'';
+    if(da||db?da!==db:String(p.as||'').toUpperCase().indexOf(w.slice(0,4))<0)return 'Different train';}
+  if(st!=='DET'&&b.eng!=null&&+p.eng!==+b.eng)return 'Engines '+p.eng+'E · board '+b.eng+'E';
+  return '';}
+function tallyPgc(list,B){var n=0,num=function(v){return String(v||'').replace(/\D/g,'')};
+  Object.keys(B).forEach(function(k){var b=B[k];if(b.st!=='OP'&&b.st!=='SP')return;
+    var p=list.filter(function(x){return num(x.no)===k})[0];
+    if(!p){list.push({no:'PGC '+k,eng:b.eng!=null?b.eng:2,ok:true,as:b.where});n++;return;}
+    if(!pgcSame(p,b))return;
+    if(pgcStOf(p)!==b.st||(b.st==='SP'&&pgcDep(p.as)!==pgcDep(b.where))||(b.st==='OP'&&/train/.test(pgcSame(p,b)))){p.as=b.where;p.ok=true;}
+    if(b.eng!=null)p.eng=b.eng;n++;});
+  return n;}
 function dailyFrom(b,base){
   var e=JSON.parse(JSON.stringify(base||{}));
   var order=['ASC','ADNS','AFC','ABC','ADNF','SPECIAL'];
@@ -3536,7 +3569,8 @@ function dailyFrom(b,base){
   var dep={},dorder=['KEMPAS BARU','TUMPAT','KL SENTRAL'];
   b.spare.forEach(function(c){var d=depotOf(c.name);dep[d]=(dep[d]||[]).concat(c.units);if(dorder.indexOf(d)<0)dorder.push(d)});
   e.spare=dorder.filter(function(d){return coaches(dep[d]||[]).length}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
-  /* only operation + spare come from the board; PGC, Minor/Major services stay as keyed in Daily Status */
+  /* PGC: only operating + spare rows that do not tally are brought in line; Minor/Major services stay as keyed */
+  e.pgc=e.pgc||[];tallyPgc(e.pgc,pgcMap(b));
   e.fleetSync=Date.now();
   return e;
 }
@@ -3589,13 +3623,11 @@ window.FLEET={
   tapTrash:function(){if(!SEL.length)return;if(!confirm('Remove '+(SEL.length>1?SEL.length+' assets':unitAt(selLocs()[0]).id)+' from this day\'s board?'))return;doMove(selLocs(),null,true);},
   cancelPick:function(){SEL=[];render();},
   sync:function(){syncDaily(curDate());},
-  /* read-only: where each PGC sits on the board of that date (for the Daily Status tally) */
-  pgcOn:function(iso){var b=boards()[iso];if(!b)return null;var m={},eng=function(u){var x=String(u.note||'').match(/ENGINE\s*:?\s*(\d)/i);return x?+x[1]:null},
-      put=function(u,st,where){m[String(u.id).replace(/\D/g,'')]={st:st,where:where,eng:eng(u)}};
-    b.service.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){put(u,'OP',c.note?c.name+' ('+c.note+')':c.name)})});
-    b.spare.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){put(u,'SP','Spare '+depotOf(c.name))})});
-    b.detained.forEach(function(g){g.cols.forEach(function(c){pgcs(c.units).forEach(function(u){put(u,'DET',tc(g.name)+' · '+c.name)})})});
-    return m;},
+  /* where each PGC sits on the board of that date, in the Daily Status wording (TREN 26, SPARE TUMPAT…) */
+  pgcOn:function(iso){var b=boards()[iso];return b?pgcMap(b):null},
+  pgcSame:pgcSame,
+  /* bring Daily Status PGC rows in line with the board — operating + spare only; returns how many rows changed */
+  tallyPgc:function(list,iso){var b=boards()[iso];return b?tallyPgc(list,pgcMap(b)):0},
   auto:function(on){try{localStorage.setItem(AUTOK,on?'1':'0')}catch(x){}if(on)syncDaily(curDate());else toast('Auto sync to Daily Status is off');},
   dailyFrom:dailyFrom,syncDaily:syncDaily,
   moveTo:function(v){if(!v||!SEL.length)return;doMove(selLocs(),v.split('|'),false);},
@@ -4703,7 +4735,7 @@ if(document.readyState==='interactive'||document.readyState==='complete')rptMoun
 .dly-tally-ct .ok{background:rgba(0,210,91,.15);color:#00d25b}.dly-tally-ct .no{background:rgba(252,66,74,.15);color:#fc424a}
 .dly-tally table{width:100%;border-collapse:collapse;margin-bottom:6px}
 .dly-tally th,.dly-tally td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line,#2c2e33);vertical-align:top}
-.dly-tally td.w{color:#fc424a;font-weight:600}.dly-tally-ok{color:#00d25b;font-weight:600}
+.dly-tally td.w{color:#fc424a;font-weight:600}.dly-tally td.ok{color:#00d25b;font-weight:700}.dly-tally tr.bad td{background:rgba(252,66,74,.07)}.dly-tally .e{color:var(--mut)}.dly-tally-ok{color:#00d25b;font-weight:600}
 /* ---------- broadcast ---------- */
 .dly-seg{display:flex;gap:6px;flex-wrap:wrap}
 .dly-seg button{padding:6px 14px;border:1px solid var(--line);background:#fff;border-radius:99px;font-size:.78rem;font-weight:700;color:var(--mut);cursor:pointer}
@@ -5201,35 +5233,34 @@ function liveCounts(){
   pgcTally();
 }
 
-/* PGC tally with Fleet Deployment — operating + spare only; it only compares, never changes Daily Status */
+/* PGC — Daily Status side by side with Fleet Deployment (operating + spare) */
 function pgcTally(){
   var el=$('#dlyPgcTally');if(!el)return;
   var B=window.FLEET&&FLEET.pgcOn?FLEET.pgcOn(D.date):null;
   if(!B){el.innerHTML='<div class="dly-mini">No Fleet Deployment board for '+waDate(D.date)+' — nothing to tally.</div>';return;}
-  var nOf=function(v){return String(v||'').replace(/\D/g,'')},dep=function(t){t=String(t||'').toUpperCase();
-    return /KEMP/.test(t)?'KEMPAS':/TUM/.test(t)?'TUMPAT':/LIPIS/.test(t)?'K.LIPIS':/GEM/.test(t)?'GEMAS':/KL|SENTRAL/.test(t)?'KL SENTRAL':t};
-  var lab={OP:'Operating',SP:'Spare',DET:'Not available',NO:'Not listed'};
-  var mine={};
-  D.pgc.forEach(function(p){mine[nOf(p.no)]={st:!p.ok?'DET':isSpare(p)?'SP':'OP',where:p.as||'',eng:p.eng}});
-  var sameTrain=function(a,b){var da=nOf(a),db=nOf(b);if(da||db)return da===db;
-    var w=String(a).toUpperCase().split(/[^A-Z]+/).filter(Boolean)[0]||'';return String(b).toUpperCase().indexOf(w.slice(0,3))>=0};
-  var cnt=function(m,st){return Object.keys(m).filter(function(k){return m[k].st===st}).length};
-  var act=function(x){return x&&(x.st==='OP'||x.st==='SP')},bad=[];
-  Object.keys(B).concat(Object.keys(mine)).filter(function(k,i,a){return a.indexOf(k)===i}).sort(function(a,b){return a-b}).forEach(function(k){
-    var b=B[k]||{st:'NO',where:'—'},m=mine[k]||{st:'NO',where:'—'},why='';
-    if(!act(b)&&!act(m))return;
-    if(b.st!==m.st)why=lab[m.st]+' here, '+lab[b.st].toLowerCase()+' on board';
-    else if(b.st==='SP'&&dep(b.where)!==dep(m.where))why='Different depot';
-    else if(b.st==='OP'&&!sameTrain(b.where,m.where))why='Different train';
-    else if(b.eng!=null&&m.eng!=null&&+b.eng!==+m.eng)why=m.eng+'E here, '+b.eng+'E on board';
-    if(why)bad.push('<tr><td><b>PGC '+k+'</b></td><td>'+esc(m.st==='NO'?'—':m.where)+'</td><td>'+esc(b.where)+'</td><td class="w">'+why+'</td></tr>');});
-  var c=function(st){var a=cnt(mine,st),b=cnt(B,st);return '<span class="'+(a===b?'ok':'no')+'">'+lab[st]+' '+a+(a===b?' ✔':' · board '+b)+'</span>'};
-  el.innerHTML='<div class="dly-tally-hd">🔎 Tally with Fleet Deployment — '+waDate(D.date)+'</div>'
-    +'<div class="dly-tally-ct">'+c('OP')+c('SP')+'</div>'
-    +(bad.length?'<table><tr><th>Unit</th><th>Daily Status</th><th>Fleet board</th><th>Not tally</th></tr>'+bad.join('')+'</table>'
-      +'<div class="dly-mini">Only a check — nothing is changed. Fix the rows above by hand if needed.</div>'
-      :'<div class="dly-tally-ok">✔ PGC operating and spare tally with the Fleet Deployment board.</div>');
+  var nOf=function(v){return String(v||'').replace(/\D/g,'')},mine={};
+  D.pgc.forEach(function(p){mine[nOf(p.no)]=p});
+  var act=function(st){return st==='OP'||st==='SP'},stOf=function(p){return !p?'NO':!p.ok?'DET':isSpare(p)?'SP':'OP'};
+  var rows=[],bad=0,cnt={OP:[0,0],SP:[0,0]};
+  Object.keys(B).concat(Object.keys(mine)).filter(function(k,i,a){return k&&a.indexOf(k)===i}).sort(function(a,b){return a-b}).forEach(function(k){
+    var b=B[k],m=mine[k],ms=stOf(m),bs=b?b.st:'NO';
+    if(cnt[ms])cnt[ms][0]++;if(cnt[bs])cnt[bs][1]++;
+    if(!act(ms)&&!act(bs))return;
+    var why=FLEET.pgcSame(m,b);if(why)bad++;
+    var side=function(txt,eng){return txt?esc(txt)+(eng!=null?' <span class="e">('+eng+'E)</span>':''):'<span class="dly-mini">—</span>'};
+    rows.push('<tr class="'+(why?'bad':'')+'"><td><b>PGC '+k+'</b></td>'
+      +'<td>'+side(m?(m.ok?m.as:'❌ '+(m.as||'not available')):'',m&&m.ok?m.eng:null)+'</td>'
+      +'<td>'+side(b?b.where+(b.st==='OP'&&b.col&&b.col.toUpperCase()!==b.where?' · '+b.col:''):'',b&&b.st!=='DET'?b.eng:null)+'</td>'
+      +'<td class="'+(why?'w':'ok')+'">'+(why?esc(why):'✔')+'</td></tr>');});
+  var c=function(st,l){var a=cnt[st][0],b=cnt[st][1];return '<span class="'+(a===b?'ok':'no')+'">'+l+' '+a+(a===b?' ✔':' · board '+b)+'</span>'};
+  el.innerHTML='<div class="dly-tally-hd">🔎 PGC — Daily Status vs Fleet Deployment · '+waDate(D.date)+'</div>'
+    +'<div class="dly-tally-ct">'+c('OP','Operating')+c('SP','Spare')+'</div>'
+    +'<table><tr><th>Unit</th><th>Daily Status</th><th>Fleet Deployment</th><th></th></tr>'+rows.join('')+'</table>'
+    +(bad?'<button class="dly-btn s" onclick="dlyPgcTallyFix()">⇄ Make '+bad+' PGC tally with Fleet Deployment</button>'
+      +' <span class="dly-mini">Only the red rows change (operating / spare). Unscheduled maintenance is not touched.</span>'
+      :'<div class="dly-tally-ok">✔ PGC operating and spare tally with Fleet Deployment.</div>');
 }
+window.dlyPgcTallyFix=function(){if(window.FLEET&&FLEET.tallyPgc(D.pgc,D.date))render();};
 
 /* =====================================================================
    WHATSAPP BROADCAST — emoji daily status format
