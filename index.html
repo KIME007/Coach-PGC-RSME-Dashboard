@@ -3589,6 +3589,13 @@ window.FLEET={
   tapTrash:function(){if(!SEL.length)return;if(!confirm('Remove '+(SEL.length>1?SEL.length+' assets':unitAt(selLocs()[0]).id)+' from this day\'s board?'))return;doMove(selLocs(),null,true);},
   cancelPick:function(){SEL=[];render();},
   sync:function(){syncDaily(curDate());},
+  /* read-only: where each PGC sits on the board of that date (for the Daily Status tally) */
+  pgcOn:function(iso){var b=boards()[iso];if(!b)return null;var m={},eng=function(u){var x=String(u.note||'').match(/ENGINE\s*:?\s*(\d)/i);return x?+x[1]:null},
+      put=function(u,st,where){m[String(u.id).replace(/\D/g,'')]={st:st,where:where,eng:eng(u)}};
+    b.service.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){put(u,'OP',c.note?c.name+' ('+c.note+')':c.name)})});
+    b.spare.forEach(function(c){((c.pgc||[]).concat(pgcs(c.units))).forEach(function(u){put(u,'SP','Spare '+depotOf(c.name))})});
+    b.detained.forEach(function(g){g.cols.forEach(function(c){pgcs(c.units).forEach(function(u){put(u,'DET',tc(g.name)+' · '+c.name)})})});
+    return m;},
   auto:function(on){try{localStorage.setItem(AUTOK,on?'1':'0')}catch(x){}if(on)syncDaily(curDate());else toast('Auto sync to Daily Status is off');},
   dailyFrom:dailyFrom,syncDaily:syncDaily,
   moveTo:function(v){if(!v||!SEL.length)return;doMove(selLocs(),v.split('|'),false);},
@@ -4689,6 +4696,14 @@ if(document.readyState==='interactive'||document.readyState==='complete')rptMoun
 .dly-tg{border:1px solid var(--line);border-radius:8px;background:#e7f6ee;color:var(--ok);font-weight:800;cursor:pointer;padding:5px 0;font-size:.85rem}
 .dly-tg.no{background:#fdeaea;color:var(--bad)}
 .dly-mini{font-size:.72rem;color:var(--mut)}
+.dly-tally{margin-top:12px;border:1px solid var(--line,#2c2e33);border-radius:8px;padding:10px;font-size:.78rem}
+.dly-tally-hd{font-weight:700;margin-bottom:6px}
+.dly-tally-ct{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.dly-tally-ct span{padding:2px 8px;border-radius:10px;font-weight:600}
+.dly-tally-ct .ok{background:rgba(0,210,91,.15);color:#00d25b}.dly-tally-ct .no{background:rgba(252,66,74,.15);color:#fc424a}
+.dly-tally table{width:100%;border-collapse:collapse;margin-bottom:6px}
+.dly-tally th,.dly-tally td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line,#2c2e33);vertical-align:top}
+.dly-tally td.w{color:#fc424a;font-weight:600}.dly-tally-ok{color:#00d25b;font-weight:600}
 /* ---------- broadcast ---------- */
 .dly-seg{display:flex;gap:6px;flex-wrap:wrap}
 .dly-seg button{padding:6px 14px;border:1px solid var(--line);background:#fff;border-radius:99px;font-size:.78rem;font-weight:700;color:var(--mut);cursor:pointer}
@@ -5052,7 +5067,8 @@ function panelHtml(){return ''
           +'<div><label class="dly-lab">Duty Train</label><input class="dly-in" id="dlyDuty" type="number"></div>'
           +'<div><label class="dly-lab">Total Units (auto)</label><input class="dly-in" id="dlyPgcTot" readonly></div></div>'
         +'<div class="dly-mini" style="margin-bottom:6px">Unit · Engines · Assignment · Serviceable (click ✅ / ❌ to toggle)</div>'
-        +'<div id="dlyPgcList"></div><button class="dly-btn s" onclick="dlyAddPGC()">+ Add unit</button></div></div>'
+        +'<div id="dlyPgcList"></div><button class="dly-btn s" onclick="dlyAddPGC()">+ Add unit</button>'
+        +'<div id="dlyPgcTally" class="dly-tally"></div></div></div>'
       +'<div class="dly-sec" id="dlyS5"><h4 onclick="dlyTog(\'dlyS5\')"><span class="ar">▼</span> Unscheduled Maintenance — Coach<span class="ct" id="dlyCt5">0</span></h4><div class="in">'
         +'<div class="dly-umtools" id="dlyUmTools"></div>'
         +'<div id="dlyUmList"></div><button class="dly-btn s" onclick="dlyAddUM()">+ Add coach</button></div></div>'
@@ -5182,6 +5198,37 @@ function liveCounts(){
   set('#dlyOpTotRow',opTotal());
   set('#dlySpTotRow',spareTotal());
   D.spare.forEach(function(sp,si){set('#dlyDepTot'+si,'Total '+depTotal(sp))});
+  pgcTally();
+}
+
+/* PGC tally with Fleet Deployment — operating + spare only; it only compares, never changes Daily Status */
+function pgcTally(){
+  var el=$('#dlyPgcTally');if(!el)return;
+  var B=window.FLEET&&FLEET.pgcOn?FLEET.pgcOn(D.date):null;
+  if(!B){el.innerHTML='<div class="dly-mini">No Fleet Deployment board for '+waDate(D.date)+' — nothing to tally.</div>';return;}
+  var nOf=function(v){return String(v||'').replace(/\D/g,'')},dep=function(t){t=String(t||'').toUpperCase();
+    return /KEMP/.test(t)?'KEMPAS':/TUM/.test(t)?'TUMPAT':/LIPIS/.test(t)?'K.LIPIS':/GEM/.test(t)?'GEMAS':/KL|SENTRAL/.test(t)?'KL SENTRAL':t};
+  var lab={OP:'Operating',SP:'Spare',DET:'Not available',NO:'Not listed'};
+  var mine={};
+  D.pgc.forEach(function(p){mine[nOf(p.no)]={st:!p.ok?'DET':isSpare(p)?'SP':'OP',where:p.as||'',eng:p.eng}});
+  var sameTrain=function(a,b){var da=nOf(a),db=nOf(b);if(da||db)return da===db;
+    var w=String(a).toUpperCase().split(/[^A-Z]+/).filter(Boolean)[0]||'';return String(b).toUpperCase().indexOf(w.slice(0,3))>=0};
+  var cnt=function(m,st){return Object.keys(m).filter(function(k){return m[k].st===st}).length};
+  var act=function(x){return x&&(x.st==='OP'||x.st==='SP')},bad=[];
+  Object.keys(B).concat(Object.keys(mine)).filter(function(k,i,a){return a.indexOf(k)===i}).sort(function(a,b){return a-b}).forEach(function(k){
+    var b=B[k]||{st:'NO',where:'—'},m=mine[k]||{st:'NO',where:'—'},why='';
+    if(!act(b)&&!act(m))return;
+    if(b.st!==m.st)why=lab[m.st]+' here, '+lab[b.st].toLowerCase()+' on board';
+    else if(b.st==='SP'&&dep(b.where)!==dep(m.where))why='Different depot';
+    else if(b.st==='OP'&&!sameTrain(b.where,m.where))why='Different train';
+    else if(b.eng!=null&&m.eng!=null&&+b.eng!==+m.eng)why=m.eng+'E here, '+b.eng+'E on board';
+    if(why)bad.push('<tr><td><b>PGC '+k+'</b></td><td>'+esc(m.st==='NO'?'—':m.where)+'</td><td>'+esc(b.where)+'</td><td class="w">'+why+'</td></tr>');});
+  var c=function(st){var a=cnt(mine,st),b=cnt(B,st);return '<span class="'+(a===b?'ok':'no')+'">'+lab[st]+' '+a+(a===b?' ✔':' · board '+b)+'</span>'};
+  el.innerHTML='<div class="dly-tally-hd">🔎 Tally with Fleet Deployment — '+waDate(D.date)+'</div>'
+    +'<div class="dly-tally-ct">'+c('OP')+c('SP')+'</div>'
+    +(bad.length?'<table><tr><th>Unit</th><th>Daily Status</th><th>Fleet board</th><th>Not tally</th></tr>'+bad.join('')+'</table>'
+      +'<div class="dly-mini">Only a check — nothing is changed. Fix the rows above by hand if needed.</div>'
+      :'<div class="dly-tally-ok">✔ PGC operating and spare tally with the Fleet Deployment board.</div>');
 }
 
 /* =====================================================================
