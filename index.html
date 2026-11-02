@@ -462,6 +462,14 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
   <button class="tab" id="tabData" onclick="setTab('data')">✏️ Data Manager</button>
   <button class="tab" id="tabIncidents" onclick="setTab('incidents')">🚨 Incident Reports</button>
 </nav>
+<script>
+/* tab order — tabs added later by other modules are put in this order (Report always last) */
+(function(){var ORDER=['tabOverview','tabData','tabIncidents','tabDaily','tabFleet','tabProj','tabReport'],nav=document.querySelector('nav.tabs');
+  function fix(){var want=ORDER.map(function(id){return document.getElementById(id)}).filter(function(x){return x&&x.parentNode===nav});
+    var now=[].filter.call(nav.children,function(x){return want.indexOf(x)>=0});
+    if(now.every(function(x,i){return x===want[i]}))return;want.forEach(function(x){nav.appendChild(x)});}
+  new MutationObserver(fix).observe(nav,{childList:true});})();
+</script>
 
 <main>
 <!-- ============ OVERVIEW ============ -->
