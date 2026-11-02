@@ -3554,7 +3554,7 @@ function tallyPgc(list,B){var n=0,num=function(v){return String(v||'').replace(/
   Object.keys(B).forEach(function(k){var b=B[k];if(b.st!=='OP'&&b.st!=='SP')return;
     var p=list.filter(function(x){return num(x.no)===k})[0];
     if(!p){list.push({no:'PGC '+k,eng:b.eng!=null?b.eng:2,ok:true,as:b.where});n++;return;}
-    if(!pgcSame(p,b))return;
+    if(!p.ok||!pgcSame(p,b))return; /* ❌ (unscheduled) rows are keyed by hand — never touched */
     if(pgcStOf(p)!==b.st||(b.st==='SP'&&pgcDep(p.as)!==pgcDep(b.where))||(b.st==='OP'&&/train/.test(pgcSame(p,b)))){p.as=b.where;p.ok=true;}
     if(b.eng!=null)p.eng=b.eng;n++;});
   return n;}
@@ -5247,7 +5247,7 @@ function pgcTally(){
   var B=pgcBoard();
   if(!B){el.innerHTML='<div class="dly-mini">No Fleet Deployment board for '+waDate(D.date)+'.</div>';return;}
   var nOf=function(v){return String(v||'').replace(/\D/g,'')},bad=[];
-  D.pgc.forEach(function(p){var b=B[nOf(p.no)];if(!b||(b.st!=='OP'&&b.st!=='SP'))return;if(FLEET.pgcSame(p,b))bad.push('PGC '+nOf(p.no))});
+  D.pgc.forEach(function(p){var b=B[nOf(p.no)];if(!p.ok||!b||(b.st!=='OP'&&b.st!=='SP'))return;if(FLEET.pgcSame(p,b))bad.push('PGC '+nOf(p.no))});
   Object.keys(B).forEach(function(k){if((B[k].st==='OP'||B[k].st==='SP')&&!D.pgc.some(function(p){return nOf(p.no)===k}))bad.push('PGC '+k)});
   el.innerHTML=bad.length
     ?'<span class="dly-tally-no">⚠ Not tally with Fleet Deployment: '+bad.join(', ')+'</span> <button class="dly-btn s" onclick="dlyPgcTallyFix()">⇄ Tally now</button>'
