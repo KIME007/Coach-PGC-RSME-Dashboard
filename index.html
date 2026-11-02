@@ -3522,7 +3522,7 @@ function moveOpts(){var b=board(),o='';
    The board knows every coach, so it fills the Daily Status record of the same day:
    coaches in operation by type, spare by depot & type, PGC list (where each is, OK / not),
    unscheduled maintenance = detained in Minor / Major services. */
-var DEPOT={KLSD:'KL SENTRAL',TUMD:'TUMPAT',KEMD:'KEMPAS BARU','K.LIPISD':'K.LIPIS',GEMD:'GEMAS',SPECIAL:'KL SENTRAL'};
+var DEPOT={KL:'KL SENTRAL',KEMPAS:'KEMPAS BARU',TUMPAT:'TUMPAT',KLSD:'KL SENTRAL',TUMD:'TUMPAT',KEMD:'KEMPAS BARU','K.LIPISD':'K.LIPIS',GEMD:'GEMAS',SPECIAL:'KL SENTRAL'};
 function depotOf(name){var w=String(name||'').trim().toUpperCase().split(/\s+/)[0];return DEPOT[w]||w||'OTHER'}
 function tc(t){return String(t).toLowerCase().replace(/\b\w/g,function(c){return c.toUpperCase()})}
 function trainName(c){var n=String(c.name||'').toUpperCase().replace(/\s+/g,' ').trim(),m;
@@ -4728,7 +4728,7 @@ if(document.readyState==='interactive'||document.readyState==='complete')rptMoun
 .dly-tg{border:1px solid var(--line);border-radius:8px;background:#e7f6ee;color:var(--ok);font-weight:800;cursor:pointer;padding:5px 0;font-size:.85rem}
 .dly-tg.no{background:#fdeaea;color:var(--bad)}
 .dly-mini{font-size:.72rem;color:var(--mut)}
-.dly-tally{margin-top:12px;border:1px solid var(--line,#2c2e33);border-radius:8px;padding:10px;font-size:.78rem}
+.dly-tally{margin-top:10px;font-size:.8rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center}.dly-tally-no{color:#fc424a;font-weight:600}
 .dly-tally-hd{font-weight:700;margin-bottom:6px}
 .dly-tally-ct{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .dly-tally-ct span{padding:2px 8px;border-radius:10px;font-weight:600}
@@ -5233,32 +5233,25 @@ function liveCounts(){
   pgcTally();
 }
 
-/* PGC — Daily Status side by side with Fleet Deployment (operating + spare) */
+/* PGC list follows Fleet Deployment (operating + spare). Applied whenever the board's PGC positions
+   for this date change, so a hand edit stays until the board moves again. */
+function pgcBoard(){return window.FLEET&&FLEET.pgcOn?FLEET.pgcOn(D.date):null}
+function pgcAutoTally(){
+  var B=pgcBoard();if(!B)return;
+  try{if(localStorage.getItem('rsd_fleet_daily_sync_v1')==='0')return}catch(x){}
+  var sig=D.date+'|'+JSON.stringify(B);if(D.pgcBoardSig===sig)return;
+  FLEET.tallyPgc(D.pgc,D.date);D.pgcBoardSig=sig;
+}
 function pgcTally(){
   var el=$('#dlyPgcTally');if(!el)return;
-  var B=window.FLEET&&FLEET.pgcOn?FLEET.pgcOn(D.date):null;
-  if(!B){el.innerHTML='<div class="dly-mini">No Fleet Deployment board for '+waDate(D.date)+' — nothing to tally.</div>';return;}
-  var nOf=function(v){return String(v||'').replace(/\D/g,'')},mine={};
-  D.pgc.forEach(function(p){mine[nOf(p.no)]=p});
-  var act=function(st){return st==='OP'||st==='SP'},stOf=function(p){return !p?'NO':!p.ok?'DET':isSpare(p)?'SP':'OP'};
-  var rows=[],bad=0,cnt={OP:[0,0],SP:[0,0]};
-  Object.keys(B).concat(Object.keys(mine)).filter(function(k,i,a){return k&&a.indexOf(k)===i}).sort(function(a,b){return a-b}).forEach(function(k){
-    var b=B[k],m=mine[k],ms=stOf(m),bs=b?b.st:'NO';
-    if(cnt[ms])cnt[ms][0]++;if(cnt[bs])cnt[bs][1]++;
-    if(!act(ms)&&!act(bs))return;
-    var why=FLEET.pgcSame(m,b);if(why)bad++;
-    var side=function(txt,eng){return txt?esc(txt)+(eng!=null?' <span class="e">('+eng+'E)</span>':''):'<span class="dly-mini">—</span>'};
-    rows.push('<tr class="'+(why?'bad':'')+'"><td><b>PGC '+k+'</b></td>'
-      +'<td>'+side(m?(m.ok?m.as:'❌ '+(m.as||'not available')):'',m&&m.ok?m.eng:null)+'</td>'
-      +'<td>'+side(b?b.where+(b.st==='OP'&&b.col&&b.col.toUpperCase()!==b.where?' · '+b.col:''):'',b&&b.st!=='DET'?b.eng:null)+'</td>'
-      +'<td class="'+(why?'w':'ok')+'">'+(why?esc(why):'✔')+'</td></tr>');});
-  var c=function(st,l){var a=cnt[st][0],b=cnt[st][1];return '<span class="'+(a===b?'ok':'no')+'">'+l+' '+a+(a===b?' ✔':' · board '+b)+'</span>'};
-  el.innerHTML='<div class="dly-tally-hd">🔎 PGC — Daily Status vs Fleet Deployment · '+waDate(D.date)+'</div>'
-    +'<div class="dly-tally-ct">'+c('OP','Operating')+c('SP','Spare')+'</div>'
-    +'<table><tr><th>Unit</th><th>Daily Status</th><th>Fleet Deployment</th><th></th></tr>'+rows.join('')+'</table>'
-    +(bad?'<button class="dly-btn s" onclick="dlyPgcTallyFix()">⇄ Make '+bad+' PGC tally with Fleet Deployment</button>'
-      +' <span class="dly-mini">Only the red rows change (operating / spare). Unscheduled maintenance is not touched.</span>'
-      :'<div class="dly-tally-ok">✔ PGC operating and spare tally with Fleet Deployment.</div>');
+  var B=pgcBoard();
+  if(!B){el.innerHTML='<div class="dly-mini">No Fleet Deployment board for '+waDate(D.date)+'.</div>';return;}
+  var nOf=function(v){return String(v||'').replace(/\D/g,'')},bad=[];
+  D.pgc.forEach(function(p){var b=B[nOf(p.no)];if(!b||(b.st!=='OP'&&b.st!=='SP'))return;if(FLEET.pgcSame(p,b))bad.push('PGC '+nOf(p.no))});
+  Object.keys(B).forEach(function(k){if((B[k].st==='OP'||B[k].st==='SP')&&!D.pgc.some(function(p){return nOf(p.no)===k}))bad.push('PGC '+k)});
+  el.innerHTML=bad.length
+    ?'<span class="dly-tally-no">⚠ Not tally with Fleet Deployment: '+bad.join(', ')+'</span> <button class="dly-btn s" onclick="dlyPgcTallyFix()">⇄ Tally now</button>'
+    :'<span class="dly-tally-ok">✔ Operating &amp; spare tally with Fleet Deployment ('+waDate(D.date)+')</span>';
 }
 window.dlyPgcTallyFix=function(){if(window.FLEET&&FLEET.tallyPgc(D.pgc,D.date))render();};
 
@@ -5575,6 +5568,7 @@ function render(keepFocus){
        still empty and would wipe the manual figure saved with the entry */
     if(_av0&&(_av0.value!==''||document.activeElement===_av0))D.avail=num(_av0.value);}
   D.duty=num($('#dlyDuty').value);
+  if(!keepFocus)pgcAutoTally();
   var m=metrics(D);
   if(D.autoAvail!==false)D.avail=m.availAuto;
   var av=$('#dlyAvail');
