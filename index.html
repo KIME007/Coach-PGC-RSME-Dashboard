@@ -722,7 +722,7 @@ async function ensureLogin(){
     catch(e){if(_auth)return;}          /* offline: keep the saved session, saving will retry later */
   }
   let why=null;try{why=localStorage.getItem(IDLE_MSG_KEY);localStorage.removeItem(IDLE_MSG_KEY)}catch(e){}
-  showLogin(why==='saved'?"You were logged out after 15 minutes without activity. Your changes were saved to the cloud."
+  showLogin(why==='lost'?"You were logged out after 15 minutes without activity. Changes not saved with 💾 Save were discarded."
            :why?"You were logged out after 15 minutes without activity.":"",true);
   await new Promise(res=>{_loginResolve=res});
   markActive(true);
@@ -730,8 +730,7 @@ async function ensureLogin(){
 
 /* ================= AUTO LOG-OUT after 15 minutes without activity =================
    Activity = mouse, keys, touch, scroll in any open dashboard tab (shared through localStorage).
-   A banner warns 1 minute before. Unsaved changes are saved to the cloud first; if that is not
-   possible the screen is locked instead, and the changes are still there after logging in again. */
+   A banner warns 1 minute before. Nothing is saved on its own: changes not saved with 💾 Save are discarded. */
 const IDLE_MS=15*60*1000, IDLE_WARN_MS=60*1000, ACT_KEY="rsd_last_active_v1", IDLE_MSG_KEY="rsd_idle_msg_v1";
 let _lastAct=Date.now(), _idleBusy=false, _keepAfterLock=false, _idleTick=null;
 function idleLimit(){return window.RSD_IDLE_MS||IDLE_MS}
@@ -746,7 +745,7 @@ function showIdleWarn(){
   let el=document.getElementById("idleWarn");
   if(!el){el=document.createElement("div");el.id="idleWarn";el.className="idlewarn";document.body.appendChild(el);}
   const draw=()=>{const left=Math.max(0,Math.ceil((idleLimit()-(Date.now()-lastActive()))/1000));
-    el.innerHTML="⏳ No activity — you will be logged out in <b>"+left+" s</b>. Move the mouse or press a key to stay logged in.";
+    el.innerHTML="⏳ No activity — you will be logged out in <b>"+left+" s</b>. Move the mouse or press a key to stay logged in."+(typeof dirty!=="undefined"&&dirty?" <b>Unsaved changes will be lost — click 💾 Save now.</b>":"");
     if(Date.now()-lastActive()<idleLimit()-IDLE_WARN_MS)hideIdleWarn();};
   draw();el.classList.add("show");
   if(!_idleTick)_idleTick=setInterval(draw,1000);
@@ -760,20 +759,13 @@ async function checkIdle(){
 }
 async function idleLogout(){
   _idleBusy=true;hideIdleWarn();
-  let saved=false,keep=false;
-  if(typeof dirty!=="undefined"&&dirty){
-    try{await cloudPushAll();if(typeof setDirty==="function")setDirty(false);saved=true;}
-    catch(e){keep=true;}
-  }
+  const lost=typeof dirty!=="undefined"&&dirty;
   try{await authCall("logout",{},_auth&&_auth.access);}catch(e){}
-  if(keep){                                         /* could not save: lock the screen, keep the work */
-    authSave(null);_keepAfterLock=true;_idleBusy=false;
-    showLogin("Logged out after 15 minutes without activity. Your unsaved changes are still here — log in and click 💾 Save.",true);
-    return;
-  }
-  try{localStorage.setItem(IDLE_MSG_KEY,saved?"saved":"idle");
+  try{localStorage.setItem(IDLE_MSG_KEY,lost?"lost":"idle");
     [AUTH_KEY,"rsd_years_v1","rsd_state_v2","rsd_wb_b64_v2",DAILY_EKEY,DAILY_RKEY,"rsd_avail_manual_v1","rptDocSeq_v1"].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  if(typeof setDirty==="function")setDirty(false);     /* no "leave page?" prompt — the reload shows the login screen */
   location.reload();
+  return true;
 }
 ["mousemove","mousedown","keydown","touchstart","wheel","scroll"].forEach(ev=>window.addEventListener(ev,()=>markActive(),{passive:true,capture:true}));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkIdle();});
@@ -1093,12 +1085,8 @@ async function cloudHydrate(){
       const base=pack||{years:yrLoadAll(),yearSel:RS_YEAR};
       if(overlayTables(base,t))pack=base;
     }
-    /* years edited on this computer but never saved stay as they are (Save still checks for newer cloud data) */
+    /* only saved data counts: changes never saved with 💾 Save are dropped and the cloud copy is shown */
     const local=yrLoadAll(), keep=Object.keys(local).filter(y=>local[y]&&local[y].dirty&&local[y].data);
-    if(pack&&keep.length){
-      pack.years=pack.years||{};keep.forEach(y=>{pack.years[y]=local[y]});
-      if(baseSeen!==undefined)setSeen(baseSeen);           /* compare the next Save with the copy these edits started from */
-    }
     if(pack){
       _dailySig=undefined;
       applyBackupPack(pack,true);
@@ -1106,7 +1094,7 @@ async function cloudHydrate(){
       await cloudPushAll();
     }
     updateCloudChip(true,cloudChipNote("Saved copies go to Supabase"));
-    if(keep.length)setTimeout(()=>toast("Your unsaved changes from last time are kept on this computer — click 💾 Save to send them to the cloud",9000),400);
+    if(keep.length)setTimeout(()=>toast("Changes from last time were not saved (💾 Save was not clicked), so they were discarded",9000),400);
     return true;
   }catch(e){
     console.warn("cloud hydrate",e);
@@ -1227,7 +1215,8 @@ function disconnectSupabase(){
   if(!confirm("Stop cloud backup? Data already in Supabase stays there. This browser will keep using local saves only."))return;
   sbSetCfg(null);updateCloudChip();closeCloudModal();toast("Cloud backup disconnected");
 }
-/* Daily Status stores its entry on every redraw (the clock ticks each minute); only real content changes go to the cloud */
+/* Daily Status stores its entry on every redraw (the clock ticks each minute); a real content change
+   only marks the dashboard as unsaved — nothing goes to the cloud until 💾 Save */
 let _dailySig;
 window.rsdAfterDailyStore=function(){
   let sig=null;
@@ -1238,7 +1227,7 @@ window.rsdAfterDailyStore=function(){
     if(sig===_dailySig)return;
     _dailySig=sig;
   }
-  scheduleCloudPush();
+  if(typeof touched==="function")touched();
 };
 /* System Failures list only genuine system failures — "Accident" is not a system category */
 function isSystemFailure(s){return !!s&&!/^\s*ACCIDENTS?\s*$/i.test(String(s.system||''));}
@@ -3420,7 +3409,6 @@ function render(){
     +(has?'<button class="fb-btn" onclick="FLEET.exportXlsx()" title="Download this day as an Excel file">⬇ Export Excel</button>'
       +'<button class="fb-btn" onclick="FLEET.sync()" title="Fill the Daily Status record of this day from the board">⇄ Sync Daily Status</button>'
       +'<label class="fb-auto" title="Update Daily Status automatically after every change"><input type="checkbox" '+(autoSync()?'checked':'')+' onchange="FLEET.auto(this.checked)"> auto</label>'
-      +'<button class="fb-btn sv'+(typeof dirty!=='undefined'&&dirty?' on':'')+'" onclick="FLEET.save(this)" title="Save to the cloud">💾 '+(typeof dirty!=='undefined'&&dirty?'Save changes':'Saved')+'</button>'
       +'<button class="fb-btn" onclick="FLEET.clearDay()" title="Delete this day\'s board">🗑 Clear day</button>':'')+'</div></div>'+cal;
   if(!has){var pv=prevDate(iso);
     h+='<div class="fb-sec fb-new"><h3>📅 '+labelOf(iso)+' — not recorded yet</h3><p>Start this day\'s board:</p><div style="display:flex;gap:8px;flex-wrap:wrap">'
