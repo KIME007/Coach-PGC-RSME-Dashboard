@@ -3547,7 +3547,7 @@ function pgcSame(p,b){var lab={OP:'operating',SP:'spare',DET:'not available',NO:
   if(st!==b.st)return 'Daily: '+lab[st]+' · Board: '+lab[b.st];
   if(st==='SP'&&pgcDep(p.as)!==pgcDep(b.where))return 'Different depot';
   if(st==='OP'){var da=String(p.as||'').replace(/\D/g,''),db=String(b.where||'').replace(/\D/g,''),w=String(b.where||'').toUpperCase().split(/[^A-Z]+/).filter(function(x){return x&&x!=='TREN'})[0]||'';
-    if(da||db?da!==db:String(p.as||'').toUpperCase().indexOf(w.slice(0,4))<0)return 'Different train';}
+    if(db?da!==db:String(p.as||'').toUpperCase().indexOf(w.slice(0,4))<0)return 'Different train';}
   if(st!=='DET'&&b.eng!=null&&+p.eng!==+b.eng)return 'Engines '+p.eng+'E · board '+b.eng+'E';
   return '';}
 function tallyPgc(list,B){var n=0,num=function(v){return String(v||'').replace(/\D/g,'')};
