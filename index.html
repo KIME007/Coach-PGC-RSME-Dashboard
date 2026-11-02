@@ -3726,6 +3726,7 @@ function mount(){
   var tabs=document.querySelector('nav.tabs'),main=document.querySelector('main');if(!tabs||!main)return;
   var btn=document.createElement('button');btn.className='tab';btn.id='tabFleet';btn.innerHTML='🚆 Fleet Deployment';btn.onclick=function(){FLEET.open()};
   var pt=document.getElementById('tabProj');if(pt)tabs.insertBefore(btn,pt);else tabs.appendChild(btn);
+  var dt=document.getElementById('tabDaily');if(dt)tabs.insertBefore(btn,dt.nextSibling); /* beside Daily Status */
   var sec=document.createElement('section');sec.className='panel';sec.id='pFleet';sec.style.display='none';sec.innerHTML='<div id="fleetArea"></div>';main.appendChild(sec);
   ['setTab','dlyOpenTab','rptOpenTab'].forEach(wrap);
   if(window.PROJ&&PROJ.open&&!PROJ.open._fleetWrapped){var po=PROJ.open;PROJ.open=function(){hide();return po.apply(this,arguments)};PROJ.open._fleetWrapped=true;}
@@ -5751,6 +5752,7 @@ function mountInner(){
   btn.onclick=function(){window.dlyOpenTab()};
   var rptBtn=document.getElementById('tabReport');
   if(rptBtn)tabs.insertBefore(btn,rptBtn); else tabs.appendChild(btn);
+  var flt=document.getElementById('tabFleet');if(flt)tabs.insertBefore(flt,btn.nextSibling); /* Fleet Deployment beside Daily Status */
 
   var sec=document.createElement('section');
   sec.className='panel';sec.id='dlyDaily';sec.style.display='none';
