@@ -1946,7 +1946,9 @@ function importExcel(inp){const f=inp.files[0];if(!f)return;const rd=new FileRea
     const u8=new Uint8Array(e.target.result);
     const wb=XLSX.read(u8,{type:'array'});
     const sheetBy=p=>{const k=Object.keys(wb.Sheets).find(x=>x.toUpperCase().startsWith(p));return k?wb.Sheets[k]:null;};
-    const ws=sheetBy('DASH');if(!ws)throw new Error("No DASHBOARD sheet found");
+    const ws=sheetBy('DASH');
+    if(!ws&&window.PE&&PE.fromWb&&PE.fromWb(XLSX.read(u8,{type:'array'}),f.name)){inp.value='';return;}   /* PE 60 & PE 90 schedule file */
+    if(!ws)throw new Error("No DASHBOARD sheet found");
     const cv=(r,c)=>{const cell=ws[XLSX.utils.encode_cell({r:r-1,c:c-1})];if(!cell)return null;
       const v=cell.v;return typeof v==='number'?v:(v==null||v==='-'||v===''?null:(typeof v==='string'&&isFinite(+v)?+v:null));};
     const N={};
@@ -7270,8 +7272,10 @@ function form(r,isNew){
 function v(id){var e=document.getElementById(id);return e?String(e.value||'').trim():''}
 /* ---------- Excel import (same layout as the file) ---------- */
 function parse(ws){
-  var R=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  var dIso=function(x){if(x instanceof Date)return isoOf(x);if(typeof x==='number'&&x>20000){var d=XLSX.SSF.parse_date_code(x);return d.y+'-'+p2(d.m)+'-'+p2(d.d)}return '-'};
+  /* read from column A even if the sheet's used range starts later, so C = coach group, D = coach … */
+  var ref=XLSX.utils.decode_range(ws['!ref']||'A1');ref.s.c=0;ref.s.r=0;
+  var R=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:ref});
+  var dIso=function(x){if(x instanceof Date)return isoOf(new Date(x.getTime()+12*36e5));if(typeof x==='number'&&x>20000){var d=XLSX.SSF.parse_date_code(x);return d.y+'-'+p2(d.m)+'-'+p2(d.d)}return '-'};
   var s=function(x){return x==null?'':String(x).trim()};
   var out={title:SEED.title,sub:SEED.sub,year:SEED.year,groups:[]},g=null;
   R.forEach(function(row){
@@ -7319,14 +7323,19 @@ window.PE={
   del:function(){if(!ED||ED.gi==null)return;var D=data(),r=D.groups[ED.gi].rows[ED.i];
     if(!confirm('Remove '+r.id+' from the PE schedule?'))return;D.groups[ED.gi].rows.splice(ED.i,1);PE.close();changed();},
   imp:function(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;var rd=new FileReader();
-    rd.onload=function(){try{var wb=XLSX.read(new Uint8Array(rd.result),{type:'array',cellDates:true}),nd=parse(wb.Sheets[wb.SheetNames[0]]);
-      var n=nd.groups.reduce(function(a,g){return a+g.rows.length},0);if(!n)throw new Error('no coaches found — is it the PE 60 & PE 90 schedule?');
-      var old={};data().groups.forEach(function(g){g.rows.forEach(function(r){if(r.hl)old[r.id]=1})});
-      nd.groups.forEach(function(g){g.rows.forEach(function(r){if(old[r.id])r.hl=1})});
-      if(!confirm('Replace the PE schedule with '+n+' coaches from '+f.name+'?'))return;
-      S.peSchedule=nd;changed();toast('Imported '+n+' coaches — click 💾 Save to keep it',5000);}
-      catch(e){toast('Import failed: '+e.message,6000);}};
+    rd.onload=function(){try{if(!PE.fromWb(XLSX.read(new Uint8Array(rd.result),{type:'array'}),f.name))
+        throw new Error('no coaches found — choose “COACHES SCHEDULE PE 60 & PE 90” file');}
+      catch(e){toast('Import failed: '+e.message,7000);}};
     rd.readAsArrayBuffer(f);},
+  /* returns true if the workbook is a PE 60 & PE 90 schedule (then it is loaded) */
+  fromWb:function(wb,name){
+    var nd=null;for(var k=0;k<wb.SheetNames.length&&!nd;k++){var t=parse(wb.Sheets[wb.SheetNames[k]]);if(t.groups.some(function(g){return g.rows.length}))nd=t;}
+    if(!nd)return false;var n=nd.groups.reduce(function(a,g){return a+g.rows.length},0);
+    var old={};data().groups.forEach(function(g){g.rows.forEach(function(r){if(r.hl)old[r.id]=1})});
+    nd.groups.forEach(function(g){g.rows.forEach(function(r){if(old[r.id])r.hl=1})});
+    if(!confirm('Load the PE 60 & PE 90 schedule — '+n+' coaches from '+name+'?'))return true;
+    S.peSchedule=nd;if(typeof touched==='function')touched();PE.open();
+    toast('✔ PE schedule loaded: '+n+' coaches — click 💾 Save to keep it',6000);return true;},
   render:render
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
