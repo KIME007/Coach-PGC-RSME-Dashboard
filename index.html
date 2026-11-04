@@ -7193,6 +7193,32 @@ window.AVX={
 #pPE .wk-col .f{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-top:1px solid #2c2e33;font-size:.7rem;color:#a3a8c3;font-weight:700}
 #pPE .wk-col .f b{color:#fff;font-size:.86rem}
 #pPE .fb-sec>h3{flex-wrap:wrap}
+#pPE .wk-nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+#pPE .wk-empty{color:#a3a8c3;font-size:.82rem;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+#pPE .wk-empty span{font-size:.74rem;color:#6c7293}
+#pPE .wk-add{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+#pPE .wk-add select,#pPE .wk-add input,#pPE table.wkt input,#pPE table.wkt select{background:#12151c;color:#fff;border:1px solid #3b4050;border-radius:8px;padding:6px 8px;font-weight:700;font-size:.76rem}
+#pPE .wk-add label{margin-left:auto;font-size:.72rem;color:#a3a8c3;font-weight:700;display:flex;gap:6px;align-items:center}
+#pPE .wk-add label input{min-width:240px}
+#pPE table.wkt{min-width:1000px}#pPE table.wkt td.rem input{width:150px}
+#pPE .wk-x{background:transparent;border:0;color:#ff5b62;font-weight:800;cursor:pointer;font-size:.9rem}
+#pPE table.wkg{min-width:860px}#pPE table.wkg td{vertical-align:top}#pPE table.wkg td .fb-chip{margin:2px auto;max-width:110px}
+#pPE table.wkg td.loc{background:#1f3b23;color:#73fb79;font-weight:800;text-align:left;white-space:nowrap}
+#pPE table.wkg th.tdy{color:#fff;background:#AF1763}#pPE table.wkg td i{color:#4b5064;font-style:normal}
+#peWkPrint{display:none}
+@media print{
+  body.pe-pw *{visibility:hidden!important}
+  body.pe-pw #peWkPrint,body.pe-pw #peWkPrint *{visibility:visible!important}
+  body.pe-pw #peWkPrint{display:block;position:absolute;left:0;top:0;width:100%;background:#fff;color:#000;font:700 8pt Calibri,Arial,sans-serif}
+  #peWkPrint .wd-h{display:flex;align-items:center;gap:14px;text-align:center;margin-bottom:8px}#peWkPrint .wd-h img{height:34px}
+  #peWkPrint .wd-h>div{flex:1;font-size:11pt}#peWkPrint .u{text-decoration:underline;margin-top:6px}#peWkPrint .big{font-size:13pt}
+  #peWkPrint table{border-collapse:collapse;width:100%;margin-bottom:10px}
+  #peWkPrint td,#peWkPrint th{border:1px solid #000;padding:3px 4px;text-align:center;height:16px}
+  #peWkPrint .wd-t{border:2px solid #000}#peWkPrint .wd-t th{background:#ff0!important}
+  #peWkPrint .wd-g{width:88%}#peWkPrint .wd-g th{background:#ff0!important}#peWkPrint .wd-g th.b{background:#0096ff!important}#peWkPrint .wd-g .g{background:#73fb79!important}
+  #peWkPrint .wd-p{border:2px solid #000;display:inline-block;padding:6px 14px;font-size:7.5pt;min-width:260px}
+  #peWkPrint *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 #pPE .pill{display:inline-block;font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;color:#111}
 #pPE .dd{display:inline-block;min-width:38px;text-align:center;font-weight:800;font-size:.76rem;padding:3px 8px;border-radius:7px;color:#111}
 #pPE .pe-tw{overflow:auto;max-height:76vh;border-radius:10px;border:1px solid #2c2e33}
@@ -7214,9 +7240,9 @@ window.AVX={
 #ovPE .pe-form .full{grid-column:1/-1}
 @media(max-width:600px){#ovPE .pe-form{grid-template-columns:1fr}}
 @media print{
-  body *{visibility:hidden!important}
-  #pPE .pe-sheet,#pPE .pe-sheet *{visibility:visible!important}
-  #pPE .pe-sheet{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;background:#fff;padding:0;margin:0}
+  body:not(.pe-pw) *{visibility:hidden!important}
+  body:not(.pe-pw) #pPE .pe-sheet,body:not(.pe-pw) #pPE .pe-sheet *{visibility:visible!important}
+  body:not(.pe-pw) #pPE .pe-sheet{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;background:#fff;padding:0;margin:0}
   #pPE .pe-sheet>h3{display:none}
   #pPE .pe-print-h{display:block;text-align:center;font:700 10pt 'Times New Roman',serif;color:#000;margin-bottom:6px}
   #pPE .pe-tw{max-height:none;overflow:visible;border:0}
@@ -7311,39 +7337,222 @@ function planHtml(){
   }
   return h+'</div>';
 }
-/* weekly plan: Monday–Sunday of the chosen week, coaches whose NEXT PE falls on each day */
-function weekHtml(){
-  var D=data(),t=today(),mon=new Date(t);mon.setDate(t.getDate()-((t.getDay()+6)%7)+WK*7);
-  var days=[];for(var n=0;n<7;n++){var d=new Date(mon);d.setDate(mon.getDate()+n);days.push(isoOf(d));}
-  var start=days[0],end=days[6],by={},over=[],locs={};days.forEach(function(d){by[d]=[]});
-  D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){if(TY&&g.name!==TY)return;if(STF&&r.st!==STF)return;
-    if(!STF&&/REFURB|UNSERVICE/.test(r.st))return;var k=calc(r);if(k.next==='-')return;var nw=nowOf(r);if(FN&&nw.cat!==FN)return;
-    if(Q&&(r.id+' '+r.loc+' '+r.st+' '+r.rem).toUpperCase().indexOf(Q.toUpperCase())<0)return;
-    var it={r:r,k:k,gi:gi,i:i,nw:nw};
-    if(by[k.next]){by[k.next].push(it);locs[r.loc||'—']=(locs[r.loc||'—']||0)+1;}
-    else if(WK===0&&k.next<start)over.push(it);})});
-  var tot=days.reduce(function(a,d){return a+by[d].length},0),WD=['MON','TUE','WED','THU','FRI','SAT','SUN'];
-  var chip=function(x){var c=TYC[typeOf(x.r.id)];return '<div class="wk-it" onclick="PE.edit('+x.gi+','+x.i+')" title="'+esc(x.r.id+' · last PE '+fmt(x.r.last)+(x.nw.w?' · now '+x.nw.w:''))+'">'
-    +'<span class="fb-chip" style="background:'+c[0]+';color:'+c[1]+'">'+esc(x.r.id)+'</span>'
-    +'<small>📍 '+esc(x.r.loc||'—')+' · PE '+(x.r.iv||defIv(x.r.id))+'</small>'
-    +'<small class="now">🚆 '+esc(x.nw.w||'not on board')+'</small></div>'};
-  var col=function(head,sub,list,cls){return '<div class="wk-col '+(cls||'')+'"><div class="h"><b>'+head+'</b><small>'+sub+'</small></div><div class="u">'
-    +(list.length?list.map(chip).join(''):'<i>—</i>')+'</div><div class="f"><span>Due</span><b>'+list.length+'</b></div></div>'};
-  over.sort(function(a,b){return a.k.days-b.k.days});
+/* ================= WEEKLY PE FORECAST (Sunday – Saturday, like "COACH PE WEEKLY PLANNING") =================
+   S.peWeekly = {prep:'', weeks:{ '<sunday iso>': {items:[{id,plan,loc,rem}]} }}
+   PE level, last PE, status and due days come live from the PE schedule. */
+var WLOCS=['KL SENTRAL','KEMPAS BARU','TUMPAT'];
+var WDN=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+function W(){if(!S.peWeekly)S.peWeekly={prep:'',weeks:{}};if(!S.peWeekly.weeks)S.peWeekly.weeks={};return S.peWeekly}
+function sunOf(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-x.getDay());return isoOf(x)}
+function weekNo(iso){var d=parseIso(iso),j=new Date(d.getFullYear(),0,1);return Math.floor((Math.round((d-j)/864e5)+j.getDay())/7)+1}
+function curSun(){var t=today();t.setDate(t.getDate()+WK*7);return sunOf(t)}
+function keyOf(id){return String(id||'').toUpperCase().replace(/\s+/g,'')}
+function findRow(id){var k=keyOf(id),D=data(),hit=null;D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){if(!hit&&keyOf(r.id)===k)hit={r:r,gi:gi,i:i}})});return hit}
+function depotOfNow(r){var w=nowOf(r).w||'';var m=w.match(/^Spare\s+(.+)$/i);if(!m)return '';var d=m[1].toUpperCase();
+  return /KEMP/.test(d)?'KEMPAS BARU':/TUM/.test(d)?'TUMPAT':/KL|SENTRAL/.test(d)?'KL SENTRAL':d}
+function clampIso(x,a,b){return x<a?a:x>b?b:x}
+function defPlan(r,sun){var sat=addDays(sun,6),nx=calc(r).next,lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;return clampIso(nx==='-'?lo:nx,lo,sat)}
+function wkItem(r,sun){var d=calc(r).days;return {id:r.id,plan:defPlan(r,sun),loc:depotOfNow(r)||r.loc||'',rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
+/* what the forecast showed when it was planned; older rows fall back to the schedule */
+function wLast(x,r){return x.last||(r&&r.last!=='-'&&r.last<=x.plan?r.last:'')}
+function wSt(x,r){return x.st||(r?r.st:'')}
+function wLvl(x,r){return x.lvl||wkLevel(r)}
+/* coaches worth planning: can run, have a PE date, due by Saturday of next week; soonest first */
+function wkCands(sun){var sat=addDays(sun,6),lim=addDays(sat,7),items=(W().weeks[sun]||{items:[]}).items,have={},out=[];
+  items.forEach(function(x){have[keyOf(x.id)]=1});
+  data().groups.forEach(function(g){g.rows.forEach(function(r){var k=calc(r);if(have[keyOf(r.id)]||k.next==='-'||r.st!=='IN OPERATIONS')return;   /* weekly planning: IN OPERATIONS only */
+    if(k.next<=lim)out.push({r:r,k:k,must:k.next<=sat});})});
+  return out.sort(function(a,b){return a.k.days-b.k.days})}
+function wkLevel(r){return r?'PE '+(r.iv||defIv(r.id)):'-'}
+function forecastHtml(){
+  var sun=curSun(),sat=addDays(sun,6),wn=weekNo(sun),wk=W().weeks[sun]||{items:[]},items=wk.items,cands=wkCands(sun),must=cands.filter(function(c){return c.must});
   var label=WK===0?'This week':WK===1?'Next week':WK===-1?'Last week':(WK>0?'In '+WK+' weeks':Math.abs(WK)+' weeks ago');
-  var h='<div class="fb-sec"><h3>🗓 Weekly PE Plan <span class="ct">'+label+' · '+fmt(start)+' – '+fmt(end)+' · '+tot+' coach'+(tot===1?'':'es')+' due'
-    +(Object.keys(locs).length?' · '+Object.keys(locs).sort().map(function(l){return esc(l)+' '+locs[l]}).join(' · '):'')+'</span>'
-    +'<span style="margin-left:auto;display:flex;gap:6px"><button class="fb-btn" onclick="PE.wk(-1)">‹ Prev</button><button class="fb-btn'+(WK===0?' p':'')+'" onclick="PE.wk(0)">This week</button><button class="fb-btn" onclick="PE.wk(1)">Next ›</button></span></h3>'
-    +'<div class="wk-row">'+(WK===0?col('OVERDUE','carried over',over,'od'):'')
-    +days.map(function(d,n){var dt=parseIso(d);return col(WD[n]+' '+dt.getDate(),MON[dt.getMonth()]+' '+dt.getFullYear(),by[d],d===isoOf(t)?'td':'')}).join('')+'</div></div>';
+  var h='<div class="fb-sec pe-wk"><h3>🗓 Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' coach'+(items.length===1?'':'es')+' planned</span>'
+    +'<span class="wk-nav"><button class="fb-btn" onclick="PE.wk(-1)">‹ Prev</button><button class="fb-btn'+(WK===0?' p':'')+'" onclick="PE.wk(0)">This week</button><button class="fb-btn" onclick="PE.wk(1)">Next ›</button>'
+    +'<button class="fb-btn" onclick="PE.wprint()" title="Print this week as the forecast sheet">🖨 Print week</button><button class="fb-btn" onclick="PE.xlsW()" title="All weeks, one sheet per week">⬇ Weekly Excel</button></span></h3>';
+  if(!items.length)h+='<div class="wk-empty">No plan for week '+wn+' yet. '
+    +(must.length?'<button class="fb-btn p" onclick="PE.wauto()">✨ Fill with the '+must.length+' coach'+(must.length===1?'':'es')+' due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')
+    +' <span>You can also add coaches one by one below.</span></div>';
+  else{
+    h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>Coaches no.</th><th>PE level</th><th>Last PE date</th><th>PE planning date</th><th>Current location</th><th>Status</th><th>Estimate due days</th><th>Remarks</th><th></th></tr></thead><tbody>';
+    var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
+    items.forEach(function(x,i){var f=findRow(x.id),r=f&&f.r,k=r?calc(r):null,over=k&&k.next!=='-'&&x.plan>k.next,lv=wLvl(x,r),la=wLast(x,r),st=wSt(x,r);
+      h+='<tr><td class="n">'+(i+1)+'</td><td class="id">'+(r?chipOf(r):esc(x.id))+'</td>'
+        +'<td>'+(lv&&lv!=='-'?pill(lv,lv==='PE 60'?'#96f28e':'#5aa9ff'):'–')+'</td><td>'+(la?fmt(la):'–')+'</td>'
+        +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.wset('+i+',\'plan\',this.value)"></td>'
+        +'<td><select onchange="PE.wset('+i+',\'loc\',this.value)">'+locs.map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
+        +'<td>'+(st?pill(st,STC[st]||'#a3a8c3'):'–')+'</td><td>'+(k?ddHtml(k.days):'–')+'</td>'
+        +'<td class="rem">'+(over?'<b style="color:#ff5b62">OVERDUE</b> ':'')+'<input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.wset('+i+',\'rem\',this.value)"></td>'
+        +'<td><button class="wk-x" title="Remove from this week" onclick="PE.wdel('+i+')">✕</button></td></tr>';});
+    h+='</tbody></table></div>';
+    /* location × day */
+    var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today());
+    h+='<div class="pe-tw" style="margin-top:12px"><table class="pe wkg"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>'
+      +locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).map(function(l){
+        return '<tr><td class="loc">'+esc(l)+'</td>'+DN.map(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
+          return '<td>'+(on.length?on.map(function(x){var f=findRow(x.id);return f?chipOf(f.r):'<span class="fb-chip" style="background:#3b4050;color:#fff">'+esc(x.id)+'</span>'}).join(''):'<i>–</i>')+'</td>'}).join('')+'</tr>'}).join('')
+      +'</tbody></table></div>';
+  }
+  /* add coaches */
+  h+='<div class="wk-add"><select onchange="if(this.value)PE.wadd(this.value)"><option value="">＋ Add coach to week '+wn+'…</option>'
+    +(cands.length?'<optgroup label="Due by '+fmt(addDays(sat,7))+' (soonest first)">'+cands.map(function(c){return '<option value="'+esc(c.r.id)+'">'+esc(c.r.id)+' — next PE '+fmt(c.k.next)+' ('+(c.k.days<0?'overdue '+(-c.k.days):c.k.days)+' d)</option>'}).join('')+'</optgroup>':'')
+    +'<optgroup label="All IN OPERATIONS coaches">'+data().groups.map(function(g){return g.rows.filter(function(r){return r.st==='IN OPERATIONS'&&!items.some(function(x){return keyOf(x.id)===keyOf(r.id)})}).map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.id)+'</option>'}).join('')}).join('')+'</optgroup></select>'
+    +(items.length&&must.length?'<button class="fb-btn" onclick="PE.wauto()">✨ Add the '+must.length+' still due by '+fmt(sat)+'</button>':'')
+    +'<label>Prepared by <input value="'+esc(W().prep)+'" placeholder="Name / position" onchange="PE.wprep(this.value)"></label></div>';
+  return h+'</div>';
+}
+/* ---------- print: the week as the forecast sheet ---------- */
+function forecastDoc(sun){
+  var sat=addDays(sun,6),items=(W().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),logo='';
+  try{logo=KASSET.logo}catch(x){}
+  var h='<div class="wd"><div class="wd-h">'+(logo?'<img src="'+logo+'">':'')+'<div><b>KERETAPI TANAH MELAYU BERHAD</b><br><b>ROLLING STOCK MAINTENANCE AND ENGINEERING (RSM COACH)</b>'
+    +'<div class="u">COACH PERIODICAL EXAMINATION WEEKLY FORECAST</div><div class="u big">WEEK '+weekNo(sun)+'</div></div></div>'
+    +'<table class="wd-t"><tr><th>NO.</th><th>COACHES NO.</th><th>PE LEVEL</th><th>LAST PE DATE</th><th>PE PLANNING DATE</th><th>CURRENT LOCATION</th><th>STATUS</th><th>ESTIMATE DUE DAYS</th><th>REMARKS</th></tr>';
+  for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';
+    h+='<tr><td>'+(i+1)+'</td><td>'+(x?esc(x.id):'')+'</td><td'+(lv&&lv!=='-'?' style="background:'+(lv==='PE 60'?'#96f28e':'#3f8efc')+'"':'')+'>'+(lv&&lv!=='-'?lv:'')+'</td><td>'+(la?fmt(la):'')+'</td><td>'+(x?fmt(x.plan):'')+'</td>'
+      +'<td>'+(x?esc(x.loc):'')+'</td><td>'+esc(st)+'</td><td'+(over?' style="color:#e00"':'')+'>'+(x&&x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):'')+'</td><td style="color:#e00">'+(x?(over?'OVERDUE ':'')+esc(x.rem):'')+'</td></tr>';}
+  h+='</table><table class="wd-g"><tr><th rowspan="2" class="g">LOCATION</th>'+WDN.map(function(d){return '<th>'+d+'</th>'}).join('')+'</tr><tr>'+WDN.map(function(d,j){return '<th class="b">'+fmt(addDays(sun,j))+'</th>'}).join('')+'</tr>';
+  var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
+  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);return items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id})});
+    var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));
+    for(var q=0;q<rows;q++)h+='<tr>'+(q===0?'<td rowspan="'+rows+'" class="g">'+esc(l)+'</td>':'')+per.map(function(p){return '<td>'+(p[q]?esc(p[q]):'')+'</td>'}).join('')+'</tr>';});
+  h+='</table><div class="wd-p">PREPARED BY :<br>'+esc(W().prep||'').replace(/\n/g,'<br>')+'</div></div>';
   return h;
 }
+
+/* ================= EXCEL WRITER (styled .xlsx, no template) ================= */
+function xmlEsc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function colNo(L){var n=0;for(var i=0;i<L.length;i++)n=n*26+L.charCodeAt(i)-64;return n}
+function colL(n){var s='';while(n>0){var m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
+function serial(iso){var d=parseIso(iso);return d?Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(1899,11,30))/864e5):null}
+/* sheets: [{name, cells:{'B6':{v, f, s:{b,sz,u,col,fill,bd,h,wrap,date,num}}}, merges:[], cols:{B:8}, rows:{2:40}, cf:[{ref,rules:[{f,fill,col}]}], land}] */
+function buildXlsx(sheets){
+  var fonts=['<font><sz val="11"/><name val="Calibri"/></font>'],fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>'],
+      borders=['<border><left/><right/><top/><bottom/><diagonal/></border>'],xfs=['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'],dxfs=[],idx={};
+  var reg=function(arr,x){var i=arr.indexOf(x);if(i<0){arr.push(x);i=arr.length-1}return i};
+  var sid=function(s){if(!s)return 0;var k=JSON.stringify(s);if(idx[k]!=null)return idx[k];
+    var fo=reg(fonts,'<font>'+(s.b?'<b/>':'')+(s.u?'<u/>':'')+'<sz val="'+(s.sz||10)+'"/>'+(s.col?'<color rgb="FF'+s.col+'"/>':'')+'<name val="Calibri"/></font>');
+    var fi=s.fill?reg(fills,'<fill><patternFill patternType="solid"><fgColor rgb="FF'+s.fill+'"/><bgColor indexed="64"/></patternFill></fill>'):0;
+    var bw=s.bd==='m'?'medium':s.bd?'thin':'';var bo=bw?reg(borders,'<border><left style="'+bw+'"><color auto="1"/></left><right style="'+bw+'"><color auto="1"/></right><top style="'+bw+'"><color auto="1"/></top><bottom style="'+bw+'"><color auto="1"/></bottom><diagonal/></border>'):0;
+    var nf=s.date?164:s.num?165:0;
+    xfs.push('<xf numFmtId="'+nf+'" fontId="'+fo+'" fillId="'+fi+'" borderId="'+bo+'" xfId="0" applyFont="1"'+(fi?' applyFill="1"':'')+(bo?' applyBorder="1"':'')+(nf?' applyNumberFormat="1"':'')
+      +' applyAlignment="1"><alignment horizontal="'+(s.h||'center')+'" vertical="center"'+(s.wrap?' wrapText="1"':'')+'/></xf>');
+    return idx[k]=xfs.length-1;};
+  var sheetXml=sheets.map(function(sh){
+    var rows={};Object.keys(sh.cells).forEach(function(a){var m=a.match(/^([A-Z]+)(\d+)$/);(rows[+m[2]]=rows[+m[2]]||[]).push([colNo(m[1]),a,sh.cells[a]])});
+    var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      +'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="18" customHeight="1"/>';
+    var cs=Object.keys(sh.cols||{});if(cs.length)x+='<cols>'+cs.sort(function(a,b){return colNo(a)-colNo(b)}).map(function(c){var n=colNo(c);return '<col min="'+n+'" max="'+n+'" width="'+sh.cols[c]+'" customWidth="1"/>'}).join('')+'</cols>';
+    x+='<sheetData>'+Object.keys(rows).map(Number).sort(function(a,b){return a-b}).map(function(r){
+      var ht=(sh.rows||{})[r];return '<row r="'+r+'"'+(ht?' ht="'+ht+'" customHeight="1"':'')+'>'+rows[r].sort(function(a,b){return a[0]-b[0]}).map(function(c){var v=c[2],s=sid(v.s);
+        if(v.f)return '<c r="'+c[1]+'" s="'+s+'"'+(typeof v.v==='string'?' t="str"':'')+'><f>'+xmlEsc(v.f)+'</f>'+(v.v!=null&&v.v!==''?'<v>'+xmlEsc(v.v)+'</v>':'')+'</c>';
+        if(v.v==null||v.v==='')return '<c r="'+c[1]+'" s="'+s+'"/>';
+        if(typeof v.v==='number')return '<c r="'+c[1]+'" s="'+s+'"><v>'+v.v+'</v></c>';
+        return '<c r="'+c[1]+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(v.v)+'</t></is></c>';}).join('')+'</row>'}).join('')+'</sheetData>';
+    if(sh.merges&&sh.merges.length)x+='<mergeCells count="'+sh.merges.length+'">'+sh.merges.map(function(m){return '<mergeCell ref="'+m+'"/>'}).join('')+'</mergeCells>';
+    var pr=1;(sh.cf||[]).forEach(function(c){x+='<conditionalFormatting sqref="'+c.ref+'">'+c.rules.map(function(ru){
+      dxfs.push('<dxf>'+(ru.col?'<font><color rgb="FF'+ru.col+'"/></font>':'')+(ru.fill?'<fill><patternFill><bgColor rgb="FF'+ru.fill+'"/></patternFill></fill>':'')+'</dxf>');
+      return '<cfRule type="expression" dxfId="'+(dxfs.length-1)+'" priority="'+(pr++)+'"><formula>'+xmlEsc(ru.f)+'</formula></cfRule>'}).join('')+'</conditionalFormatting>'});
+    x+='<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="'+(sh.land?'landscape':'portrait')+'" fitToWidth="1" fitToHeight="0"/></worksheet>';
+    return x;});
+  var z=new JSZip();
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+    +sheets.map(function(s,i){return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'}).join('')+'</Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="'+(sheets.length-1)+'"/></bookViews><sheets>'
+    +sheets.map(function(s,i){return '<sheet name="'+xmlEsc(s.name.slice(0,31))+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'}).join('')+'</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>');
+  z.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    +sheets.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')
+    +'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  sheetXml.forEach(function(x,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',x)});
+  z.file('xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="d\\-mmm\\-yy"/><numFmt numFmtId="165" formatCode="0;[Red]\\(0\\)"/></numFmts>'
+    +'<fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts><fills count="'+fills.length+'">'+fills.join('')+'</fills><borders count="'+borders.length+'">'+borders.join('')+'</borders>'
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs>'
+    +'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="'+dxfs.length+'">'+dxfs.join('')+'</dxfs></styleSheet>');
+  return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function saveBlob(b,name){var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},3000)}
+/* PE schedule in the "COACHES SCHEDULE PE 60 & PE 90" layout — NEXT PE, STATUS and DAYS DUE stay live formulas */
+function scheduleSheet(){
+  var D=data(),c={},M=['C2:M2','C5:C6','E5:J5','K5:K6','L5:L6','M5:M6'],H={b:1,bd:1,fill:'83CCEB',wrap:1,sz:9},T={b:1,bd:1,sz:10},TL={b:1,bd:1,sz:10,h:'center',wrap:1};
+  c.C2={v:D.title+'\n'+D.sub,s:{b:1,sz:14,wrap:1}};c.G3={v:'YEAR : '+D.year,s:{b:1,sz:11}};
+  c.C5={v:'NO.',s:H};c.C6={v:'',s:H};c.D5={v:'COACHES NUMBER',s:H};c.D6={v:'NEW NUMBER',s:H};c.E5={v:'SCHEDULE FOR PE 60 & PE 90 MAINTENANCE',s:H};
+  ['F5','G5','H5','I5','J5','K6','L6','M6'].forEach(function(a){c[a]={v:'',s:H}});
+  [['E6','LAST PE DATE'],['F6','PE LOCATION'],['G6','NEXT PE DATE'],['H6','STATUS'],['I6','PE STATUS'],['J6','DAYS DUE'],['K5','YEAR OF REFURBISHMENT'],['L5','REFURBISHMENT BY'],['M5','REMARKS']].forEach(function(p){c[p[0]]={v:p[1],s:H}});
+  var r=7,dataRefs=[],stRefs=[];
+  D.groups.forEach(function(g){c['C'+r]={v:g.name,s:{b:1,u:1,sz:14,fill:'FF2F92',bd:1,h:'left'}};
+    'DEFGHIJKLM'.split('').forEach(function(L){c[L+r]={v:'',s:{fill:'FF2F92',bd:1}}});var a=r+1;r++;
+    g.rows.forEach(function(row,i){var ls=serial(row.last),k=calc(row),iv=row.iv||defIv(row.id);
+      c['C'+r]={v:i+1,s:T};c['D'+r]={v:row.id,s:row.hl?{b:1,bd:1,sz:10,fill:'FFFF00'}:T};
+      c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};c['F'+r]={v:row.loc,s:T};
+      c['G'+r]=ls?{f:'E'+r+'+'+iv,v:ls+iv,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};c['H'+r]={v:row.st,s:T};
+      c['I'+r]=ls?{f:'IF(J'+r+'="","",IF(J'+r+'<=0,"OVERDUE",IF(J'+r+'<=15,"PLAN FOR PE","OKAY")))',v:k.ps,s:T}:{v:'-',s:T};
+      c['J'+r]=ls?{f:'G'+r+'-TODAY()',v:k.days,s:{b:1,bd:1,sz:10,num:1}}:{v:'-',s:T};
+      c['K'+r]={v:row.ry?(isFinite(+row.ry)?+row.ry:row.ry):'',s:T};c['L'+r]={v:row.by,s:T};c['M'+r]={v:row.rem,s:TL};r++;});
+    if(r>a){dataRefs.push([a,r-1]);}});
+  var rng=function(L){return dataRefs.map(function(p){return L+p[0]+':'+L+p[1]}).join(' ')},f0=dataRefs.length?dataRefs[0][0]:8;
+  var cf=dataRefs.length?[
+    {ref:rng('H'),rules:[['IN OPERATIONS','00FA00'],['UNSERVICEABLE','FF2600'],['MAINTENANCE','FFFC00'],['PARTIAL OVERHAUL','FF9300'],['REFURBISHMENT','AF5D3B']].map(function(p){return {f:'H'+f0+'="'+p[0]+'"',fill:p[1]}})},
+    {ref:rng('I'),rules:[{f:'I'+f0+'="OVERDUE"',fill:'FF2600'},{f:'I'+f0+'="PLAN FOR PE"',fill:'FF9300'},{f:'I'+f0+'="OKAY"',fill:'00FA00'},{f:'I'+f0+'="-"',fill:'AF5D3B'}]},
+    {ref:rng('J'),rules:[{f:'J'+f0+'="-"',fill:'AF5D3B'},{f:'AND(ISNUMBER(J'+f0+'),J'+f0+'<=0)',fill:'FF2600'},{f:'AND(ISNUMBER(J'+f0+'),J'+f0+'<=13)',fill:'FF9300'},{f:'AND(ISNUMBER(J'+f0+'),J'+f0+'<=20)',fill:'FFFC00'},{f:'ISNUMBER(J'+f0+')',fill:'00FA00'}]}]:[];
+  return {name:String(D.year).match(/\d{4}/)?String(D.year).match(/\d{4}/)[0]:'PE',cells:c,merges:M,cols:{A:3,B:3,C:6,D:16,E:13,F:15,G:13,H:19,I:14,J:11,K:16,L:17,M:42},rows:{2:44},cf:cf,land:1};
+}
+/* one week in the "COACH PE WEEKLY PLANNING" layout */
+function weekSheet(sun){
+  var items=(W().weeks[sun]||{items:[]}).items,c={},M=['C2:J2','C3:J3','D4:I4'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
+  c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM COACH)',s:{b:1,sz:14,wrap:1}};
+  c.C3={v:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.D4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
+  ['NO.','COACHES NO.','PE LEVEL','LAST PE DATE','PE PLANNING DATE','CURRENT\nLOCATION','STATUS','ESTIMATE DUE\nDAYS','REMARKS'].forEach(function(t,j){c[colL(2+j)+'6']={v:t,s:Y}});
+  var n=Math.max(20,items.length);
+  for(var i=0;i<n;i++){var r=7+i,x=items[i],f=x&&findRow(x.id),row=f&&f.r,k=row&&calc(row),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,row):'',la=x?wLast(x,row):'',st=x?wSt(x,row):'';if(lv==='-')lv='';
+    c['B'+r]={v:i+1,s:T};c['C'+r]={v:x?x.id:'',s:T};c['D'+r]={v:lv,s:lv?{b:1,bd:1,sz:10,fill:lv==='PE 60'?'96F28E':'3F8EFC'}:T};
+    var ls=la&&serial(la);c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
+    var ps=x&&serial(x.plan);c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
+    c['G'+r]={v:x?x.loc:'',s:T};c['H'+r]={v:st,s:T};
+    c['I'+r]={v:x&&x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):'',s:over?{b:1,bd:1,sz:10,col:'FF0000'}:T};
+    c['J'+r]={v:x?((over?'OVERDUE':'')+(over&&x.rem?' · ':'')+(x.rem||'')):'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
+  var r0=7+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
+  WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
+  var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
+  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);return items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id})});
+    var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));M.push('B'+rr+':B'+(rr+rows-1));
+    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9}}});}
+    rr+=rows;});
+  rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(W().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
+  var rh={2:44};rh[rr]=48;
+  return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:14,D:12,E:13,F:15,G:15,H:19,I:13,J:24},rows:rh,land:0};
+}
+/* ---------- weekly Excel import (sheets "WEEK n") ---------- */
+function serialIso(x){if(x instanceof Date)return isoOf(new Date(x.getTime()+12*36e5));if(typeof x==='number'&&x>20000){var d=XLSX.SSF.parse_date_code(x);return d.y+'-'+p2(d.m)+'-'+p2(d.d)}
+  var m=String(x||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[0]:''}
+/* Sunday of Excel week n (WEEKNUM, weeks start on Sunday, week 1 holds 1 January) */
+function sunOfWeek(y,n){var j=new Date(y,0,1);j.setDate(j.getDate()-j.getDay()+(n-1)*7);return isoOf(j)}
+function parseWeeks(wb){var out={},prep='';
+  wb.SheetNames.filter(function(n){return /^WEEK\s*\d+/i.test(n)}).forEach(function(n){var ws=wb.Sheets[n];if(!ws||!ws['!ref'])return;
+    var ref=XLSX.utils.decode_range(ws['!ref']);ref.s.c=0;ref.s.r=0;var R=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:ref});
+    var s=function(v){return v==null?'':String(v).trim()},hdr=-1,loc=-1,col={};
+    R.forEach(function(row,i){if(hdr<0&&row.some(function(v){return /^NO\.?$/i.test(s(v))})&&row.some(function(v){return /COACH/i.test(s(v))}))hdr=i;
+      if(loc<0&&row.some(function(v){return /^LOCATION$/i.test(s(v))}))loc=i;
+      row.forEach(function(v){var m=s(v).match(/^PREPARED BY\s*:?\s*([\s\S]*)$/i);if(m&&m[1].trim())prep=m[1].replace(/\r/g,'').trim()})});
+    if(hdr<0)return;
+    /* columns by their titles — older sheets have no LAST PE DATE column */
+    R[hdr].forEach(function(v,j){var t=s(v).toUpperCase();if(/COACH/.test(t))col.id=j;else if(/PLANNING/.test(t))col.plan=j;else if(/LOCATION/.test(t))col.loc=j;else if(/REMARK/.test(t))col.rem=j;else if(/ESTIMATE|DUE/.test(t))col.est=j;else if(/LAST/.test(t))col.last=j;else if(/STATUS/.test(t))col.st=j;else if(/LEVEL/.test(t))col.lvl=j;});
+    if(col.id==null||col.plan==null)return;var items=[];
+    for(var i=hdr+1;i<R.length&&(loc<0||i<loc);i++){var row=R[i]||[],id=s(row[col.id]);if(!id)continue;var pl=serialIso(row[col.plan]);if(!pl)continue;
+      items.push({id:id,plan:pl,loc:col.loc!=null?s(row[col.loc]).toUpperCase():'',rem:col.rem!=null?s(row[col.rem]).replace(/^OVERDUE\s*[·-]?\s*/i,'').toUpperCase():'',est:col.est!=null&&isFinite(parseFloat(row[col.est]))?Math.abs(parseFloat(row[col.est])):null,last:col.last!=null?serialIso(row[col.last]):'',st:col.st!=null?s(row[col.st]).toUpperCase():'',lvl:col.lvl!=null?s(row[col.lvl]).toUpperCase():''});}
+    if(!items.length)return;
+    var wn=+n.match(/\d+/)[0],yr=+items.map(function(x){return x.plan}).sort()[0].slice(0,4),sun=sunOfWeek(yr,wn);
+    if(Math.abs((parseIso(items[0].plan)-parseIso(sun))/864e5)>40)sun=sunOf(parseIso(items.map(function(x){return x.plan}).sort()[0]));   /* name does not fit the dates */
+    out[sun]={items:items};});
+  return {weeks:out,prep:prep};}
+
 function render(){
   var el=document.getElementById('peArea');if(!el)return;var D=data();if(!D){el.innerHTML='';return;}
   var c=counts(),total=c.all;
   var k=function(cls,key,v,l){return '<div class="fb-k '+cls+(PS===key&&key?' on':'')+'" onclick="PE.ps(\''+key+'\')"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'};
   var h='<div class="fb-top"><div><h2>🛠️ Coaches PE Schedule — PE 60 &amp; PE 90</h2><small>'+esc(D.sub)+' · Year '+esc(D.year)+' · days due count from today</small></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="fb-btn" onclick="window.print()" title="Print or save as PDF (A4 landscape)">🖨 Print / PDF</button>'
+    +'<button class="fb-btn" onclick="PE.xlsS()" title="PE schedule in the COACHES SCHEDULE PE 60 &amp; PE 90 layout">⬇ Download Excel</button>'
     +'<button class="fb-btn" onclick="PE.add()">＋ Add coach</button>'
     +'<button class="fb-btn p" onclick="document.getElementById(\'peFile\').click()">⬆ Import Excel</button>'
     +'<input type="file" id="peFile" accept=".xlsx,.xls" style="display:none" onchange="PE.imp(this)"></div></div>';
@@ -7359,7 +7568,8 @@ function render(){
     +sts.filter(function(x){return stc[x]}).map(function(x){return '<span class="t'+(STF===x?' on':'')+'" style="background:'+(STC[x]||'#a3a8c3')+';color:#111" onclick="PE.st(\''+esc(x)+'\')">'+esc(x)+' · '+stc[x]+'</span>'}).join('')
     +'<select onchange="PE.fn(this.value)" title="Where the coach is today on the Fleet Deployment board"><option value="">🚆 Fleet now: all</option>'
     +Object.keys(FNL).filter(function(x){return fnc[x]}).map(function(x){return '<option value="'+x+'"'+(FN===x?' selected':'')+'>🚆 '+FNL[x]+' · '+fnc[x]+'</option>'}).join('')+'</select></div>';
-  if(total)h+=weekHtml()+planHtml();
+  if(total)h+=forecastHtml()+planHtml();
+  h+='<div id="peWkPrint"></div>';
   h+='<div class="fb-sec pe-sheet"><h3>📋 PE 60 &amp; PE 90 Schedule <span class="ct">'+(PS||TY||Q||STF||FN?'filtered · ':'')+'click a coach to edit</span></h3>'
     +'<div class="pe-print-h">'+esc(D.title)+'<br>'+esc(D.sub)+'<br>YEAR : '+esc(D.year)+'</div>'
     +'<div class="pe-tw"><table class="pe"><thead><tr><th>No.</th><th>Coach number</th><th>Last PE date</th><th>PE location</th><th>Next PE date</th><th>Status</th><th>PE status</th><th>Days due</th>'
@@ -7447,6 +7657,20 @@ window.PE={
   ty:function(x){TY=x;render();},
   sort:function(x){SORT=x;render();},
   wk:function(n){WK=n===0?0:WK+n;render();},
+  wadd:function(id){var f=findRow(id);if(!f)return;var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]};w.items.push(wkItem(f.r,sun));changed();},
+  wauto:function(){var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]},n=0;wkCands(sun).forEach(function(c){if(c.must){w.items.push(wkItem(c.r,sun));n++}});
+    changed();toast(n+' coach'+(n===1?'':'es')+' added to week '+weekNo(sun)+' — adjust the dates / locations, then 💾 Save',5000);},
+  wset:function(i,k,v){var w=W().weeks[curSun()];if(!w||!w.items[i])return;w.items[i][k]=k==='rem'?String(v).toUpperCase():v;
+    if(k==='plan')w.items.sort(function(a,b){return a.plan<b.plan?-1:a.plan>b.plan?1:0});changed();},
+  wdel:function(i){var sun=curSun(),w=W().weeks[sun];if(!w)return;w.items.splice(i,1);if(!w.items.length)delete W().weeks[sun];changed();},
+  wprep:function(v){W().prep=String(v).toUpperCase();changed();},
+  wprint:function(){var sun=curSun();if(!(W().weeks[sun]||{items:[]}).items.length){toast('No coaches planned for this week');return;}
+    var el=document.getElementById('peWkPrint');el.innerHTML=forecastDoc(sun);document.body.classList.add('pe-pw');
+    var done=function(){document.body.classList.remove('pe-pw');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);window.print();setTimeout(done,60000);},
+  xlsW:function(){var ks=Object.keys(W().weeks).filter(function(k){return W().weeks[k].items.length}).sort();if(!ks.length){toast('No weekly plans yet');return;}
+    buildXlsx(ks.map(weekSheet)).then(function(b){saveBlob(b,'COACH PE WEEKLY PLANNING '+ks[ks.length-1].slice(0,4)+'.xlsx');toast('⬇ Weekly planning downloaded ('+ks.length+' week'+(ks.length===1?'':'s')+')',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
+  xlsS:function(){if(!data().groups.some(function(g){return g.rows.length})){toast('No PE schedule yet');return;}
+    var y=(String(data().year).match(/\d{4}/)||[RS_YEAR])[0];buildXlsx([scheduleSheet()]).then(function(b){saveBlob(b,'COACHES SCHEDULE PE 60 & PE 90 '+y+'.xlsx');toast('⬇ PE schedule downloaded',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
   st:function(x){STF=STF===x?'':x;render();},
   fn:function(x){FN=x;render();},
   plan:function(){PLAN=!PLAN;try{localStorage.setItem('rsd_pe_plan_v1',PLAN?'1':'0')}catch(x){}render();},
@@ -7471,6 +7695,10 @@ window.PE={
     rd.readAsArrayBuffer(f);},
   /* returns true if the workbook is a PE 60 & PE 90 schedule (then it is loaded) */
   fromWb:function(wb,name){
+    if(wb.SheetNames.some(function(n){return /^WEEK\s*\d+/i.test(n)})){var pw=parseWeeks(wb),ks=Object.keys(pw.weeks).sort();if(!ks.length)return false;
+      if(!confirm('Load '+ks.length+' weekly PE plan'+(ks.length===1?'':'s')+' (week '+weekNo(ks[0])+' – '+weekNo(ks[ks.length-1])+') from '+name+'?\nWeeks already in the dashboard with the same dates are replaced.'))return true;
+      ks.forEach(function(k){W().weeks[k]=pw.weeks[k]});if(pw.prep&&!W().prep)W().prep=pw.prep.replace(/\r/g,'').toUpperCase();
+      if(typeof touched==='function')touched();PE.open();toast('✔ Loaded '+ks.length+' weekly plans — click 💾 Save to keep them',6000);return true;}
     var nd=null;for(var k=0;k<wb.SheetNames.length&&!nd;k++){var t=parse(wb.Sheets[wb.SheetNames[k]]);if(t.groups.some(function(g){return g.rows.length}))nd=t;}
     if(!nd)return false;var n=nd.groups.reduce(function(a,g){return a+g.rows.length},0);
     var fileHl=nd.groups.some(function(g){return g.rows.some(function(r){return r.hl})});
