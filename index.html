@@ -7155,54 +7155,60 @@ window.AVX={
 <!-- ================= END SYSTEM AVAILABILITY (DAILY) MODULE ================= -->
 
 <style id="peCss">
-#pPE .pe-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
-#pPE .pe-bar input,#pPE .pe-bar select{background:#191c24;color:#fff;border:1px solid #2c2e33;border-radius:8px;padding:7px 10px;font-size:.85rem}
-#pPE .pe-bar input[type=search]{min-width:200px}
-#pPE .pe-btn{background:#191c24;color:#fff;border:1px solid #2c2e33;border-radius:8px;padding:7px 12px;font-weight:600;cursor:pointer;font-size:.85rem}
-#pPE .pe-btn:hover{border-color:#0090e7}
-#pPE .pe-chip{padding:5px 11px;border-radius:14px;font-weight:700;font-size:.8rem;cursor:pointer;border:2px solid transparent;color:#111}
-#pPE .pe-chip.on{border-color:#fff}
-#pPE .pe-sheetwrap{background:#fff;color:#000;border-radius:10px;padding:14px;overflow-x:auto}
-#pPE .pe-title{text-align:center;font-weight:700;font-family:'Times New Roman',serif;font-size:.95rem;line-height:1.35}
-#pPE .pe-year{text-align:center;font-weight:700;font-family:'Times New Roman',serif;font-size:.85rem;margin:6px 0 12px}
-#pPE table.pe{border-collapse:collapse;width:100%;min-width:1150px;font-family:'Times New Roman',serif;font-size:.74rem;font-weight:700;color:#000}
-#pPE table.pe th,#pPE table.pe td{border:1px solid #000;padding:5px 6px;text-align:center;vertical-align:middle}
-#pPE table.pe th{background:#6fc5e6;font-size:.66rem}
-#pPE table.pe tr.grp td{background:#ff2f92;text-align:left;font-size:.95rem;text-decoration:underline;padding:4px 8px}
+#pPE .pe-kpis .fb-k{cursor:pointer;border-width:2px;transition:border-color .15s}
+#pPE .pe-kpis .fb-k:hover{border-color:#3b4050}
+#pPE .pe-kpis .fb-k.on{border-color:#AF1763;box-shadow:0 0 14px rgba(175,23,99,.25)}
+#pPE .pe-kpis .r .v{color:#ff5b62}#pPE .pe-kpis .o .v{color:#ffa63d}#pPE .pe-kpis .g .v{color:#3ddc84}#pPE .pe-kpis .y .v{color:#ffd60a}#pPE .pe-kpis .m .v{color:#a3a8c3}
+#pPE .pe-filt{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+#pPE .pe-filt .t{font-size:.72rem;font-weight:800;padding:5px 12px;border-radius:99px;cursor:pointer;border:2px solid transparent;opacity:.55}
+#pPE .pe-filt .t.on{opacity:1;border-color:#fff}
+#pPE .pe-filt .t.all{background:#22252e;color:#e4e6ef}
+#pPE .pe-filt select{margin-left:auto;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#22252e;color:#e4e6ef;font-weight:700;font-size:.78rem}
+#pPE .pe-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;max-height:360px;overflow-y:auto;padding-right:4px}
+#pPE .pe-card{background:#1d2029;border:2px solid #3b4050;border-radius:11px;cursor:pointer;display:flex;flex-direction:column;overflow:hidden}
+#pPE .pe-card:hover{border-color:#AF1763}
+#pPE .pe-card .h{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #2c2e33}
+#pPE .pe-card .h .fb-chip{flex:0 0 auto;padding:3px 9px}
+#pPE .pe-card .h .dd{margin-left:auto}
+#pPE .pe-card .b{padding:7px 10px;font-size:.72rem;color:#a3a8c3;font-weight:600;line-height:1.55;flex:1}
+#pPE .pe-card .b b{color:#fff}
+#pPE .pe-card .b .now{color:#5ad1f0;font-weight:700}
+#pPE .pe-card .f{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid #2c2e33}
+#pPE .pe-card .f button{background:#198754;color:#fff;border:0;border-radius:7px;padding:4px 10px;font-weight:800;cursor:pointer;font-size:.7rem}
+#pPE .pill{display:inline-block;font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;color:#111}
+#pPE .dd{display:inline-block;min-width:38px;text-align:center;font-weight:800;font-size:.76rem;padding:3px 8px;border-radius:7px;color:#111}
+#pPE .pe-tw{overflow:auto;max-height:76vh;border-radius:10px;border:1px solid #2c2e33}
+#pPE table.pe{width:100%;min-width:1100px;border-collapse:separate;border-spacing:0;font-size:.78rem}
+#pPE table.pe th{position:sticky;top:0;z-index:2;background:#22252e;color:#a3a8c3;font-size:.64rem;letter-spacing:.6px;text-transform:uppercase;font-weight:800;padding:9px 8px;text-align:center;border-bottom:2px solid #AF1763;white-space:nowrap}
+#pPE table.pe td{padding:7px 8px;text-align:center;border-bottom:1px solid #2c2e33;color:#e4e6ef;font-weight:600;background:#191c24}
 #pPE table.pe tr.row{cursor:pointer}
-#pPE table.pe tr.row:hover td{outline:2px solid #0090e7;outline-offset:-2px}
-html body #pPE table.pe tr.row td{background-color:#fff;color:#000}
-html body #pPE table.pe tr.row td.hl{background-color:#ffff00}
-#pPE table.pe td.rem{min-width:220px}
-#pPE .pe-note{font-size:.75rem;color:var(--mut,#8f95a8);margin-top:8px}
-#pPE .pe-sheetwrap{max-height:78vh;overflow:auto}
-#pPE table.pe thead th{position:sticky;z-index:2}
-#pPE table.pe thead tr:first-child th{top:-14px}
-#pPE table.pe thead tr:nth-child(2) th{top:21px}
-#pPE .pe-plan{background:#191c24;border:1px solid #2c2e33;border-radius:10px;padding:12px 14px;margin-bottom:12px}
-#pPE .pe-plan h4{margin:0;font-size:.9rem;cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-#pPE .pe-plan h4 small{font-weight:500;color:var(--mut,#8f95a8)}
-#pPE .pe-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:10px;max-height:330px;overflow-y:auto;padding-right:4px}
-#pPE .pe-card{background:#0f1015;border:1px solid #2c2e33;border-left:6px solid #999;border-radius:8px;padding:8px 10px;font-size:.78rem;cursor:pointer;line-height:1.5}
-#pPE .pe-card:hover{border-color:#0090e7}
-#pPE .pe-card b.id{font-size:.9rem}
-#pPE .pe-card .dd{float:right;font-weight:800;padding:0 7px;border-radius:9px;color:#111}
-#pPE .pe-card .now{color:#5ad1f0}
-#pPE .pe-card button{margin-top:4px;background:#198754;color:#fff;border:0;border-radius:6px;padding:3px 9px;font-weight:700;cursor:pointer;font-size:.72rem}
-@media print{
-  body *{visibility:hidden!important}
-  #pPE .pe-sheetwrap,#pPE .pe-sheetwrap *{visibility:visible!important}
-  #pPE .pe-sheetwrap{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;padding:0}
-  #pPE table.pe{min-width:0;font-size:7pt}
-  #pPE table.pe thead th{position:static}
-  #pPE table.pe td,#pPE table.pe th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  @page{size:A4 landscape;margin:8mm}
-}
+#pPE table.pe tr.row:hover td{background:#232734}
+#pPE table.pe tr.grp td{background:#2a1b26;color:#f06aa8;text-align:left;font-weight:800;letter-spacing:.7px;font-size:.74rem;border-top:2px solid #AF1763;padding:8px 12px}
+#pPE table.pe tr.grp td span{color:#a3a8c3;font-weight:700;letter-spacing:0;margin-left:8px}
+#pPE table.pe td.n{color:#6c7293;width:34px}
+#pPE table.pe td.id .fb-chip{display:inline-block;min-width:92px;padding:3px 8px}
+#pPE table.pe td.id .hl{box-shadow:0 0 0 2px #ffff00}
+#pPE table.pe td.rem{text-align:left;color:#a3a8c3;font-size:.72rem;max-width:260px}
+#pPE .pe-print-h{display:none}
 #ovPE .pe-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #ovPE .pe-form label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;opacity:.8}
 #ovPE .pe-form input,#ovPE .pe-form select{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--line,#2c2e33)}
 #ovPE .pe-form .full{grid-column:1/-1}
 @media(max-width:600px){#ovPE .pe-form{grid-template-columns:1fr}}
+@media print{
+  body *{visibility:hidden!important}
+  #pPE .pe-sheet,#pPE .pe-sheet *{visibility:visible!important}
+  #pPE .pe-sheet{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;background:#fff;padding:0;margin:0}
+  #pPE .pe-sheet>h3{display:none}
+  #pPE .pe-print-h{display:block;text-align:center;font:700 10pt 'Times New Roman',serif;color:#000;margin-bottom:6px}
+  #pPE .pe-tw{max-height:none;overflow:visible;border:0}
+  #pPE table.pe{min-width:0;font-size:7pt}
+  #pPE table.pe th{position:static;background:#6fc5e6!important;color:#000!important;border:1px solid #000}
+  #pPE table.pe td{background:#fff!important;color:#000!important;border:1px solid #000}
+  #pPE table.pe tr.grp td{background:#ff2f92!important;color:#000!important}
+  #pPE *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:A4 landscape;margin:8mm}
+}
 </style>
 <div class="overlay" id="ovPE"><div class="modal" style="max-width:620px">
   <div class="mhead"><h3 id="peEdT">Edit coach</h3><button class="iconb" onclick="PE.close()">✕</button></div>
@@ -7220,8 +7226,9 @@ html body #pPE table.pe tr.row td.hl{background-color:#ffff00}
 'use strict';
 var SEED={"title":"COACHES PERIODICAL EXAMINATION (PE 60 & PE 90)","sub":"ROLLING STOCK AND ENGINEERING (RSM COACH)","year":"JAN - DEC 2026","groups":[{"name":"ABC COACHES","rows":[]},{"name":"ADNS COACHES","rows":[]},{"name":"ASC COACHES","rows":[]},{"name":"AFC COACHES","rows":[]},{"name":"SPECIAL COACHES","rows":[]}]}; /* empty — the schedule is imported from Excel and kept in the cloud only */
 var STS=['IN OPERATIONS','PARTIAL OVERHAUL','MAINTENANCE','REFURBISHMENT','UNSERVICEABLE'];
-var STC={'IN OPERATIONS':'#00FA00','UNSERVICEABLE':'#FF2600','MAINTENANCE':'#FFFC00','PARTIAL OVERHAUL':'#FF9300','REFURBISHMENT':'#AF5D3B'};
-var PSC={'OVERDUE':'#FF2600','PLAN FOR PE':'#FF9300','OKAY':'#00FA00','-':'#AF5D3B'};
+/* same meaning as the Excel colours, toned for the dark dashboard */
+var STC={'IN OPERATIONS':'#3ddc84','UNSERVICEABLE':'#ff5b62','MAINTENANCE':'#ffd60a','PARTIAL OVERHAUL':'#ffa63d','REFURBISHMENT':'#c08a6a'};
+var PSC={'OVERDUE':'#ff5b62','PLAN FOR PE':'#ffa63d','OKAY':'#3ddc84','-':'#c08a6a'};
 var LOCS=['KL SENTRAL','TUMPAT','KEMPAS BARU','PADU SEDIA'];
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var Q='',TY='',PS='',ED=null,SORT='',PLAN=true;
@@ -7236,7 +7243,7 @@ function today(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d
 function defIv(id){return /^(ADN|AFC)/i.test(String(id).trim())?60:90}
 function calc(r){var nx=addDays(r.last,r.iv||defIv(r.id));if(nx==='-')return {next:'-',days:'-',ps:'-'};
   var dd=Math.round((parseIso(nx)-today())/864e5);return {next:nx,days:dd,ps:dd<=0?'OVERDUE':dd<=15?'PLAN FOR PE':'OKAY'}}
-function dayColor(d){return d==='-'?'#AF5D3B':d<=0?'#FF2600':d<=13?'#FF9300':d<=20?'#FFFC00':'#00FA00'}
+function dayColor(d){return d==='-'?'#c08a6a':d<=0?'#ff5b62':d<=13?'#ffa63d':d<=20?'#ffd60a':'#3ddc84'}
 function data(){
   if(typeof S==='undefined'||!S)return null;
   if(!S.peSchedule){
@@ -7246,64 +7253,74 @@ function data(){
 function changed(){if(typeof touched==='function')touched();render();}
 /* coach id on the Fleet board: 'ASC 2148' → '2148', 'AKC2' → 'AKC2' */
 function fleetKey(id){var t=String(id).toUpperCase().replace(/\s+/g,''),m=t.match(/^[A-Z]+(\d{4})$/);return m?m[1]:t}
+/* coach type colours — same as Fleet Deployment */
+var TYC={ABC:['#ffd60a','#1a1a1a'],ADNF:['#9437ff','#fff'],ADNS:['#2f7fe0','#fff'],AFC:['#2ecc40','#0b1a0d'],ASC:['#e5383b','#fff'],SPECIAL:['#ff9300','#1a1a1a']};
+function typeOf(id){var t=String(id).toUpperCase().replace(/\s+/g,'').match(/^[A-Z]+/);t=t?t[0]:'';return TYC[t]?t:'SPECIAL'}
+function chipOf(r){var c=TYC[typeOf(r.id)];return '<span class="fb-chip'+(r.hl?' hl':'')+'" style="background:'+c[0]+';color:'+c[1]+'"'+(r.hl?' title="Highlighted"':'')+'>'+esc(r.id)+'</span>'}
+function pill(t,bg){return '<span class="pill" style="background:'+bg+'">'+esc(t)+'</span>'}
+function ddHtml(d){return '<span class="dd" style="background:'+dayColor(d)+'">'+(d==='-'?'–':d<0?'('+(-d)+')':d)+'</span>'}
+function grpType(g){return typeOf(String(g.name).split(/\s+/)[0]+'0')}
+function counts(){var c={'OVERDUE':0,'PLAN FOR PE':0,'OKAY':0,'-':0,all:0,week:0};
+  data().groups.forEach(function(g){g.rows.forEach(function(r){var k=calc(r);c[k.ps]++;c.all++;if(k.days!=='-'&&k.days>=0&&k.days<=7&&!/REFURB|UNSERVICE/.test(r.st))c.week++;})});return c}
+function match(r,g){var k=calc(r);
+  if(TY&&g.name!==TY)return false;
+  if(PS==='WEEK'){if(k.days==='-'||k.days<0||k.days>7||/REFURB|UNSERVICE/.test(r.st))return false;}
+  else if(PS&&k.ps!==PS)return false;
+  if(Q){var t=(r.id+' '+r.loc+' '+r.st+' '+r.rem+' '+r.by+' '+k.ps).toUpperCase();if(t.indexOf(Q.toUpperCase())<0)return false;}
+  return true}
 /* PE planning: overdue + due within 15 days, coaches that can run (not refurbishment / unserviceable) */
 function planHtml(){
   var D=data(),items=[],skip=0;
   D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){var k=calc(r);if(k.ps!=='OVERDUE'&&k.ps!=='PLAN FOR PE')return;
-    if(/REFURB|UNSERVICE/.test(r.st)){skip++;return;}items.push({r:r,k:k,gi:gi,i:i});})});
-  if(!items.length&&!skip&&!D.groups.some(function(g){return g.rows.length}))return '';
+    if(/REFURB|UNSERVICE/.test(r.st)){skip++;return;}if(TY&&g.name!==TY)return;items.push({r:r,k:k,gi:gi,i:i});})});
   items.sort(function(a,b){return a.k.days-b.k.days});
-  var h='<div class="pe-plan"><h4 onclick="PE.plan()">'+(PLAN?'▼':'▶')+' 📅 PE planning — '+items.length+' coach'+(items.length===1?'':'es')+' overdue or due within 15 days'
-    +' <small>(soonest first'+(skip?' · '+skip+' under refurbishment / unserviceable not listed':'')+')</small></h4>';
+  var h='<div class="fb-sec"><h3 style="cursor:pointer" onclick="PE.plan()">'+(PLAN?'▾':'▸')+' 📅 PE Planning — due within 15 days <span class="ct">'+items.length+' coach'+(items.length===1?'':'es')
+    +' · soonest first'+(skip?' · '+skip+' under refurbishment / unserviceable not listed':'')+'</span></h3>';
   if(PLAN){
-    if(!items.length)h+='<div class="pe-note">✔ Nothing due in the next 15 days.</div>';
+    if(!items.length)h+='<div style="color:#3ddc84;font-weight:700;font-size:.82rem">✔ Nothing due in the next 15 days.</div>';
     else h+='<div class="pe-cards">'+items.map(function(x){var r=x.r,k=x.k,w=window.FLEET&&FLEET.whereIs?FLEET.whereIs(fleetKey(r.id)):null;
-      return '<div class="pe-card" style="border-left-color:'+PSC[k.ps]+'" onclick="PE.edit('+x.gi+','+x.i+')">'
-        +'<span class="dd" style="background:'+dayColor(k.days)+'">'+(k.days<0?'('+(-k.days)+')':k.days)+' d</span>'
-        +'<b class="id">'+esc(r.id)+'</b> · '+k.ps+'<br>Next PE <b>'+fmt(k.next)+'</b> · PE '+(r.iv||defIv(r.id))+' · '+esc(r.loc||'—')+'<br>'
-        +'<span>'+esc(r.st)+'</span>'+(w&&w.where?'<br><span class="now">🚆 Now: '+esc(w.where)+'</span>':'')
-        +'<br><button onclick="event.stopPropagation();PE.done('+x.gi+','+x.i+')">✔ PE done today</button></div>'}).join('')+'</div>';
+      return '<div class="pe-card" onclick="PE.edit('+x.gi+','+x.i+')"><div class="h">'+chipOf(r)+pill(k.ps,PSC[k.ps])+'<span class="dd" style="background:'+dayColor(k.days)+'">'+(k.days<0?'('+(-k.days)+')':k.days)+' d</span></div>'
+        +'<div class="b">Next PE <b>'+fmt(k.next)+'</b> · PE '+(r.iv||defIv(r.id))+'<br>📍 '+esc(r.loc||'—')+' · '+esc(r.st)
+        +(w&&w.where?'<br><span class="now">🚆 Now: '+esc(w.where)+'</span>':'')+'</div>'
+        +'<div class="f"><span style="font-size:.66rem;color:#6c7293;font-weight:700">Last PE '+fmt(r.last)+'</span><button onclick="event.stopPropagation();PE.done('+x.gi+','+x.i+')">✔ PE done today</button></div></div>'}).join('')+'</div>';
   }
   return h+'</div>';
 }
-function counts(){var c={'OVERDUE':0,'PLAN FOR PE':0,'OKAY':0,'-':0};data().groups.forEach(function(g){g.rows.forEach(function(r){c[calc(r).ps]++})});return c}
-function match(r,g){var k=calc(r);
-  if(TY&&g.name!==TY)return false;if(PS&&k.ps!==PS)return false;
-  if(Q){var t=(r.id+' '+r.loc+' '+r.st+' '+r.rem+' '+r.by).toUpperCase();if(t.indexOf(Q.toUpperCase())<0)return false;}
-  return true}
 function render(){
   var el=document.getElementById('peArea');if(!el)return;var D=data();if(!D){el.innerHTML='';return;}
-  var c=counts(),chip=function(k,l){return '<span class="pe-chip'+(PS===k?' on':'')+'" style="background:'+PSC[k]+'" onclick="PE.ps(\''+k+'\')">'+l+' '+c[k]+'</span>'};
-  var h='<div class="pe-bar"><input type="search" placeholder="🔍 Search coach / location / remarks" value="'+esc(Q)+'" oninput="PE.q(this.value)">'
-    +'<select onchange="PE.ty(this.value)"><option value="">All coaches</option>'+D.groups.map(function(g){return '<option'+(TY===g.name?' selected':'')+'>'+esc(g.name)+'</option>'}).join('')+'</select>'
-    +chip('OVERDUE','Overdue')+chip('PLAN FOR PE','Plan for PE')+chip('OKAY','Okay')
-    +'<select onchange="PE.sort(this.value)"><option value="">Order as in file</option><option value="due"'+(SORT==='due'?' selected':'')+'>Days due (soonest first)</option></select>'
-    +'<span style="flex:1"></span><button class="pe-btn" onclick="window.print()" title="Print or save as PDF (A4 landscape)">🖨 Print / PDF</button><button class="pe-btn" onclick="PE.add()">＋ Add coach</button>'
-    +'<button class="pe-btn" onclick="document.getElementById(\'peFile\').click()">⬆ Import Excel</button>'
-    +'<input type="file" id="peFile" accept=".xlsx,.xls" style="display:none" onchange="PE.imp(this)"></div>';
-  h+=planHtml();
-  h+='<div class="pe-sheetwrap"><div class="pe-title">'+esc(D.title)+'<br>'+esc(D.sub)+'</div><div class="pe-year">YEAR : '+esc(D.year)+'</div>'
-    +'<table class="pe"><thead><tr><th rowspan="2">NO.</th><th>COACHES NUMBER</th><th colspan="6">SCHEDULE FOR PE 60 &amp; PE 90 MAINTENANCE</th>'
-    +'<th rowspan="2">YEAR OF REFURBISHMENT</th><th rowspan="2">REFURBISHMENT BY</th><th rowspan="2">REMARKS</th></tr>'
-    +'<tr><th>NEW NUMBER</th><th>LAST PE DATE</th><th>PE LOCATION</th><th>NEXT PE DATE</th><th>STATUS</th><th>PE STATUS</th><th>DAYS DUE</th></tr></thead>';
+  var c=counts(),total=c.all;
+  var k=function(cls,key,v,l){return '<div class="fb-k '+cls+(PS===key&&key?' on':'')+'" onclick="PE.ps(\''+key+'\')"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'};
+  var h='<div class="fb-top"><div><h2>🛠️ Coaches PE Schedule — PE 60 &amp; PE 90</h2><small>'+esc(D.sub)+' · Year '+esc(D.year)+' · days due count from today</small></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="fb-btn" onclick="window.print()" title="Print or save as PDF (A4 landscape)">🖨 Print / PDF</button>'
+    +'<button class="fb-btn" onclick="PE.add()">＋ Add coach</button>'
+    +'<button class="fb-btn p" onclick="document.getElementById(\'peFile\').click()">⬆ Import Excel</button>'
+    +'<input type="file" id="peFile" accept=".xlsx,.xls" style="display:none" onchange="PE.imp(this)"></div></div>';
+  h+='<div class="fb-kpis pe-kpis">'+k('','',total,'Coaches in schedule')+k('r','OVERDUE',c['OVERDUE'],'Overdue')+k('o','PLAN FOR PE',c['PLAN FOR PE'],'Plan for PE (≤15 days)')
+    +k('y','WEEK',c.week,'Due within 7 days')+k('g','OKAY',c['OKAY'],'Okay')+k('m','-',c['-'],'No PE date')+'</div>';
+  h+='<div class="fb-search"><span class="ic">🔍</span><input type="search" placeholder="Find a coach, location, status or remark… e.g. 2148, TUMPAT, OVERDUE" value="'+esc(Q)+'" oninput="PE.q(this.value)"></div>';
+  h+='<div class="pe-filt"><span class="t all'+(TY?'':' on')+'" onclick="PE.ty(\'\')">All coaches</span>'
+    +D.groups.map(function(g){var col=TYC[grpType(g)];return '<span class="t'+(TY===g.name?' on':'')+'" style="background:'+col[0]+';color:'+col[1]+'" onclick="PE.ty(\''+esc(g.name)+'\')">'+esc(g.name.replace(/\s*COACHES$/,''))+' · '+g.rows.length+'</span>'}).join('')
+    +'<select onchange="PE.sort(this.value)"><option value="">Order as in file</option><option value="due"'+(SORT==='due'?' selected':'')+'>Days due — soonest first</option></select></div>';
+  if(total)h+=planHtml();
+  h+='<div class="fb-sec pe-sheet"><h3>📋 PE 60 &amp; PE 90 Schedule <span class="ct">'+(PS||TY||Q?'filtered · ':'')+'click a coach to edit</span></h3>'
+    +'<div class="pe-print-h">'+esc(D.title)+'<br>'+esc(D.sub)+'<br>YEAR : '+esc(D.year)+'</div>'
+    +'<div class="pe-tw"><table class="pe"><thead><tr><th>No.</th><th>Coach number</th><th>Last PE date</th><th>PE location</th><th>Next PE date</th><th>Status</th><th>PE status</th><th>Days due</th>'
+    +'<th>Year of refurb.</th><th>Refurbishment by</th><th>Remarks</th></tr></thead><tbody>';
   var shown=0;
   D.groups.forEach(function(g,gi){
     var rows=g.rows.map(function(r,i){return [r,i]}).filter(function(x){return match(x[0],g)});
     if(SORT==='due')rows.sort(function(a,b){var x=calc(a[0]).days,y=calc(b[0]).days;x=x==='-'?1e9:x;y=y==='-'?1e9:y;return x-y});
     if(!rows.length&&(TY||PS||Q))return;
-    h+='<tr class="grp"><td colspan="11">'+esc(g.name)+'</td></tr>';
-    rows.forEach(function(x){var r=x[0],k=calc(r);shown++;
-      h+='<tr class="row" onclick="PE.edit('+gi+','+x[1]+')"><td>'+(x[1]+1)+'</td><td'+(r.hl?' class="hl"':'')+'>'+esc(r.id)+'</td>'
-        +'<td>'+fmt(r.last)+'</td><td>'+esc(r.loc)+'</td><td>'+fmt(k.next)+'</td>'
-        +'<td style="background:'+(STC[r.st]||'#fff')+'">'+esc(r.st)+'</td>'
-        +'<td style="background:'+PSC[k.ps]+'">'+k.ps+'</td>'
-        +'<td style="background:'+dayColor(k.days)+'">'+(k.days==='-'?'-':k.days<0?'('+(-k.days)+')':k.days)+'</td>'
+    h+='<tr class="grp"><td colspan="11">'+esc(g.name)+'<span>'+rows.length+(rows.length!==g.rows.length?' of '+g.rows.length:'')+'</span></td></tr>';
+    rows.forEach(function(x){var r=x[0],kk=calc(r);shown++;
+      h+='<tr class="row" onclick="PE.edit('+gi+','+x[1]+')"><td class="n">'+(x[1]+1)+'</td><td class="id">'+chipOf(r)+'</td>'
+        +'<td>'+fmt(r.last)+'</td><td>'+esc(r.loc||'—')+'</td><td><b>'+fmt(kk.next)+'</b></td>'
+        +'<td>'+(r.st?pill(r.st,STC[r.st]||'#a3a8c3'):'')+'</td><td>'+pill(kk.ps==='-'?'–':kk.ps,PSC[kk.ps])+'</td><td>'+ddHtml(kk.days)+'</td>'
         +'<td>'+esc(r.ry)+'</td><td>'+esc(r.by)+'</td><td class="rem">'+esc(r.rem)+'</td></tr>';});
   });
-  var total=D.groups.reduce(function(a,g){return a+g.rows.length},0);
-  h+='</table>'+(shown?'':total?'<div style="padding:14px;text-align:center">No coach matches.</div>'
-      :'<div style="padding:18px;text-align:center">No schedule yet — click <b>⬆ Import Excel</b> and choose “COACHES SCHEDULE PE 60 &amp; PE 90 2026.xlsx”, then click <b>💾 Save</b>.</div>')+'</div>'
-    +'<div class="pe-note">Click a coach to edit it. NEXT PE DATE = LAST PE DATE + 60 days (ADNS, AFC) or 90 days (others); DAYS DUE counts from today. Click 💾 Save to keep changes.</div>';
+  h+='</tbody></table>'+(shown?'':total?'<div style="padding:16px;text-align:center;color:#a3a8c3">No coach matches.</div>'
+      :'<div style="padding:18px;text-align:center;color:#a3a8c3">No schedule yet — click <b>⬆ Import Excel</b> and choose “COACHES SCHEDULE PE 60 &amp; PE 90 2026.xlsx”, then click <b>💾 Save</b>.</div>')
+    +'</div></div>';
   el.innerHTML=h;
 }
 /* ---------- edit dialog ---------- */
