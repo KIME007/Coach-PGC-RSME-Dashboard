@@ -1947,7 +1947,7 @@ function importExcel(inp){const f=inp.files[0];if(!f)return;const rd=new FileRea
     const wb=XLSX.read(u8,{type:'array'});
     const sheetBy=p=>{const k=Object.keys(wb.Sheets).find(x=>x.toUpperCase().startsWith(p));return k?wb.Sheets[k]:null;};
     const ws=sheetBy('DASH');
-    if(!ws&&window.PE&&PE.fromWb&&PE.fromWb(XLSX.read(u8,{type:'array'}),f.name)){inp.value='';return;}   /* PE 60 & PE 90 schedule file */
+    if(!ws&&window.PE&&PE.fromWb&&PE.fromWb(XLSX.read(u8,{type:'array',cellStyles:true}),f.name)){inp.value='';return;}   /* PE 60 & PE 90 schedule file */
     if(!ws)throw new Error("No DASHBOARD sheet found");
     const cv=(r,c)=>{const cell=ws[XLSX.utils.encode_cell({r:r-1,c:c-1})];if(!cell)return null;
       const v=cell.v;return typeof v==='number'?v:(v==null||v==='-'||v===''?null:(typeof v==='string'&&isFinite(+v)?+v:null));};
@@ -3624,6 +3624,14 @@ window.FLEET={
   /* where each PGC sits on the board of that date, in the Daily Status wording (TREN 26, SPARE TUMPAT…) */
   pgcOn:function(iso){var b=boards()[iso];return b?pgcMap(b):null},
   pgcSame:pgcSame,
+  /* where a coach sits on the latest board up to today: {date, where} or null. key = '2148' or 'AKE2' */
+  whereIs:function(key){var t=isoOf(new Date()),d=dates().filter(function(x){return x<=t}).pop()||dates().pop();if(!d)return null;
+    var b=boards()[d],k=String(key).toUpperCase().replace(/\s+/g,''),hit=null,
+      has=function(list){return (list||[]).some(function(u){var x=String(u.id).toUpperCase().replace(/\s+/g,'');return x===k})};
+    b.service.forEach(function(c){if(!hit&&(has(c.units)||has(c.pgc)))hit=c.name+(c.note?' ('+c.note+')':'')});
+    b.spare.forEach(function(c){if(!hit&&(has(c.units)||has(c.pgc)))hit='Spare '+depotOf(c.name)});
+    b.detained.forEach(function(g){g.cols.forEach(function(c){if(!hit&&has(c.units))hit=tc(g.name)+' · '+c.name})});
+    return {date:d,where:hit};},
   /* bring Daily Status PGC rows in line with the board — operating + spare only; returns how many rows changed */
   tallyPgc:function(list,iso){var b=boards()[iso];return b?tallyPgc(list,pgcMap(b)):0},
   auto:function(on){try{localStorage.setItem(AUTOK,on?'1':'0')}catch(x){}if(on)syncDaily(curDate());else toast('Auto sync to Daily Status is off');},
@@ -7167,6 +7175,29 @@ html body #pPE table.pe tr.row td{background-color:#fff;color:#000}
 html body #pPE table.pe tr.row td.hl{background-color:#ffff00}
 #pPE table.pe td.rem{min-width:220px}
 #pPE .pe-note{font-size:.75rem;color:var(--mut,#8f95a8);margin-top:8px}
+#pPE .pe-sheetwrap{max-height:78vh;overflow:auto}
+#pPE table.pe thead th{position:sticky;z-index:2}
+#pPE table.pe thead tr:first-child th{top:-14px}
+#pPE table.pe thead tr:nth-child(2) th{top:21px}
+#pPE .pe-plan{background:#191c24;border:1px solid #2c2e33;border-radius:10px;padding:12px 14px;margin-bottom:12px}
+#pPE .pe-plan h4{margin:0;font-size:.9rem;cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#pPE .pe-plan h4 small{font-weight:500;color:var(--mut,#8f95a8)}
+#pPE .pe-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:10px;max-height:330px;overflow-y:auto;padding-right:4px}
+#pPE .pe-card{background:#0f1015;border:1px solid #2c2e33;border-left:6px solid #999;border-radius:8px;padding:8px 10px;font-size:.78rem;cursor:pointer;line-height:1.5}
+#pPE .pe-card:hover{border-color:#0090e7}
+#pPE .pe-card b.id{font-size:.9rem}
+#pPE .pe-card .dd{float:right;font-weight:800;padding:0 7px;border-radius:9px;color:#111}
+#pPE .pe-card .now{color:#5ad1f0}
+#pPE .pe-card button{margin-top:4px;background:#198754;color:#fff;border:0;border-radius:6px;padding:3px 9px;font-weight:700;cursor:pointer;font-size:.72rem}
+@media print{
+  body *{visibility:hidden!important}
+  #pPE .pe-sheetwrap,#pPE .pe-sheetwrap *{visibility:visible!important}
+  #pPE .pe-sheetwrap{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;padding:0}
+  #pPE table.pe{min-width:0;font-size:7pt}
+  #pPE table.pe thead th{position:static}
+  #pPE table.pe td,#pPE table.pe th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:A4 landscape;margin:8mm}
+}
 #ovPE .pe-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #ovPE .pe-form label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;opacity:.8}
 #ovPE .pe-form input,#ovPE .pe-form select{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--line,#2c2e33)}
@@ -7193,7 +7224,8 @@ var STC={'IN OPERATIONS':'#00FA00','UNSERVICEABLE':'#FF2600','MAINTENANCE':'#FFF
 var PSC={'OVERDUE':'#FF2600','PLAN FOR PE':'#FF9300','OKAY':'#00FA00','-':'#AF5D3B'};
 var LOCS=['KL SENTRAL','TUMPAT','KEMPAS BARU','PADU SEDIA'];
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var Q='',TY='',PS='',ED=null;
+var Q='',TY='',PS='',ED=null,SORT='',PLAN=true;
+try{PLAN=localStorage.getItem('rsd_pe_plan_v1')!=='0'}catch(x){}
 function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function p2(n){return String(n).padStart(2,'0')}
 function isoOf(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
@@ -7212,6 +7244,28 @@ function data(){
   return S.peSchedule;
 }
 function changed(){if(typeof touched==='function')touched();render();}
+/* coach id on the Fleet board: 'ASC 2148' → '2148', 'AKC2' → 'AKC2' */
+function fleetKey(id){var t=String(id).toUpperCase().replace(/\s+/g,''),m=t.match(/^[A-Z]+(\d{4})$/);return m?m[1]:t}
+/* PE planning: overdue + due within 15 days, coaches that can run (not refurbishment / unserviceable) */
+function planHtml(){
+  var D=data(),items=[],skip=0;
+  D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){var k=calc(r);if(k.ps!=='OVERDUE'&&k.ps!=='PLAN FOR PE')return;
+    if(/REFURB|UNSERVICE/.test(r.st)){skip++;return;}items.push({r:r,k:k,gi:gi,i:i});})});
+  if(!items.length&&!skip&&!D.groups.some(function(g){return g.rows.length}))return '';
+  items.sort(function(a,b){return a.k.days-b.k.days});
+  var h='<div class="pe-plan"><h4 onclick="PE.plan()">'+(PLAN?'▼':'▶')+' 📅 PE planning — '+items.length+' coach'+(items.length===1?'':'es')+' overdue or due within 15 days'
+    +' <small>(soonest first'+(skip?' · '+skip+' under refurbishment / unserviceable not listed':'')+')</small></h4>';
+  if(PLAN){
+    if(!items.length)h+='<div class="pe-note">✔ Nothing due in the next 15 days.</div>';
+    else h+='<div class="pe-cards">'+items.map(function(x){var r=x.r,k=x.k,w=window.FLEET&&FLEET.whereIs?FLEET.whereIs(fleetKey(r.id)):null;
+      return '<div class="pe-card" style="border-left-color:'+PSC[k.ps]+'" onclick="PE.edit('+x.gi+','+x.i+')">'
+        +'<span class="dd" style="background:'+dayColor(k.days)+'">'+(k.days<0?'('+(-k.days)+')':k.days)+' d</span>'
+        +'<b class="id">'+esc(r.id)+'</b> · '+k.ps+'<br>Next PE <b>'+fmt(k.next)+'</b> · PE '+(r.iv||defIv(r.id))+' · '+esc(r.loc||'—')+'<br>'
+        +'<span>'+esc(r.st)+'</span>'+(w&&w.where?'<br><span class="now">🚆 Now: '+esc(w.where)+'</span>':'')
+        +'<br><button onclick="event.stopPropagation();PE.done('+x.gi+','+x.i+')">✔ PE done today</button></div>'}).join('')+'</div>';
+  }
+  return h+'</div>';
+}
 function counts(){var c={'OVERDUE':0,'PLAN FOR PE':0,'OKAY':0,'-':0};data().groups.forEach(function(g){g.rows.forEach(function(r){c[calc(r).ps]++})});return c}
 function match(r,g){var k=calc(r);
   if(TY&&g.name!==TY)return false;if(PS&&k.ps!==PS)return false;
@@ -7223,16 +7277,19 @@ function render(){
   var h='<div class="pe-bar"><input type="search" placeholder="🔍 Search coach / location / remarks" value="'+esc(Q)+'" oninput="PE.q(this.value)">'
     +'<select onchange="PE.ty(this.value)"><option value="">All coaches</option>'+D.groups.map(function(g){return '<option'+(TY===g.name?' selected':'')+'>'+esc(g.name)+'</option>'}).join('')+'</select>'
     +chip('OVERDUE','Overdue')+chip('PLAN FOR PE','Plan for PE')+chip('OKAY','Okay')
-    +'<span style="flex:1"></span><button class="pe-btn" onclick="PE.add()">＋ Add coach</button>'
+    +'<select onchange="PE.sort(this.value)"><option value="">Order as in file</option><option value="due"'+(SORT==='due'?' selected':'')+'>Days due (soonest first)</option></select>'
+    +'<span style="flex:1"></span><button class="pe-btn" onclick="window.print()" title="Print or save as PDF (A4 landscape)">🖨 Print / PDF</button><button class="pe-btn" onclick="PE.add()">＋ Add coach</button>'
     +'<button class="pe-btn" onclick="document.getElementById(\'peFile\').click()">⬆ Import Excel</button>'
     +'<input type="file" id="peFile" accept=".xlsx,.xls" style="display:none" onchange="PE.imp(this)"></div>';
+  h+=planHtml();
   h+='<div class="pe-sheetwrap"><div class="pe-title">'+esc(D.title)+'<br>'+esc(D.sub)+'</div><div class="pe-year">YEAR : '+esc(D.year)+'</div>'
-    +'<table class="pe"><tr><th rowspan="2">NO.</th><th>COACHES NUMBER</th><th colspan="6">SCHEDULE FOR PE 60 &amp; PE 90 MAINTENANCE</th>'
+    +'<table class="pe"><thead><tr><th rowspan="2">NO.</th><th>COACHES NUMBER</th><th colspan="6">SCHEDULE FOR PE 60 &amp; PE 90 MAINTENANCE</th>'
     +'<th rowspan="2">YEAR OF REFURBISHMENT</th><th rowspan="2">REFURBISHMENT BY</th><th rowspan="2">REMARKS</th></tr>'
-    +'<tr><th>NEW NUMBER</th><th>LAST PE DATE</th><th>PE LOCATION</th><th>NEXT PE DATE</th><th>STATUS</th><th>PE STATUS</th><th>DAYS DUE</th></tr>';
+    +'<tr><th>NEW NUMBER</th><th>LAST PE DATE</th><th>PE LOCATION</th><th>NEXT PE DATE</th><th>STATUS</th><th>PE STATUS</th><th>DAYS DUE</th></tr></thead>';
   var shown=0;
   D.groups.forEach(function(g,gi){
     var rows=g.rows.map(function(r,i){return [r,i]}).filter(function(x){return match(x[0],g)});
+    if(SORT==='due')rows.sort(function(a,b){var x=calc(a[0]).days,y=calc(b[0]).days;x=x==='-'?1e9:x;y=y==='-'?1e9:y;return x-y});
     if(!rows.length&&(TY||PS||Q))return;
     h+='<tr class="grp"><td colspan="11">'+esc(g.name)+'</td></tr>';
     rows.forEach(function(x){var r=x[0],k=calc(r);shown++;
@@ -7278,14 +7335,17 @@ function parse(ws){
   var dIso=function(x){if(x instanceof Date)return isoOf(new Date(x.getTime()+12*36e5));if(typeof x==='number'&&x>20000){var d=XLSX.SSF.parse_date_code(x);return d.y+'-'+p2(d.m)+'-'+p2(d.d)}return '-'};
   var s=function(x){return x==null?'':String(x).trim()};
   var out={title:SEED.title,sub:SEED.sub,year:SEED.year,groups:[]},g=null;
-  R.forEach(function(row){
+  R.forEach(function(row,ri){
     var c=s(row[2]),id=s(row[3]);
     if(/YEAR\s*:/i.test(row.map(s).join(' '))){var m=row.map(s).join(' ').match(/YEAR\s*:\s*(.+)/i);if(m)out.year=m[1].trim();}
     if(/COACHES$/i.test(c)&&!id){g={name:c.toUpperCase(),rows:[]};out.groups.push(g);return;}
     if(!g||!id||/NUMBER/i.test(id))return;
     var last=dIso(row[4]),nx=dIso(row[6]),iv=defIv(id);
     if(last!=='-'&&nx!=='-'){var n=Math.round((parseIso(nx)-parseIso(last))/864e5);if(n===60||n===90)iv=n;}
-    g.rows.push({id:id,last:last,loc:s(row[5]),st:s(row[7]).toUpperCase(),ry:s(row[10]),by:s(row[11]),rem:s(row[12]),iv:iv});
+    var o={id:id,last:last,loc:s(row[5]),st:s(row[7]).toUpperCase(),ry:s(row[10]),by:s(row[11]),rem:s(row[12]),iv:iv};
+    var st=ws['D'+(ri+1)]&&ws['D'+(ri+1)].s,fg=st&&st.fgColor&&String(st.fgColor.rgb||'').toUpperCase();
+    if(st&&st.patternType==='solid'&&/^(FF)?FFFF00$/.test(fg))o.hl=1;
+    g.rows.push(o);
   });
   return out;
 }
@@ -7310,6 +7370,10 @@ window.PE={
     document.getElementById('tabPE').classList.add('on');document.getElementById('pPE').style.display='';render();},
   q:function(x){Q=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   ty:function(x){TY=x;render();},
+  sort:function(x){SORT=x;render();},
+  plan:function(){PLAN=!PLAN;try{localStorage.setItem('rsd_pe_plan_v1',PLAN?'1':'0')}catch(x){}render();},
+  done:function(gi,i){var r=data().groups[gi].rows[i];if(!confirm(r.id+': PE done today ('+fmt(isoOf(today()))+')?'))return;
+    r.last=isoOf(today());changed();toast(r.id+' — next PE '+fmt(calc(r).next)+'. Click 💾 Save to keep it',5000);},
   ps:function(k){PS=PS===k?'':k;render();},
   edit:function(gi,i){ED={gi:gi,i:i};form(data().groups[gi].rows[i],false);},
   add:function(){ED={gi:null,i:null};form({id:'',last:'-',loc:'',st:'IN OPERATIONS',ry:'',by:'',rem:'',iv:90},true);},
@@ -7323,7 +7387,7 @@ window.PE={
   del:function(){if(!ED||ED.gi==null)return;var D=data(),r=D.groups[ED.gi].rows[ED.i];
     if(!confirm('Remove '+r.id+' from the PE schedule?'))return;D.groups[ED.gi].rows.splice(ED.i,1);PE.close();changed();},
   imp:function(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;var rd=new FileReader();
-    rd.onload=function(){try{if(!PE.fromWb(XLSX.read(new Uint8Array(rd.result),{type:'array'}),f.name))
+    rd.onload=function(){try{if(!PE.fromWb(XLSX.read(new Uint8Array(rd.result),{type:'array',cellStyles:true}),f.name))
         throw new Error('no coaches found — choose “COACHES SCHEDULE PE 60 & PE 90” file');}
       catch(e){toast('Import failed: '+e.message,7000);}};
     rd.readAsArrayBuffer(f);},
@@ -7331,8 +7395,9 @@ window.PE={
   fromWb:function(wb,name){
     var nd=null;for(var k=0;k<wb.SheetNames.length&&!nd;k++){var t=parse(wb.Sheets[wb.SheetNames[k]]);if(t.groups.some(function(g){return g.rows.length}))nd=t;}
     if(!nd)return false;var n=nd.groups.reduce(function(a,g){return a+g.rows.length},0);
-    var old={};data().groups.forEach(function(g){g.rows.forEach(function(r){if(r.hl)old[r.id]=1})});
-    nd.groups.forEach(function(g){g.rows.forEach(function(r){if(old[r.id])r.hl=1})});
+    var fileHl=nd.groups.some(function(g){return g.rows.some(function(r){return r.hl})});
+    if(!fileHl){var old={};data().groups.forEach(function(g){g.rows.forEach(function(r){if(r.hl)old[r.id]=1})});
+      nd.groups.forEach(function(g){g.rows.forEach(function(r){if(old[r.id])r.hl=1})});}
     if(!confirm('Load the PE 60 & PE 90 schedule — '+n+' coaches from '+name+'?'))return true;
     S.peSchedule=nd;if(typeof touched==='function')touched();PE.open();
     toast('✔ PE schedule loaded: '+n+' coaches — click 💾 Save to keep it',6000);return true;},
