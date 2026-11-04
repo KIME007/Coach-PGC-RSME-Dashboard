@@ -464,7 +464,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
 </nav>
 <script>
 /* tab order — tabs added later by other modules are put in this order (Report always last) */
-(function(){var ORDER=['tabOverview','tabData','tabIncidents','tabDaily','tabFleet','tabProj','tabReport'],nav=document.querySelector('nav.tabs');
+(function(){var ORDER=['tabOverview','tabData','tabIncidents','tabDaily','tabFleet','tabPE','tabProj','tabReport'],nav=document.querySelector('nav.tabs');
   function fix(){var want=ORDER.map(function(id){return document.getElementById(id)}).filter(function(x){return x&&x.parentNode===nav});
     var now=[].filter.call(nav.children,function(x){return want.indexOf(x)>=0});
     if(now.every(function(x,i){return x===want[i]}))return;want.forEach(function(x){nav.appendChild(x)});}
@@ -7143,6 +7143,195 @@ window.AVX={
 </script>
 
 <!-- ================= END SYSTEM AVAILABILITY (DAILY) MODULE ================= -->
+
+<style id="peCss">
+#pPE .pe-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+#pPE .pe-bar input,#pPE .pe-bar select{background:#191c24;color:#fff;border:1px solid #2c2e33;border-radius:8px;padding:7px 10px;font-size:.85rem}
+#pPE .pe-bar input[type=search]{min-width:200px}
+#pPE .pe-btn{background:#191c24;color:#fff;border:1px solid #2c2e33;border-radius:8px;padding:7px 12px;font-weight:600;cursor:pointer;font-size:.85rem}
+#pPE .pe-btn:hover{border-color:#0090e7}
+#pPE .pe-chip{padding:5px 11px;border-radius:14px;font-weight:700;font-size:.8rem;cursor:pointer;border:2px solid transparent;color:#111}
+#pPE .pe-chip.on{border-color:#fff}
+#pPE .pe-sheetwrap{background:#fff;color:#000;border-radius:10px;padding:14px;overflow-x:auto}
+#pPE .pe-title{text-align:center;font-weight:700;font-family:'Times New Roman',serif;font-size:.95rem;line-height:1.35}
+#pPE .pe-year{text-align:center;font-weight:700;font-family:'Times New Roman',serif;font-size:.85rem;margin:6px 0 12px}
+#pPE table.pe{border-collapse:collapse;width:100%;min-width:1150px;font-family:'Times New Roman',serif;font-size:.74rem;font-weight:700;color:#000}
+#pPE table.pe th,#pPE table.pe td{border:1px solid #000;padding:5px 6px;text-align:center;vertical-align:middle}
+#pPE table.pe th{background:#6fc5e6;font-size:.66rem}
+#pPE table.pe tr.grp td{background:#ff2f92;text-align:left;font-size:.95rem;text-decoration:underline;padding:4px 8px}
+#pPE table.pe tr.row{cursor:pointer}
+#pPE table.pe tr.row:hover td{outline:2px solid #0090e7;outline-offset:-2px}
+html body #pPE table.pe tr.row td{background-color:#fff;color:#000}
+html body #pPE table.pe tr.row td.hl{background-color:#ffff00}
+#pPE table.pe td.rem{min-width:220px}
+#pPE .pe-note{font-size:.75rem;color:var(--mut,#8f95a8);margin-top:8px}
+#ovPE .pe-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#ovPE .pe-form label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;opacity:.8}
+#ovPE .pe-form input,#ovPE .pe-form select{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--line,#2c2e33)}
+#ovPE .pe-form .full{grid-column:1/-1}
+@media(max-width:600px){#ovPE .pe-form{grid-template-columns:1fr}}
+</style>
+<div class="overlay" id="ovPE"><div class="modal" style="max-width:620px">
+  <div class="mhead"><h3 id="peEdT">Edit coach</h3><button class="iconb" onclick="PE.close()">✕</button></div>
+  <div class="mbody"><div class="pe-form" id="peForm"></div></div>
+  <div class="mfoot"><button class="btn ghost" id="peDel" onclick="PE.del()" style="margin-right:auto;color:#fc424a">🗑 Remove</button><button class="btn ghost" onclick="PE.close()">Cancel</button><button class="btn primary" onclick="PE.saveRow()">Done</button></div>
+</div></div>
+<script id="peJs">
+/* =====================================================================
+   PE SCHEDULE — coaches periodical examination (PE 60 & PE 90), laid out
+   like "COACHES SCHEDULE PE 60 & PE 90 2026.xlsx". Data in S.peSchedule.
+   NEXT PE = LAST PE + 60 (ADNS, AFC) / 90 days; DAYS DUE = NEXT PE − today;
+   PE STATUS: ≤0 OVERDUE, ≤15 PLAN FOR PE, else OKAY (same as the Excel).
+   ===================================================================== */
+(function(){
+'use strict';
+var SEED={"title":"COACHES PERIODICAL EXAMINATION (PE 60 & PE 90)","sub":"ROLLING STOCK AND ENGINEERING (RSM COACH)","year":"JAN - DEC 2026","groups":[{"name":"ABC COACHES","rows":[]},{"name":"ADNS COACHES","rows":[]},{"name":"ASC COACHES","rows":[]},{"name":"AFC COACHES","rows":[]},{"name":"SPECIAL COACHES","rows":[]}]}; /* empty — the schedule is imported from Excel and kept in the cloud only */
+var STS=['IN OPERATIONS','PARTIAL OVERHAUL','MAINTENANCE','REFURBISHMENT','UNSERVICEABLE'];
+var STC={'IN OPERATIONS':'#00FA00','UNSERVICEABLE':'#FF2600','MAINTENANCE':'#FFFC00','PARTIAL OVERHAUL':'#FF9300','REFURBISHMENT':'#AF5D3B'};
+var PSC={'OVERDUE':'#FF2600','PLAN FOR PE':'#FF9300','OKAY':'#00FA00','-':'#AF5D3B'};
+var LOCS=['KL SENTRAL','TUMPAT','KEMPAS BARU','PADU SEDIA'];
+var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var Q='',TY='',PS='',ED=null;
+function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function p2(n){return String(n).padStart(2,'0')}
+function isoOf(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function parseIso(s){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):null}
+function addDays(s,n){var d=parseIso(s);if(!d)return '-';d.setDate(d.getDate()+n);return isoOf(d)}
+function fmt(s){var d=parseIso(s);return d?d.getDate()+'-'+MON[d.getMonth()]+'-'+String(d.getFullYear()).slice(2):'-'}
+function today(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function defIv(id){return /^(ADN|AFC)/i.test(String(id).trim())?60:90}
+function calc(r){var nx=addDays(r.last,r.iv||defIv(r.id));if(nx==='-')return {next:'-',days:'-',ps:'-'};
+  var dd=Math.round((parseIso(nx)-today())/864e5);return {next:nx,days:dd,ps:dd<=0?'OVERDUE':dd<=15?'PLAN FOR PE':'OKAY'}}
+function dayColor(d){return d==='-'?'#AF5D3B':d<=0?'#FF2600':d<=13?'#FF9300':d<=20?'#FFFC00':'#00FA00'}
+function data(){
+  if(typeof S==='undefined'||!S)return null;
+  if(!S.peSchedule){
+    S.peSchedule={title:SEED.title,sub:SEED.sub,year:'JAN - DEC '+(typeof RS_YEAR==='undefined'?2026:RS_YEAR),groups:SEED.groups.map(function(g){return {name:g.name,rows:[]}})};}
+  return S.peSchedule;
+}
+function changed(){if(typeof touched==='function')touched();render();}
+function counts(){var c={'OVERDUE':0,'PLAN FOR PE':0,'OKAY':0,'-':0};data().groups.forEach(function(g){g.rows.forEach(function(r){c[calc(r).ps]++})});return c}
+function match(r,g){var k=calc(r);
+  if(TY&&g.name!==TY)return false;if(PS&&k.ps!==PS)return false;
+  if(Q){var t=(r.id+' '+r.loc+' '+r.st+' '+r.rem+' '+r.by).toUpperCase();if(t.indexOf(Q.toUpperCase())<0)return false;}
+  return true}
+function render(){
+  var el=document.getElementById('peArea');if(!el)return;var D=data();if(!D){el.innerHTML='';return;}
+  var c=counts(),chip=function(k,l){return '<span class="pe-chip'+(PS===k?' on':'')+'" style="background:'+PSC[k]+'" onclick="PE.ps(\''+k+'\')">'+l+' '+c[k]+'</span>'};
+  var h='<div class="pe-bar"><input type="search" placeholder="🔍 Search coach / location / remarks" value="'+esc(Q)+'" oninput="PE.q(this.value)">'
+    +'<select onchange="PE.ty(this.value)"><option value="">All coaches</option>'+D.groups.map(function(g){return '<option'+(TY===g.name?' selected':'')+'>'+esc(g.name)+'</option>'}).join('')+'</select>'
+    +chip('OVERDUE','Overdue')+chip('PLAN FOR PE','Plan for PE')+chip('OKAY','Okay')
+    +'<span style="flex:1"></span><button class="pe-btn" onclick="PE.add()">＋ Add coach</button>'
+    +'<button class="pe-btn" onclick="document.getElementById(\'peFile\').click()">⬆ Import Excel</button>'
+    +'<input type="file" id="peFile" accept=".xlsx,.xls" style="display:none" onchange="PE.imp(this)"></div>';
+  h+='<div class="pe-sheetwrap"><div class="pe-title">'+esc(D.title)+'<br>'+esc(D.sub)+'</div><div class="pe-year">YEAR : '+esc(D.year)+'</div>'
+    +'<table class="pe"><tr><th rowspan="2">NO.</th><th>COACHES NUMBER</th><th colspan="6">SCHEDULE FOR PE 60 &amp; PE 90 MAINTENANCE</th>'
+    +'<th rowspan="2">YEAR OF REFURBISHMENT</th><th rowspan="2">REFURBISHMENT BY</th><th rowspan="2">REMARKS</th></tr>'
+    +'<tr><th>NEW NUMBER</th><th>LAST PE DATE</th><th>PE LOCATION</th><th>NEXT PE DATE</th><th>STATUS</th><th>PE STATUS</th><th>DAYS DUE</th></tr>';
+  var shown=0;
+  D.groups.forEach(function(g,gi){
+    var rows=g.rows.map(function(r,i){return [r,i]}).filter(function(x){return match(x[0],g)});
+    if(!rows.length&&(TY||PS||Q))return;
+    h+='<tr class="grp"><td colspan="11">'+esc(g.name)+'</td></tr>';
+    rows.forEach(function(x){var r=x[0],k=calc(r);shown++;
+      h+='<tr class="row" onclick="PE.edit('+gi+','+x[1]+')"><td>'+(x[1]+1)+'</td><td'+(r.hl?' class="hl"':'')+'>'+esc(r.id)+'</td>'
+        +'<td>'+fmt(r.last)+'</td><td>'+esc(r.loc)+'</td><td>'+fmt(k.next)+'</td>'
+        +'<td style="background:'+(STC[r.st]||'#fff')+'">'+esc(r.st)+'</td>'
+        +'<td style="background:'+PSC[k.ps]+'">'+k.ps+'</td>'
+        +'<td style="background:'+dayColor(k.days)+'">'+(k.days==='-'?'-':k.days<0?'('+(-k.days)+')':k.days)+'</td>'
+        +'<td>'+esc(r.ry)+'</td><td>'+esc(r.by)+'</td><td class="rem">'+esc(r.rem)+'</td></tr>';});
+  });
+  var total=D.groups.reduce(function(a,g){return a+g.rows.length},0);
+  h+='</table>'+(shown?'':total?'<div style="padding:14px;text-align:center">No coach matches.</div>'
+      :'<div style="padding:18px;text-align:center">No schedule yet — click <b>⬆ Import Excel</b> and choose “COACHES SCHEDULE PE 60 &amp; PE 90 2026.xlsx”, then click <b>💾 Save</b>.</div>')+'</div>'
+    +'<div class="pe-note">Click a coach to edit it. NEXT PE DATE = LAST PE DATE + 60 days (ADNS, AFC) or 90 days (others); DAYS DUE counts from today. Click 💾 Save to keep changes.</div>';
+  el.innerHTML=h;
+}
+/* ---------- edit dialog ---------- */
+function opt(list,v){return list.map(function(x){return '<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>'}).join('')}
+function form(r,isNew){
+  var D=data();
+  document.getElementById('peEdT').textContent=isNew?'Add coach':'Edit '+r.id;
+  document.getElementById('peDel').style.display=isNew?'none':'';
+  document.getElementById('peForm').innerHTML=
+     (isNew?'<div class="full"><label>Group</label><select id="peG">'+D.groups.map(function(g,i){return '<option value="'+i+'">'+esc(g.name)+'</option>'}).join('')+'</select></div>':'')
+    +'<div><label>Coach number</label><input id="peId" value="'+esc(r.id)+'" placeholder="ASC 2131"></div>'
+    +'<div><label>PE interval</label><select id="peIv"><option value="60"'+(r.iv===60?' selected':'')+'>PE 60 (60 days)</option><option value="90"'+(r.iv!==60?' selected':'')+'>PE 90 (90 days)</option></select></div>'
+    +'<div><label>Last PE date</label><input type="date" id="peLast" value="'+(parseIso(r.last)?r.last:'')+'"></div>'
+    +'<div style="display:flex;align-items:flex-end"><button class="btn" type="button" onclick="document.getElementById(\'peLast\').value=\''+isoOf(today())+'\'">✔ PE done today</button></div>'
+    +'<div><label>PE location</label><input id="peLoc" list="peLocs" value="'+esc(r.loc)+'"><datalist id="peLocs">'+opt(LOCS,'')+'</datalist></div>'
+    +'<div><label>Status</label><select id="peSt">'+opt(STS.indexOf(r.st)<0&&r.st?STS.concat([r.st]):STS,r.st||'IN OPERATIONS')+'</select></div>'
+    +'<div><label>Year of refurbishment</label><input id="peRy" value="'+esc(r.ry)+'"></div>'
+    +'<div><label>Refurbishment by</label><input id="peBy" value="'+esc(r.by)+'"></div>'
+    +'<div class="full"><label>Remarks</label><input id="peRem" value="'+esc(r.rem)+'"></div>'
+    +'<div class="full"><label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0"><input type="checkbox" id="peHl" style="width:auto"'+(r.hl?' checked':'')+'> Highlight coach number (yellow)</label></div>';
+  document.getElementById('ovPE').classList.add('show');
+}
+function v(id){var e=document.getElementById(id);return e?String(e.value||'').trim():''}
+/* ---------- Excel import (same layout as the file) ---------- */
+function parse(ws){
+  var R=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  var dIso=function(x){if(x instanceof Date)return isoOf(x);if(typeof x==='number'&&x>20000){var d=XLSX.SSF.parse_date_code(x);return d.y+'-'+p2(d.m)+'-'+p2(d.d)}return '-'};
+  var s=function(x){return x==null?'':String(x).trim()};
+  var out={title:SEED.title,sub:SEED.sub,year:SEED.year,groups:[]},g=null;
+  R.forEach(function(row){
+    var c=s(row[2]),id=s(row[3]);
+    if(/YEAR\s*:/i.test(row.map(s).join(' '))){var m=row.map(s).join(' ').match(/YEAR\s*:\s*(.+)/i);if(m)out.year=m[1].trim();}
+    if(/COACHES$/i.test(c)&&!id){g={name:c.toUpperCase(),rows:[]};out.groups.push(g);return;}
+    if(!g||!id||/NUMBER/i.test(id))return;
+    var last=dIso(row[4]),nx=dIso(row[6]),iv=defIv(id);
+    if(last!=='-'&&nx!=='-'){var n=Math.round((parseIso(nx)-parseIso(last))/864e5);if(n===60||n===90)iv=n;}
+    g.rows.push({id:id,last:last,loc:s(row[5]),st:s(row[7]).toUpperCase(),ry:s(row[10]),by:s(row[11]),rem:s(row[12]),iv:iv});
+  });
+  return out;
+}
+/* ---------- mount ---------- */
+function visible(){var p=document.getElementById('pPE');return p&&p.style.display!=='none'}
+function hide(){var t=document.getElementById('tabPE'),p=document.getElementById('pPE');if(t)t.classList.remove('on');if(p)p.style.display='none';}
+function mount(){
+  if(document.getElementById('pPE'))return;
+  var tabs=document.querySelector('nav.tabs'),main=document.querySelector('main');if(!tabs||!main)return;
+  var btn=document.createElement('button');btn.className='tab';btn.id='tabPE';btn.innerHTML='🛠️ PE Schedule';btn.onclick=function(){PE.open()};
+  tabs.appendChild(btn);
+  var sec=document.createElement('section');sec.className='panel';sec.id='pPE';sec.style.display='none';sec.innerHTML='<div id="peArea"></div>';main.appendChild(sec);
+  /* any other tab hides this one */
+  tabs.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.tab');if(t&&t.id!=='tabPE')hide();},true);
+  var ay=window.applyYear;if(typeof ay==='function'&&!ay._peWrapped){window.applyYear=function(){var r=ay.apply(this,arguments);if(visible())render();return r};window.applyYear._peWrapped=true;}
+  window.addEventListener('rsd-backup-applied',function(){if(visible())setTimeout(render,0)});
+}
+window.PE={
+  open:function(){
+    document.querySelectorAll('nav.tabs .tab').forEach(function(t){t.classList.remove('on')});
+    document.querySelectorAll('main > section.panel').forEach(function(p){if(p.id!=='pPE')p.style.display='none'});
+    document.getElementById('tabPE').classList.add('on');document.getElementById('pPE').style.display='';render();},
+  q:function(x){Q=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
+  ty:function(x){TY=x;render();},
+  ps:function(k){PS=PS===k?'':k;render();},
+  edit:function(gi,i){ED={gi:gi,i:i};form(data().groups[gi].rows[i],false);},
+  add:function(){ED={gi:null,i:null};form({id:'',last:'-',loc:'',st:'IN OPERATIONS',ry:'',by:'',rem:'',iv:90},true);},
+  close:function(){document.getElementById('ovPE').classList.remove('show');ED=null;},
+  saveRow:function(){
+    if(!ED)return;var id=v('peId').toUpperCase();if(!id){toast('Enter the coach number');return;}
+    var D=data(),r={id:id,last:v('peLast')||'-',loc:v('peLoc').toUpperCase(),st:v('peSt'),ry:v('peRy'),by:v('peBy').toUpperCase(),rem:v('peRem').toUpperCase(),iv:+v('peIv')||defIv(id)};
+    if(document.getElementById('peHl').checked)r.hl=1;
+    if(ED.gi==null)D.groups[+v('peG')||0].rows.push(r);else D.groups[ED.gi].rows[ED.i]=r;
+    PE.close();changed();toast(id+' updated — click 💾 Save to keep it');},
+  del:function(){if(!ED||ED.gi==null)return;var D=data(),r=D.groups[ED.gi].rows[ED.i];
+    if(!confirm('Remove '+r.id+' from the PE schedule?'))return;D.groups[ED.gi].rows.splice(ED.i,1);PE.close();changed();},
+  imp:function(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;var rd=new FileReader();
+    rd.onload=function(){try{var wb=XLSX.read(new Uint8Array(rd.result),{type:'array',cellDates:true}),nd=parse(wb.Sheets[wb.SheetNames[0]]);
+      var n=nd.groups.reduce(function(a,g){return a+g.rows.length},0);if(!n)throw new Error('no coaches found — is it the PE 60 & PE 90 schedule?');
+      var old={};data().groups.forEach(function(g){g.rows.forEach(function(r){if(r.hl)old[r.id]=1})});
+      nd.groups.forEach(function(g){g.rows.forEach(function(r){if(old[r.id])r.hl=1})});
+      if(!confirm('Replace the PE schedule with '+n+' coaches from '+f.name+'?'))return;
+      S.peSchedule=nd;changed();toast('Imported '+n+' coaches — click 💾 Save to keep it',5000);}
+      catch(e){toast('Import failed: '+e.message,6000);}};
+    rd.readAsArrayBuffer(f);},
+  render:render
+};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+})();
+</script>
 
 <style id="darkCss">
 /* ================= DARK THEME (Corona palette) =================
