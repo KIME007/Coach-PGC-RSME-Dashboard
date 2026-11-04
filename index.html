@@ -7163,6 +7163,7 @@ window.AVX={
 #pPE .pe-filt .t{font-size:.72rem;font-weight:800;padding:5px 12px;border-radius:99px;cursor:pointer;border:2px solid transparent;opacity:.55}
 #pPE .pe-filt .t.on{opacity:1;border-color:#fff}
 #pPE .pe-filt .t.all{background:#22252e;color:#e4e6ef}
+#pPE .pe-filt .lb{font-size:.68rem;letter-spacing:.6px;text-transform:uppercase;color:#a3a8c3;min-width:54px}
 #pPE .pe-filt select{margin-left:auto;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#22252e;color:#e4e6ef;font-weight:700;font-size:.78rem}
 #pPE .pe-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;max-height:360px;overflow-y:auto;padding-right:4px}
 #pPE .pe-card{background:#1d2029;border:2px solid #3b4050;border-radius:11px;cursor:pointer;display:flex;flex-direction:column;overflow:hidden}
@@ -7231,7 +7232,7 @@ var STC={'IN OPERATIONS':'#3ddc84','UNSERVICEABLE':'#ff5b62','MAINTENANCE':'#ffd
 var PSC={'OVERDUE':'#ff5b62','PLAN FOR PE':'#ffa63d','OKAY':'#3ddc84','-':'#c08a6a'};
 var LOCS=['KL SENTRAL','TUMPAT','KEMPAS BARU','PADU SEDIA'];
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var Q='',TY='',PS='',ED=null,SORT='',PLAN=true;
+var Q='',TY='',PS='',ED=null,SORT='',PLAN=true,STF='',FN='';
 try{PLAN=localStorage.getItem('rsd_pe_plan_v1')!=='0'}catch(x){}
 function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function p2(n){return String(n).padStart(2,'0')}
@@ -7262,8 +7263,14 @@ function ddHtml(d){return '<span class="dd" style="background:'+dayColor(d)+'">'
 function grpType(g){return typeOf(String(g.name).split(/\s+/)[0]+'0')}
 function counts(){var c={'OVERDUE':0,'PLAN FOR PE':0,'OKAY':0,'-':0,all:0,week:0};
   data().groups.forEach(function(g){g.rows.forEach(function(r){var k=calc(r);c[k.ps]++;c.all++;if(k.days!=='-'&&k.days>=0&&k.days<=7&&!/REFURB|UNSERVICE/.test(r.st))c.week++;})});return c}
+/* where the coach is today on the Fleet Deployment board, as a filter group */
+var FNL={TRAIN:'On train service',SPARE:'Spare at depot',MINOR:'Minor services',MAJOR:'Major services',REFURB:'Refurbishment',DET:'Other detained',NONE:'Not on the board'};
+function nowOf(r){var w=window.FLEET&&FLEET.whereIs?FLEET.whereIs(fleetKey(r.id)):null,t=w&&w.where;
+  return {w:t,cat:!t?'NONE':/^Spare/i.test(t)?'SPARE':/^Minor/i.test(t)?'MINOR':/^Major/i.test(t)?'MAJOR':/^Refurb/i.test(t)?'REFURB':/·/.test(t)?'DET':'TRAIN'}}
 function match(r,g){var k=calc(r);
   if(TY&&g.name!==TY)return false;
+  if(STF&&r.st!==STF)return false;
+  if(FN&&nowOf(r).cat!==FN)return false;
   if(PS==='WEEK'){if(k.days==='-'||k.days<0||k.days>7||/REFURB|UNSERVICE/.test(r.st))return false;}
   else if(PS&&k.ps!==PS)return false;
   if(Q){var t=(r.id+' '+r.loc+' '+r.st+' '+r.rem+' '+r.by+' '+k.ps).toUpperCase();if(t.indexOf(Q.toUpperCase())<0)return false;}
@@ -7272,7 +7279,8 @@ function match(r,g){var k=calc(r);
 function planHtml(){
   var D=data(),items=[],skip=0;
   D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){var k=calc(r);if(k.ps!=='OVERDUE'&&k.ps!=='PLAN FOR PE')return;
-    if(/REFURB|UNSERVICE/.test(r.st)){skip++;return;}if(TY&&g.name!==TY)return;items.push({r:r,k:k,gi:gi,i:i});})});
+    if(/REFURB|UNSERVICE/.test(r.st)&&STF!==r.st){skip++;return;}if(TY&&g.name!==TY)return;
+    if(STF&&r.st!==STF)return;if(FN&&nowOf(r).cat!==FN)return;items.push({r:r,k:k,gi:gi,i:i});})});
   items.sort(function(a,b){return a.k.days-b.k.days});
   var h='<div class="fb-sec"><h3 style="cursor:pointer" onclick="PE.plan()">'+(PLAN?'▾':'▸')+' 📅 PE Planning — due within 15 days <span class="ct">'+items.length+' coach'+(items.length===1?'':'es')
     +' · soonest first'+(skip?' · '+skip+' under refurbishment / unserviceable not listed':'')+'</span></h3>';
@@ -7281,7 +7289,7 @@ function planHtml(){
     else h+='<div class="pe-cards">'+items.map(function(x){var r=x.r,k=x.k,w=window.FLEET&&FLEET.whereIs?FLEET.whereIs(fleetKey(r.id)):null;
       return '<div class="pe-card" onclick="PE.edit('+x.gi+','+x.i+')"><div class="h">'+chipOf(r)+pill(k.ps,PSC[k.ps])+'<span class="dd" style="background:'+dayColor(k.days)+'">'+(k.days<0?'('+(-k.days)+')':k.days)+' d</span></div>'
         +'<div class="b">Next PE <b>'+fmt(k.next)+'</b> · PE '+(r.iv||defIv(r.id))+'<br>📍 '+esc(r.loc||'—')+' · '+esc(r.st)
-        +(w&&w.where?'<br><span class="now">🚆 Now: '+esc(w.where)+'</span>':'')+'</div>'
+        +'<br><span class="now">🚆 Now: '+(w&&w.where?esc(w.where):'<i style="color:#6c7293">not on the Fleet board</i>')+'</span></div>'
         +'<div class="f"><span style="font-size:.66rem;color:#6c7293;font-weight:700">Last PE '+fmt(r.last)+'</span><button onclick="event.stopPropagation();PE.done('+x.gi+','+x.i+')">✔ PE done today</button></div></div>'}).join('')+'</div>';
   }
   return h+'</div>';
@@ -7301,8 +7309,14 @@ function render(){
   h+='<div class="pe-filt"><span class="t all'+(TY?'':' on')+'" onclick="PE.ty(\'\')">All coaches</span>'
     +D.groups.map(function(g){var col=TYC[grpType(g)];return '<span class="t'+(TY===g.name?' on':'')+'" style="background:'+col[0]+';color:'+col[1]+'" onclick="PE.ty(\''+esc(g.name)+'\')">'+esc(g.name.replace(/\s*COACHES$/,''))+' · '+g.rows.length+'</span>'}).join('')
     +'<select onchange="PE.sort(this.value)"><option value="">Order as in file</option><option value="due"'+(SORT==='due'?' selected':'')+'>Days due — soonest first</option></select></div>';
+  var stc={},fnc={};D.groups.forEach(function(g){if(TY&&g.name!==TY)return;g.rows.forEach(function(r){stc[r.st]=(stc[r.st]||0)+1;var n=nowOf(r).cat;fnc[n]=(fnc[n]||0)+1})});
+  var sts=STS.concat(Object.keys(stc).filter(function(x){return x&&STS.indexOf(x)<0}));
+  h+='<div class="pe-filt"><b class="lb">Status</b><span class="t all'+(STF?'':' on')+'" onclick="PE.st(\'\')">All</span>'
+    +sts.filter(function(x){return stc[x]}).map(function(x){return '<span class="t'+(STF===x?' on':'')+'" style="background:'+(STC[x]||'#a3a8c3')+';color:#111" onclick="PE.st(\''+esc(x)+'\')">'+esc(x)+' · '+stc[x]+'</span>'}).join('')
+    +'<select onchange="PE.fn(this.value)" title="Where the coach is today on the Fleet Deployment board"><option value="">🚆 Fleet now: all</option>'
+    +Object.keys(FNL).filter(function(x){return fnc[x]}).map(function(x){return '<option value="'+x+'"'+(FN===x?' selected':'')+'>🚆 '+FNL[x]+' · '+fnc[x]+'</option>'}).join('')+'</select></div>';
   if(total)h+=planHtml();
-  h+='<div class="fb-sec pe-sheet"><h3>📋 PE 60 &amp; PE 90 Schedule <span class="ct">'+(PS||TY||Q?'filtered · ':'')+'click a coach to edit</span></h3>'
+  h+='<div class="fb-sec pe-sheet"><h3>📋 PE 60 &amp; PE 90 Schedule <span class="ct">'+(PS||TY||Q||STF||FN?'filtered · ':'')+'click a coach to edit</span></h3>'
     +'<div class="pe-print-h">'+esc(D.title)+'<br>'+esc(D.sub)+'<br>YEAR : '+esc(D.year)+'</div>'
     +'<div class="pe-tw"><table class="pe"><thead><tr><th>No.</th><th>Coach number</th><th>Last PE date</th><th>PE location</th><th>Next PE date</th><th>Status</th><th>PE status</th><th>Days due</th>'
     +'<th>Year of refurb.</th><th>Refurbishment by</th><th>Remarks</th></tr></thead><tbody>';
@@ -7310,7 +7324,7 @@ function render(){
   D.groups.forEach(function(g,gi){
     var rows=g.rows.map(function(r,i){return [r,i]}).filter(function(x){return match(x[0],g)});
     if(SORT==='due')rows.sort(function(a,b){var x=calc(a[0]).days,y=calc(b[0]).days;x=x==='-'?1e9:x;y=y==='-'?1e9:y;return x-y});
-    if(!rows.length&&(TY||PS||Q))return;
+    if(!rows.length&&(TY||PS||Q||STF||FN))return;
     h+='<tr class="grp"><td colspan="11">'+esc(g.name)+'<span>'+rows.length+(rows.length!==g.rows.length?' of '+g.rows.length:'')+'</span></td></tr>';
     rows.forEach(function(x){var r=x[0],kk=calc(r);shown++;
       h+='<tr class="row" onclick="PE.edit('+gi+','+x[1]+')"><td class="n">'+(x[1]+1)+'</td><td class="id">'+chipOf(r)+'</td>'
@@ -7388,6 +7402,8 @@ window.PE={
   q:function(x){Q=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   ty:function(x){TY=x;render();},
   sort:function(x){SORT=x;render();},
+  st:function(x){STF=STF===x?'':x;render();},
+  fn:function(x){FN=x;render();},
   plan:function(){PLAN=!PLAN;try{localStorage.setItem('rsd_pe_plan_v1',PLAN?'1':'0')}catch(x){}render();},
   done:function(gi,i){var r=data().groups[gi].rows[i];if(!confirm(r.id+': PE done today ('+fmt(isoOf(today()))+')?'))return;
     r.last=isoOf(today());changed();toast(r.id+' — next PE '+fmt(calc(r).next)+'. Click 💾 Save to keep it',5000);},
