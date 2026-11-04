@@ -7176,6 +7176,23 @@ window.AVX={
 #pPE .pe-card .b .now{color:#5ad1f0;font-weight:700}
 #pPE .pe-card .f{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid #2c2e33}
 #pPE .pe-card .f button{background:#198754;color:#fff;border:0;border-radius:7px;padding:4px 10px;font-weight:800;cursor:pointer;font-size:.7rem}
+#pPE .wk-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}
+#pPE .wk-col{flex:1 0 150px;background:#1d2029;border:2px solid #3b4050;border-radius:11px;display:flex;flex-direction:column;min-height:150px}
+#pPE .wk-col.td{border-color:#AF1763;box-shadow:0 0 12px rgba(175,23,99,.3)}
+#pPE .wk-col.od{border-color:#ff5b62}
+#pPE .wk-col .h{padding:7px 8px;border-bottom:1px solid #2c2e33;text-align:center}
+#pPE .wk-col .h b{display:block;color:#fff;font-size:.84rem}#pPE .wk-col.od .h b{color:#ff5b62}
+#pPE .wk-col .h small{display:block;font-size:.62rem;color:var(--mut);font-weight:700}
+#pPE .wk-col .u{padding:7px;display:flex;flex-direction:column;gap:6px;flex:1;max-height:330px;overflow-y:auto}
+#pPE .wk-col .u i{color:#4b5064;text-align:center;font-style:normal;margin-top:10px}
+#pPE .wk-it{cursor:pointer;border-radius:8px;padding:4px;background:#14161d;border:1px solid transparent}
+#pPE .wk-it:hover{border-color:#AF1763}
+#pPE .wk-it .fb-chip{padding:3px 4px}
+#pPE .wk-it small{display:block;font-size:.6rem;color:#a3a8c3;font-weight:700;text-align:center;margin-top:2px;line-height:1.3}
+#pPE .wk-it small.now{color:#5ad1f0}
+#pPE .wk-col .f{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-top:1px solid #2c2e33;font-size:.7rem;color:#a3a8c3;font-weight:700}
+#pPE .wk-col .f b{color:#fff;font-size:.86rem}
+#pPE .fb-sec>h3{flex-wrap:wrap}
 #pPE .pill{display:inline-block;font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;color:#111}
 #pPE .dd{display:inline-block;min-width:38px;text-align:center;font-weight:800;font-size:.76rem;padding:3px 8px;border-radius:7px;color:#111}
 #pPE .pe-tw{overflow:auto;max-height:76vh;border-radius:10px;border:1px solid #2c2e33}
@@ -7232,7 +7249,7 @@ var STC={'IN OPERATIONS':'#3ddc84','UNSERVICEABLE':'#ff5b62','MAINTENANCE':'#ffd
 var PSC={'OVERDUE':'#ff5b62','PLAN FOR PE':'#ffa63d','OKAY':'#3ddc84','-':'#c08a6a'};
 var LOCS=['KL SENTRAL','TUMPAT','KEMPAS BARU','PADU SEDIA'];
 var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-var Q='',TY='',PS='',ED=null,SORT='',PLAN=true,STF='',FN='';
+var Q='',TY='',PS='',ED=null,SORT='',PLAN=true,STF='',FN='',WK=0;
 try{PLAN=localStorage.getItem('rsd_pe_plan_v1')!=='0'}catch(x){}
 function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function p2(n){return String(n).padStart(2,'0')}
@@ -7294,6 +7311,33 @@ function planHtml(){
   }
   return h+'</div>';
 }
+/* weekly plan: Monday–Sunday of the chosen week, coaches whose NEXT PE falls on each day */
+function weekHtml(){
+  var D=data(),t=today(),mon=new Date(t);mon.setDate(t.getDate()-((t.getDay()+6)%7)+WK*7);
+  var days=[];for(var n=0;n<7;n++){var d=new Date(mon);d.setDate(mon.getDate()+n);days.push(isoOf(d));}
+  var start=days[0],end=days[6],by={},over=[],locs={};days.forEach(function(d){by[d]=[]});
+  D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){if(TY&&g.name!==TY)return;if(STF&&r.st!==STF)return;
+    if(!STF&&/REFURB|UNSERVICE/.test(r.st))return;var k=calc(r);if(k.next==='-')return;var nw=nowOf(r);if(FN&&nw.cat!==FN)return;
+    if(Q&&(r.id+' '+r.loc+' '+r.st+' '+r.rem).toUpperCase().indexOf(Q.toUpperCase())<0)return;
+    var it={r:r,k:k,gi:gi,i:i,nw:nw};
+    if(by[k.next]){by[k.next].push(it);locs[r.loc||'—']=(locs[r.loc||'—']||0)+1;}
+    else if(WK===0&&k.next<start)over.push(it);})});
+  var tot=days.reduce(function(a,d){return a+by[d].length},0),WD=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  var chip=function(x){var c=TYC[typeOf(x.r.id)];return '<div class="wk-it" onclick="PE.edit('+x.gi+','+x.i+')" title="'+esc(x.r.id+' · last PE '+fmt(x.r.last)+(x.nw.w?' · now '+x.nw.w:''))+'">'
+    +'<span class="fb-chip" style="background:'+c[0]+';color:'+c[1]+'">'+esc(x.r.id)+'</span>'
+    +'<small>📍 '+esc(x.r.loc||'—')+' · PE '+(x.r.iv||defIv(x.r.id))+'</small>'
+    +'<small class="now">🚆 '+esc(x.nw.w||'not on board')+'</small></div>'};
+  var col=function(head,sub,list,cls){return '<div class="wk-col '+(cls||'')+'"><div class="h"><b>'+head+'</b><small>'+sub+'</small></div><div class="u">'
+    +(list.length?list.map(chip).join(''):'<i>—</i>')+'</div><div class="f"><span>Due</span><b>'+list.length+'</b></div></div>'};
+  over.sort(function(a,b){return a.k.days-b.k.days});
+  var label=WK===0?'This week':WK===1?'Next week':WK===-1?'Last week':(WK>0?'In '+WK+' weeks':Math.abs(WK)+' weeks ago');
+  var h='<div class="fb-sec"><h3>🗓 Weekly PE Plan <span class="ct">'+label+' · '+fmt(start)+' – '+fmt(end)+' · '+tot+' coach'+(tot===1?'':'es')+' due'
+    +(Object.keys(locs).length?' · '+Object.keys(locs).sort().map(function(l){return esc(l)+' '+locs[l]}).join(' · '):'')+'</span>'
+    +'<span style="margin-left:auto;display:flex;gap:6px"><button class="fb-btn" onclick="PE.wk(-1)">‹ Prev</button><button class="fb-btn'+(WK===0?' p':'')+'" onclick="PE.wk(0)">This week</button><button class="fb-btn" onclick="PE.wk(1)">Next ›</button></span></h3>'
+    +'<div class="wk-row">'+(WK===0?col('OVERDUE','carried over',over,'od'):'')
+    +days.map(function(d,n){var dt=parseIso(d);return col(WD[n]+' '+dt.getDate(),MON[dt.getMonth()]+' '+dt.getFullYear(),by[d],d===isoOf(t)?'td':'')}).join('')+'</div></div>';
+  return h;
+}
 function render(){
   var el=document.getElementById('peArea');if(!el)return;var D=data();if(!D){el.innerHTML='';return;}
   var c=counts(),total=c.all;
@@ -7315,7 +7359,7 @@ function render(){
     +sts.filter(function(x){return stc[x]}).map(function(x){return '<span class="t'+(STF===x?' on':'')+'" style="background:'+(STC[x]||'#a3a8c3')+';color:#111" onclick="PE.st(\''+esc(x)+'\')">'+esc(x)+' · '+stc[x]+'</span>'}).join('')
     +'<select onchange="PE.fn(this.value)" title="Where the coach is today on the Fleet Deployment board"><option value="">🚆 Fleet now: all</option>'
     +Object.keys(FNL).filter(function(x){return fnc[x]}).map(function(x){return '<option value="'+x+'"'+(FN===x?' selected':'')+'>🚆 '+FNL[x]+' · '+fnc[x]+'</option>'}).join('')+'</select></div>';
-  if(total)h+=planHtml();
+  if(total)h+=weekHtml()+planHtml();
   h+='<div class="fb-sec pe-sheet"><h3>📋 PE 60 &amp; PE 90 Schedule <span class="ct">'+(PS||TY||Q||STF||FN?'filtered · ':'')+'click a coach to edit</span></h3>'
     +'<div class="pe-print-h">'+esc(D.title)+'<br>'+esc(D.sub)+'<br>YEAR : '+esc(D.year)+'</div>'
     +'<div class="pe-tw"><table class="pe"><thead><tr><th>No.</th><th>Coach number</th><th>Last PE date</th><th>PE location</th><th>Next PE date</th><th>Status</th><th>PE status</th><th>Days due</th>'
@@ -7402,6 +7446,7 @@ window.PE={
   q:function(x){Q=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   ty:function(x){TY=x;render();},
   sort:function(x){SORT=x;render();},
+  wk:function(n){WK=n===0?0:WK+n;render();},
   st:function(x){STF=STF===x?'':x;render();},
   fn:function(x){FN=x;render();},
   plan:function(){PLAN=!PLAN;try{localStorage.setItem('rsd_pe_plan_v1',PLAN?'1':'0')}catch(x){}render();},
