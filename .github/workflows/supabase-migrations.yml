@@ -28,4 +28,4 @@ jobs:
             exit 1
           fi
       - name: Apply new tables to Supabase
-        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
