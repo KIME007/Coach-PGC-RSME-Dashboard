@@ -7261,6 +7261,28 @@ body.viewonly #pPE .wk-x,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty
 #pPE table.pgt th.hh{color:#ffa63d}#pPE table.pgt th.h30{color:#ff7e79}#pPE table.pgt th.h90{color:#d5fc79}#pPE table.pgt th.hc{color:#9aa0ff}#pPE table.pgt th.hb{color:#ff8ad8}
 #pPE table.pgt thead tr:nth-child(2) th{top:31px}#pPE .pf{color:#ff5b62;font-weight:800}
 #ovPE .pe-form .sub{grid-column:1/-1;font-size:.7rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#f06aa8;border-bottom:1px solid var(--line,#2c2e33);padding-top:6px}
+#pPE .pg-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+#pPE .pg-card{background:#1d2029;border:2px solid #3b4050;border-top-width:5px;border-radius:12px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:9px}
+#pPE .pg-card:hover{border-color:#AF1763}
+#pPE .pg-card .ph{display:flex;align-items:center;gap:8px}#pPE .pg-card .ph .fb-chip{font-size:1rem;padding:4px 12px}
+#pPE .pg-card .pw{margin-left:auto;font-size:.7rem;color:#5ad1f0;font-weight:700;text-align:right}
+#pPE .eb{display:grid;grid-template-columns:70px 1fr auto;gap:2px 8px;align-items:center}
+#pPE .eb .el{font-size:.72rem;font-weight:800;color:#ffa63d;letter-spacing:.3px}
+#pPE .eb .bar{height:12px;background:#12151c;border-radius:6px;overflow:hidden;border:1px solid #2c2e33}#pPE .eb .bar i{display:block;height:100%;border-radius:6px}
+#pPE .eb .ev{font-size:.8rem;color:#a3a8c3;font-weight:700;white-space:nowrap}#pPE .eb .ev b{font-size:.95rem}
+#pPE .eb .eu{grid-column:2/4;font-size:.66rem;color:#6c7293;font-weight:700}
+#pPE .eb .ef{grid-column:2/4;color:#ff5b62;font-weight:800;font-size:.78rem}#pPE .eb .en,#pPE .hrt .en{grid-column:2/4;color:#6c7293;font-size:.72rem;font-weight:700}
+#pPE .pbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#pPE .pb{background:#14161d;border:1px solid #2c2e33;border-radius:9px;padding:8px}
+#pPE .pb .pt{display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:.7rem;color:#e4e6ef;margin-bottom:4px}
+#pPE .pb .pn .big{display:block;font-size:1.15rem;font-weight:800;line-height:1.2}#pPE .pb .pn span:last-child{font-size:.7rem;color:#a3a8c3;font-weight:700}
+#pPE .pb .pl{font-size:.64rem;color:#6c7293;font-weight:700;margin-top:3px}
+#pPE .pf2{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:.68rem;color:#a3a8c3;font-weight:700;border-top:1px solid #2c2e33;padding-top:8px}
+#pPE .pf2 .bt{margin-left:auto}
+#pPE .hrt{min-width:760px}#pPE .hrt td{padding:3px 8px}#pPE .hrt .fb-chip{padding:2px 6px}
+#pPE .hin{width:165px;background:#12151c;color:#fff;border:1px solid #3b4050;border-radius:8px;padding:5px 9px;font-weight:800;font-size:.86rem;text-align:center}
+#pPE .hin:focus{border-color:#AF1763;outline:none;box-shadow:0 0 0 3px rgba(175,23,99,.25)}
+body.viewonly #pPE .hin{pointer-events:none;opacity:.7}
 #pPE .pill{display:inline-block;font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;color:#111}
 #pPE .dd{display:inline-block;min-width:38px;text-align:center;font-weight:800;font-size:.76rem;padding:3px 8px;border-radius:7px;color:#111}
 #pPE .pe-tw{overflow:auto;max-height:76vh;border-radius:10px;border:1px solid #2c2e33}
@@ -7594,7 +7616,40 @@ function parseWeeks(wb){var out={},prep='';
          p30,l30 last PE 30 + location, p90,l90 last PE 90 + location, c1,c2 compressors, b1,b2,bl battery dates + location} */
 /* Coach or PGC follows the COACH / PGC switch in the header (global `section`) */
 var MODE='coach';function curMode(){return (typeof section!=='undefined'&&section==='pgc')?'pgc':'coach'}
-var PQ='',PPS='',PWK=0,PGCC=['#5ad1f0','#06222b'];
+var PQ='',PPS='',PWK=0,PGCC=['#5ad1f0','#06222b'],PVIEW='cards',PHRS=true;
+try{PVIEW=localStorage.getItem('rsd_pgc_view_v1')==='table'?'table':'cards';PHRS=localStorage.getItem('rsd_pgc_hrs_v1')!=='0'}catch(x){}
+/* engine hour bar: used out of 250 */
+function hourBar(label,at,now,used,left){var a=hrs(at),n=hrs(now);
+  if(a.f||n.f)return '<div class="eb"><span class="el">'+label+'</span><span class="ef">⚠ Meter faulty'+(n.t?' · '+esc(n.t):'')+'</span></div>';
+  if(used==null)return '<div class="eb"><span class="el">'+label+'</span><span class="en">no hours recorded</span></div>';
+  var pc=Math.max(0,Math.min(100,used/250*100));
+  return '<div class="eb"><span class="el">'+label+'</span><div class="bar"><i style="width:'+pc+'%;background:'+hrsColor(left)+'"></i></div>'
+    +'<span class="ev"><b style="color:'+hrsColor(left)+'">'+(left<0?'OVER '+(-left):left)+' h</b> '+(left<0?'':'left')+'</span>'
+    +'<span class="eu">'+used+' / 250 h · meter '+esc(n.t)+'</span></div>'}
+function peBlock(lv,last,loc,next,d,ps,col){
+  return '<div class="pb"><div class="pt"><b>'+lv+'</b>'+pill(ps==='-'?'no date':ps,PSC[ps])+'</div>'
+    +(next==='-'?'<div class="pn">–</div>':'<div class="pn"><span class="big" style="color:'+col+'">'+(d<0?(-d)+' days over':d===0?'due today':d+' days')+'</span><span>next '+fmt(next)+'</span></div>')
+    +'<div class="pl">last '+fmt(last)+(loc?' · '+esc(loc):'')+'</div></div>'}
+function pgcCards(rows){
+  return '<div class="pg-cards">'+rows.map(function(x){var r=x.r,i=x.i,k=pgcCalc(r),w=nowOf(r);
+    var worst=[k.ps30,k.ps90].indexOf('OVERDUE')>=0?'OVERDUE':[k.ps30,k.ps90].indexOf('PLAN FOR PE')>=0?'PLAN FOR PE':(k.ps30==='-'&&k.ps90==='-')?'-':'OKAY';
+    return '<div class="pg-card" style="border-top-color:'+PSC[worst]+'" onclick="PE.pedit('+i+')">'
+      +'<div class="ph">'+pgcChip(r.id)+'<span class="pw">🚆 '+(w.w?esc(w.w):'not on board')+'</span></div>'
+      +hourBar('Engine 1',r.a1,r.h1,k.u1,k.l1)+hourBar('Engine 2',r.a2,r.h2,k.u2,k.l2)
+      +'<div class="pbs">'+peBlock('PE 30 · engine',r.p30,r.l30,k.n30,k.d30,k.ps30,dayColor(k.d30))+peBlock('PE 90 · bogie',r.p90,r.l90,k.n90,k.d90,k.ps90,d90Color(k.d90))+'</div>'
+      +'<div class="pf2"><span>Comp 1 '+compPill(r.c1)+'</span><span>Comp 2 '+compPill(r.c2)+'</span><span class="bt">🔋 '+(r.b1||r.b2?fmt(r.b1)+(r.b2&&r.b2!==r.b1?' / '+fmt(r.b2):'')+(r.bl?' · '+esc(r.bl):''):'–')+'</span></div></div>'}).join('')+'</div>';}
+/* quick daily entry: today's meter reading for each engine */
+function hoursEntry(rows){
+  var ro=(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER)?' readonly':'';
+  var h='<div class="fb-sec pg-hrs"><h3 style="cursor:pointer" onclick="PE.phrs()">'+(PHRS?'▾':'▸')+' 📝 Daily engine hours <span class="ct">type today’s hour-meter reading · press Enter / Tab to go to the next box · then 💾 Save</span></h3>';
+  if(!PHRS)return h+'</div>';
+  h+='<div class="pe-tw"><table class="pe hrt"><thead><tr><th>PGC</th><th>Engine 1 — today</th><th>used since PE 30</th><th>Engine 2 — today</th><th>used since PE 30</th><th>PE 30 due</th></tr></thead><tbody>';
+  rows.forEach(function(x){var r=x.r,k=pgcCalc(r),u=function(used,left){return used==null?'<span class="en">–</span>':'<span class="dd" style="background:'+hrsColor(left)+'">'+used+' / 250 h</span>'};
+    h+='<tr><td>'+pgcChip(r.id)+'</td>'
+      +'<td><input class="hin" data-i="'+x.i+'" data-k="h1" value="'+esc(r.h1)+'" inputmode="numeric"'+ro+' onchange="PE.phset(this)" onkeydown="PE.phkey(event,this)" onblur="PE.phset(this)"></td><td>'+u(k.u1,k.l1)+'</td>'
+      +'<td><input class="hin" data-i="'+x.i+'" data-k="h2" value="'+esc(r.h2)+'" inputmode="numeric"'+ro+' onchange="PE.phset(this)" onkeydown="PE.phkey(event,this)" onblur="PE.phset(this)"></td><td>'+u(k.u2,k.l2)+'</td>'
+      +'<td>'+(k.n30==='-'?'–':fmt(k.n30)+' · '+ddHtml(k.d30))+'</td></tr>';});
+  return h+'</tbody></table></div></div>';}
 function modeBar(){return '';return '<div class="pe-mode"><span class="'+(MODE==='coach'?'on':'')+'" onclick="PE.mode(\'coach\')">🚃 Coach PE</span>'
   +'<span class="'+(MODE==='pgc'?'on':'')+'" onclick="PE.mode(\'pgc\')">🚂 PGC PE</span></div>'}
 function P(){if(!S.pePgc)S.pePgc={title:'PGC PERIODICAL EXAMINATION (PE 30 & PE 90)',sub:'ROLLING STOCK AND ENGINEERING (RSM PGC)',year:'JAN-DEC '+(typeof RS_YEAR==='undefined'?2026:RS_YEAR),rows:[]};return S.pePgc}
@@ -7692,13 +7747,17 @@ function renderPgc(el){
     +kt('o','PLAN',c.p30+c.p90,'Plan for PE (PE 30 '+c.p30+' · PE 90 '+c.p90+')')+kt('m','FAULT',c.f,'Faulty hour meter / compressor')+'</div>';
   h+='<div class="fb-search"><span class="ic">🔍</span><input type="search" placeholder="Find a PGC, location, FAULTY… e.g. 213, TUMPAT" value="'+esc(PQ)+'" oninput="PE.pq(this.value)"></div>';
   if(!rows.length){h+='<div class="fb-sec"><div style="padding:18px;text-align:center;color:#a3a8c3">No PGC schedule yet — click <b>⬆ Import Excel</b> and choose “PGC SCHEDULE PE 30 &amp; PE 90 2026.xlsx”, then click <b>💾 Save</b>.</div></div>';el.innerHTML=h+'<div id="peWkPrint"></div>';return;}
-  h+=pgcForecastHtml()+pgcPlanHtml();
-  h+='<div class="fb-sec pe-sheet"><h3>📋 PGC PE 30 &amp; PE 90 Schedule <span class="ct">'+(PQ||PPS?'filtered · ':'')+'click a PGC to edit or update daily hours</span></h3>'
+  var vis=rows.map(function(r,i){return {r:r,i:i}}).filter(function(x){return pgcMatch(x.r)});
+  h+=hoursEntry(vis)+pgcForecastHtml()+pgcPlanHtml();
+  h+='<div class="fb-sec pe-sheet"><h3>📋 PGC PE 30 &amp; PE 90 Schedule <span class="ct">'+(PQ||PPS?'filtered · ':'')+'click a PGC to edit</span>'
+    +'<span class="wk-nav"><button class="fb-btn'+(PVIEW==='cards'?' p':'')+'" onclick="PE.pview(\'cards\')">▦ Cards</button><button class="fb-btn'+(PVIEW==='table'?' p':'')+'" onclick="PE.pview(\'table\')">☰ Full table</button></span></h3>'
+    +(PVIEW==='cards'?(vis.length?pgcCards(vis):'<div style="padding:16px;text-align:center;color:#a3a8c3">No PGC matches.</div>')+'</div><div id="peWkPrint"></div>':'')
     +'<div class="pe-print-h">'+esc(D.title)+'<br>'+esc(D.sub)+'<br>YEAR : '+esc(D.year)+'</div>'
     +'<div class="pe-tw"><table class="pe pgt"><thead><tr><th rowspan="2">No.</th><th rowspan="2">PGC</th><th colspan="2" class="hh">Engine hours (daily · since PE 30)</th><th colspan="5" class="h30">PE 30 (engine)</th><th colspan="4" class="h90">PE 90 (bogie)</th>'
     +'<th rowspan="2" class="hc">Comp. 1</th><th rowspan="2" class="hc">Comp. 2</th><th colspan="3" class="hb">Battery</th></tr>'
     +'<tr><th class="hh">Engine 1</th><th class="hh">Engine 2</th><th class="h30">Last PE</th><th class="h30">Location</th><th class="h30">Next PE</th><th class="h30">Days</th><th class="h30">Status</th>'
     +'<th class="h90">Last PE</th><th class="h90">Location</th><th class="h90">Next PE</th><th class="h90">Days</th><th class="hb">Engine 1</th><th class="hb">Engine 2</th><th class="hb">Location</th></tr></thead><tbody>';
+  if(PVIEW==='cards'){el.innerHTML=h;return;}
   var shown=0;rows.forEach(function(r,i){if(!pgcMatch(r))return;shown++;var k=pgcCalc(r);
     h+='<tr class="row" onclick="PE.pedit('+i+')"><td class="n">'+(i+1)+'</td><td class="id">'+pgcChip(r.id)+'</td>'
       +'<td class="hrs">'+hoursCell(r.a1,r.h1,k.l1)+'</td><td class="hrs">'+hoursCell(r.a2,r.h2,k.l2)+'</td>'
@@ -7942,6 +8001,16 @@ window.PE={
   pq:function(x){PQ=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   pps:function(k){PPS=PPS===k?'':k;render();},
   pedit:function(i){ED={pgc:1,i:i};pform(P().rows[i],false);},
+  pview:function(v){PVIEW=v==='table'?'table':'cards';try{localStorage.setItem('rsd_pgc_view_v1',PVIEW)}catch(x){}render();},
+  phrs:function(){PHRS=!PHRS;try{localStorage.setItem('rsd_pgc_hrs_v1',PHRS?'1':'0')}catch(x){}render();},
+  /* typing a meter reading: update that row in place (no page redraw), redraw cards once you leave the list */
+  phset:function(el){var i=+el.getAttribute('data-i'),r=P().rows[i],k=el.getAttribute('data-k'),v=String(el.value).trim().toUpperCase();if(!r||String(r[k]||'')===v)return;
+    r[k]=v;if(typeof touched==='function')touched();if(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER)return;
+    var c=pgcCalc(r),tr=el.closest('tr'),u=function(used,left){return used==null?'<span class="en">–</span>':'<span class="dd" style="background:'+hrsColor(left)+'">'+used+' / 250 h</span>'};
+    if(tr){tr.children[2].innerHTML=u(c.u1,c.l1);tr.children[4].innerHTML=u(c.u2,c.l2);tr.children[5].innerHTML=c.n30==='-'?'–':fmt(c.n30)+' · '+ddHtml(c.d30);}
+    clearTimeout(PE._rt);PE._rt=setTimeout(function(){var a=document.activeElement;if(!(a&&a.classList&&a.classList.contains('hin')))render();},400);},
+  phkey:function(e,el){if(e.key!=='Enter')return;e.preventDefault();var all=[].slice.call(document.querySelectorAll('.hin')),nx=all[all.indexOf(el)+(e.shiftKey?-1:1)];
+    PE.phset(el);if(nx){nx.focus();nx.select();}else el.blur();},
   padd:function(){ED={pgc:1,i:null};pform({id:'PGC '},true);},
   p30now:function(){var t=isoOf(today()),g=function(id){return document.getElementById(id)};g('pgP30').value=t;if(g('pgH1').value)g('pgA1').value=g('pgH1').value;if(g('pgH2').value)g('pgA2').value=g('pgH2').value;},
   pdone:function(i,lv){var r=P().rows[i];if(!confirm(r.id+': '+lv+' done today ('+fmt(isoOf(today()))+')?'))return;
