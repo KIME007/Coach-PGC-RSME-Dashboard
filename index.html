@@ -464,7 +464,7 @@ const KASSET={logo:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAaUAAACJCAYAAA
 </nav>
 <script>
 /* tab order — tabs added later by other modules are put in this order (Report always last) */
-(function(){var ORDER=['tabOverview','tabData','tabIncidents','tabDaily','tabFleet','tabPE','tabProj','tabReport'],nav=document.querySelector('nav.tabs');
+(function(){var ORDER=['tabOverview','tabData','tabIncidents','tabDaily','tabFleet','tabPE','tabPEP','tabProj','tabReport'],nav=document.querySelector('nav.tabs');
   function fix(){var want=ORDER.map(function(id){return document.getElementById(id)}).filter(function(x){return x&&x.parentNode===nav});
     var now=[].filter.call(nav.children,function(x){return want.indexOf(x)>=0});
     if(now.every(function(x,i){return x===want[i]}))return;want.forEach(function(x){nav.appendChild(x)});}
@@ -7594,7 +7594,7 @@ function parseWeeks(wb){var out={},prep='';
          p30,l30 last PE 30 + location, p90,l90 last PE 90 + location, c1,c2 compressors, b1,b2,bl battery dates + location} */
 var MODE='coach';try{MODE=localStorage.getItem('rsd_pe_mode_v1')==='pgc'?'pgc':'coach'}catch(x){}
 var PQ='',PPS='',PWK=0,PGCC=['#5ad1f0','#06222b'];
-function modeBar(){return '<div class="pe-mode"><span class="'+(MODE==='coach'?'on':'')+'" onclick="PE.mode(\'coach\')">🚃 Coach PE</span>'
+function modeBar(){return '';return '<div class="pe-mode"><span class="'+(MODE==='coach'?'on':'')+'" onclick="PE.mode(\'coach\')">🚃 Coach PE</span>'
   +'<span class="'+(MODE==='pgc'?'on':'')+'" onclick="PE.mode(\'pgc\')">🚂 PGC PE</span></div>'}
 function P(){if(!S.pePgc)S.pePgc={title:'PGC PERIODICAL EXAMINATION (PE 30 & PE 90)',sub:'ROLLING STOCK AND ENGINEERING (RSM PGC)',year:'JAN-DEC '+(typeof RS_YEAR==='undefined'?2026:RS_YEAR),rows:[]};return S.pePgc}
 function WP(){if(!S.pePgcWeekly)S.pePgcWeekly={prep:'',weeks:{}};if(!S.pePgcWeekly.weeks)S.pePgcWeekly.weeks={};return S.pePgcWeekly}
@@ -7916,15 +7916,16 @@ function parse(ws){
 }
 /* ---------- mount ---------- */
 function visible(){var p=document.getElementById('pPE');return p&&p.style.display!=='none'}
-function hide(){var t=document.getElementById('tabPE'),p=document.getElementById('pPE');if(t)t.classList.remove('on');if(p)p.style.display='none';}
+function hide(){['tabPE','tabPEP'].forEach(function(id){var t=document.getElementById(id);if(t)t.classList.remove('on')});var p=document.getElementById('pPE');if(p)p.style.display='none';}
 function mount(){
   if(document.getElementById('pPE'))return;
   var tabs=document.querySelector('nav.tabs'),main=document.querySelector('main');if(!tabs||!main)return;
-  var btn=document.createElement('button');btn.className='tab';btn.id='tabPE';btn.innerHTML='🛠️ PE Schedule';btn.onclick=function(){PE.open()};
+  var btn=document.createElement('button');btn.className='tab';btn.id='tabPE';btn.innerHTML='🛠️ Coach PE';btn.onclick=function(){PE.mode('coach');PE.open()};
+  tabs.appendChild(btn);btn=document.createElement('button');btn.className='tab';btn.id='tabPEP';btn.innerHTML='🚂 PGC PE';btn.onclick=function(){PE.mode('pgc');PE.open()};
   tabs.appendChild(btn);
   var sec=document.createElement('section');sec.className='panel';sec.id='pPE';sec.style.display='none';sec.innerHTML='<div id="peArea"></div>';main.appendChild(sec);
   /* any other tab hides this one */
-  tabs.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.tab');if(t&&t.id!=='tabPE')hide();},true);
+  tabs.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.tab');if(t&&t.id!=='tabPE'&&t.id!=='tabPEP')hide();},true);
   var ay=window.applyYear;if(typeof ay==='function'&&!ay._peWrapped){window.applyYear=function(){var r=ay.apply(this,arguments);if(visible())render();return r};window.applyYear._peWrapped=true;}
   window.addEventListener('rsd-backup-applied',function(){if(visible())setTimeout(render,0)});
 }
@@ -7932,11 +7933,12 @@ window.PE={
   open:function(){
     document.querySelectorAll('nav.tabs .tab').forEach(function(t){t.classList.remove('on')});
     document.querySelectorAll('main > section.panel').forEach(function(p){if(p.id!=='pPE')p.style.display='none'});
-    document.getElementById('tabPE').classList.add('on');document.getElementById('pPE').style.display='';render();},
+    document.getElementById(MODE==='pgc'?'tabPEP':'tabPE').classList.add('on');document.getElementById('pPE').style.display='';render();},
   q:function(x){Q=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   ty:function(x){TY=x;render();},
   sort:function(x){SORT=x;render();},
-  mode:function(m){MODE=m==='pgc'?'pgc':'coach';try{localStorage.setItem('rsd_pe_mode_v1',MODE)}catch(x){}render();},
+  mode:function(m){MODE=m==='pgc'?'pgc':'coach';try{localStorage.setItem('rsd_pe_mode_v1',MODE)}catch(x){}
+    ['tabPE','tabPEP'].forEach(function(id){var t=document.getElementById(id);if(t)t.classList.toggle('on',(id==='tabPEP')===(MODE==='pgc')&&document.getElementById('pPE').style.display!=='none')});render();},
   pq:function(x){PQ=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   pps:function(k){PPS=PPS===k?'':k;render();},
   pedit:function(i){ED={pgc:1,i:i};pform(P().rows[i],false);},
@@ -8014,14 +8016,14 @@ window.PE={
     if(wb.SheetNames.some(function(n){return /^WEEK\s*\d+/i.test(n)})){var pw=parseWeeks(wb),ks=Object.keys(pw.weeks).sort();if(!ks.length)return false;
       if(!confirm('Load '+ks.length+' weekly PE plan'+(ks.length===1?'':'s')+' (week '+weekNo(ks[0])+' – '+weekNo(ks[ks.length-1])+') from '+name+'?\nWeeks already in the dashboard with the same dates are replaced.'))return true;
       ks.forEach(function(k){W().weeks[k]=pw.weeks[k]});if(pw.prep&&!W().prep)W().prep=pw.prep.replace(/\r/g,'').toUpperCase();
-      if(typeof touched==='function')touched();PE.open();toast('✔ Loaded '+ks.length+' weekly plans — click 💾 Save to keep them',6000);return true;}
+      if(typeof touched==='function')touched();MODE='coach';PE.open();toast('✔ Loaded '+ks.length+' weekly plans — click 💾 Save to keep them',6000);return true;}
     var nd=null;for(var k=0;k<wb.SheetNames.length&&!nd;k++){var t=parse(wb.Sheets[wb.SheetNames[k]]);if(t.groups.some(function(g){return g.rows.length}))nd=t;}
     if(!nd)return false;var n=nd.groups.reduce(function(a,g){return a+g.rows.length},0);
     var fileHl=nd.groups.some(function(g){return g.rows.some(function(r){return r.hl})});
     if(!fileHl){var old={};data().groups.forEach(function(g){g.rows.forEach(function(r){if(r.hl)old[r.id]=1})});
       nd.groups.forEach(function(g){g.rows.forEach(function(r){if(old[r.id])r.hl=1})});}
     if(!confirm('Load the PE 60 & PE 90 schedule — '+n+' coaches from '+name+'?'))return true;
-    S.peSchedule=nd;if(typeof touched==='function')touched();PE.open();
+    S.peSchedule=nd;if(typeof touched==='function')touched();MODE='coach';PE.open();
     toast('✔ PE schedule loaded: '+n+' coaches — click 💾 Save to keep it',6000);return true;},
   render:render
 };
