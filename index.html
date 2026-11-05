@@ -779,8 +779,15 @@ async function loadRole(){
   RSD_VIEWER=v;document.body.classList.toggle("viewonly",v);renderUserBox();
   if(v&&typeof setDirty==="function")setDirty(false);
 }
-function viewNote(){const n=Date.now();if(n-_viewNoteAt<8000)return;_viewNoteAt=n;
-  toast("👁 View-only account — you can look and filter, but changes are not saved",4500);}
+function viewNote(){const n=Date.now();if(n-_viewNoteAt<6000)return;_viewNoteAt=n;
+  toast("👁 View-only account — you cannot change anything",4000);}
+/* the data as loaded from the cloud; any change a viewer makes is put back at once */
+let _viewSnap=null,_viewRT=null;
+document.addEventListener("dragstart",e=>{if(RSD_VIEWER){e.preventDefault();e.stopPropagation();viewNote();}},true);
+function viewSnapTake(){if(!RSD_VIEWER)return;try{_viewSnap=JSON.stringify(packBackup())}catch(e){_viewSnap=null}}
+function viewRevert(){if(!_viewSnap)return;clearTimeout(_viewRT);_viewRT=setTimeout(()=>{
+  try{applyBackupPack(JSON.parse(_viewSnap),true);if(typeof applyYear==="function")applyYear();}catch(e){console.warn("view revert",e)}
+  toast("👁 View-only account — change undone, nothing was saved",3500);},60);}
 function renderUserBox(){
   const el=document.getElementById("userBox");if(!el)return;
   if(!_auth){el.innerHTML="";return;}
@@ -1103,6 +1110,7 @@ async function cloudHydrate(){
     if(pack){
       _dailySig=undefined;
       applyBackupPack(pack,true);
+      viewSnapTake();
     }else{
       await cloudPushAll();
     }
@@ -1340,7 +1348,7 @@ function setDirty(d){if(RSD_VIEWER)d=false;dirty=d;const el=document.getElementB
   const ei=document.getElementById('editInfo');if(ei)ei.textContent=d?"● Unsaved changes — click 💾 Save (Ctrl+S)":"";
   const b=document.getElementById('btnSave');if(b)b.classList.toggle('clean',!d);
   if(typeof renderCloudPill==="function")renderCloudPill();}
-function touched(){if(RSD_VIEWER){viewNote();return;}setDirty(true);persist();}
+function touched(){if(RSD_VIEWER){viewNote();viewRevert();return;}setDirty(true);persist();}
 function resetAll(){if(!confirm("Discard the edits for "+RS_YEAR+" and restore that year to its starting data?"))return;
   const all=yrLoadAll();delete all[String(RS_YEAR)];yrSaveAll(all);
   if(RS_YEAR===BASE_YEAR){localStorage.removeItem(LSK);localStorage.removeItem(LSB);wbB64=ORIG_B64;S=onlySystemFailures(deep(DATA));}
@@ -7170,6 +7178,13 @@ window.AVX={
 <!-- ================= END SYSTEM AVAILABILITY (DAILY) MODULE ================= -->
 
 <style id="viewCss">
+body.viewonly .overlay .mfoot .btn.primary,body.viewonly .overlay .mfoot [onclick*="del" i],body.viewonly .pj-fab,
+body.viewonly #pFleet .fb-trash,body.viewonly #pFleet .fb-btn.p,body.viewonly #pFleet [onclick*="FLEET.add" i],body.viewonly #pFleet [onclick*="newDay" i],body.viewonly #pFleet [onclick*="clearDay" i],
+body.viewonly #pFleet [onclick*="FLEET.undo" i],body.viewonly #pFleet [onclick*="FLEET.sync" i],body.viewonly #pFleet input[type=file]+*,
+body.viewonly #pPE [onclick*="PE.add" i],body.viewonly [onclick*="dlyAdd" i],body.viewonly [onclick*="dlyDel" i],body.viewonly [onclick*="resetAll" i]{display:none!important}
+body.viewonly #pFleet .fb-chip,body.viewonly #pFleet .fb-col{cursor:default!important}
+body.viewonly::after{content:"👁 VIEW ONLY — nothing can be changed";position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:9999;
+  background:#2a1b26;color:#f06aa8;border:1px solid #AF1763;border-radius:99px;padding:5px 14px;font:800 .72rem/1.2 system-ui,sans-serif;letter-spacing:.5px;pointer-events:none}
 body.viewonly #btnSave,body.viewonly .hbtn[onclick*="fileIn"],body.viewonly #pPE .fb-btn.p,body.viewonly #pPE .pe-card .f button,
 body.viewonly #pPE .wk-x,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty .fb-btn,body.viewonly #ovPE .mfoot .primary,body.viewonly #ovPE #peDel{display:none!important}
 .ubox .vbadge{background:#2a1b26;color:#f06aa8;border:1px solid #AF1763;font-weight:800}
