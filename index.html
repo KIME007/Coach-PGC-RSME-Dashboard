@@ -7181,7 +7181,7 @@ window.AVX={
 body.viewonly .overlay .mfoot .btn.primary,body.viewonly .overlay .mfoot [onclick*="del" i],body.viewonly .pj-fab,
 body.viewonly #pFleet .fb-trash,body.viewonly #pFleet .fb-btn.p,body.viewonly #pFleet [onclick*="FLEET.add" i],body.viewonly #pFleet [onclick*="newDay" i],body.viewonly #pFleet [onclick*="clearDay" i],
 body.viewonly #pFleet [onclick*="FLEET.undo" i],body.viewonly #pFleet [onclick*="FLEET.sync" i],body.viewonly #pFleet input[type=file]+*,
-body.viewonly #pPE [onclick*="PE.add" i],body.viewonly [onclick*="dlyAdd" i],body.viewonly [onclick*="dlyDel" i],body.viewonly [onclick*="resetAll" i]{display:none!important}
+body.viewonly #pPE [onclick*="PE.add" i],body.viewonly #pPE [onclick*="PE.padd" i],body.viewonly [onclick*="dlyAdd" i],body.viewonly [onclick*="dlyDel" i],body.viewonly [onclick*="resetAll" i]{display:none!important}
 body.viewonly #pFleet .fb-chip,body.viewonly #pFleet .fb-col{cursor:default!important}
 body.viewonly::after{content:"👁 VIEW ONLY — nothing can be changed";position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:9999;
   background:#2a1b26;color:#f06aa8;border:1px solid #AF1763;border-radius:99px;padding:5px 14px;font:800 .72rem/1.2 system-ui,sans-serif;letter-spacing:.5px;pointer-events:none}
@@ -7254,6 +7254,13 @@ body.viewonly #pPE .wk-x,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty
   #peWkPrint .wd-p{border:2px solid #000;display:inline-block;padding:6px 14px;font-size:7.5pt;min-width:260px}
   #peWkPrint *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+#pPE .pe-mode{display:inline-flex;gap:4px;background:#12151c;border:1px solid #2c2e33;border-radius:12px;padding:4px;margin-bottom:12px}
+#pPE .pe-mode span{padding:7px 16px;border-radius:9px;font-weight:800;font-size:.82rem;color:#a3a8c3;cursor:pointer}
+#pPE .pe-mode span.on{background:#AF1763;color:#fff}
+#pPE table.pgt{min-width:1650px}#pPE table.pgt td{white-space:nowrap}#pPE .pe-card .dd,#pPE .pe-card .pill{white-space:nowrap}#pPE .pe-card .h{flex-wrap:wrap}#pPE table.pgt td.hrs{font-size:.72rem;white-space:nowrap}#pPE table.pgt td.hrs small{color:#6c7293;font-weight:700}
+#pPE table.pgt th.hh{color:#ffa63d}#pPE table.pgt th.h30{color:#ff7e79}#pPE table.pgt th.h90{color:#d5fc79}#pPE table.pgt th.hc{color:#9aa0ff}#pPE table.pgt th.hb{color:#ff8ad8}
+#pPE table.pgt thead tr:nth-child(2) th{top:31px}#pPE .pf{color:#ff5b62;font-weight:800}
+#ovPE .pe-form .sub{grid-column:1/-1;font-size:.7rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#f06aa8;border-bottom:1px solid var(--line,#2c2e33);padding-top:6px}
 #pPE .pill{display:inline-block;font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;color:#111}
 #pPE .dd{display:inline-block;min-width:38px;text-align:center;font-weight:800;font-size:.76rem;padding:3px 8px;border-radius:7px;color:#111}
 #pPE .pe-tw{overflow:auto;max-height:76vh;border-radius:10px;border:1px solid #2c2e33}
@@ -7331,7 +7338,7 @@ function data(){
 }
 function changed(){if(typeof touched==='function')touched();render();}
 /* coach id on the Fleet board: 'ASC 2148' → '2148', 'AKC2' → 'AKC2' */
-function fleetKey(id){var t=String(id).toUpperCase().replace(/\s+/g,''),m=t.match(/^[A-Z]+(\d{4})$/);return m?m[1]:t}
+function fleetKey(id){var t=String(id).toUpperCase().replace(/\s+/g,''),m=t.match(/^[A-Z]+(\d{4})$/)||t.match(/^PGC(\d+)$/);return m?m[1]:t}
 /* coach type colours — same as Fleet Deployment */
 var TYC={ABC:['#ffd60a','#1a1a1a'],ADNF:['#9437ff','#fff'],ADNS:['#2f7fe0','#fff'],AFC:['#2ecc40','#0b1a0d'],ASC:['#e5383b','#fff'],SPECIAL:['#ff9300','#1a1a1a']};
 function typeOf(id){var t=String(id).toUpperCase().replace(/\s+/g,'').match(/^[A-Z]+/);t=t?t[0]:'';return TYC[t]?t:'SPECIAL'}
@@ -7581,11 +7588,249 @@ function parseWeeks(wb){var out={},prep='';
     out[sun]={items:items};});
   return {weeks:out,prep:prep};}
 
+/* ================= PGC PE (PE 30 engine: 30 days / 250 engine hours · PE 90 bogie: 90 days) =================
+   Laid out like "PGC SCHEDULE PE 30 & PE 90" and "PGC PE WEEKLY PLANNING". Data in S.pePgc / S.pePgcWeekly.
+   Row: {id, a1,a2 hours at last PE 30, h1,h2 daily hours (text kept, e.g. "53021 (FAULTY)"),
+         p30,l30 last PE 30 + location, p90,l90 last PE 90 + location, c1,c2 compressors, b1,b2,bl battery dates + location} */
+var MODE='coach';try{MODE=localStorage.getItem('rsd_pe_mode_v1')==='pgc'?'pgc':'coach'}catch(x){}
+var PQ='',PPS='',PWK=0,PGCC=['#5ad1f0','#06222b'];
+function modeBar(){return '<div class="pe-mode"><span class="'+(MODE==='coach'?'on':'')+'" onclick="PE.mode(\'coach\')">🚃 Coach PE</span>'
+  +'<span class="'+(MODE==='pgc'?'on':'')+'" onclick="PE.mode(\'pgc\')">🚂 PGC PE</span></div>'}
+function P(){if(!S.pePgc)S.pePgc={title:'PGC PERIODICAL EXAMINATION (PE 30 & PE 90)',sub:'ROLLING STOCK AND ENGINEERING (RSM PGC)',year:'JAN-DEC '+(typeof RS_YEAR==='undefined'?2026:RS_YEAR),rows:[]};return S.pePgc}
+function WP(){if(!S.pePgcWeekly)S.pePgcWeekly={prep:'',weeks:{}};if(!S.pePgcWeekly.weeks)S.pePgcWeekly.weeks={};return S.pePgcWeekly}
+function hrs(v){var t=String(v==null?'':v).replace(/\s+/g,' ').trim(),m=t.match(/-?\d+(\.\d+)?/);return {n:m&&t!=='-'?+m[0]:null,f:/FAULT/i.test(t),t:t==='-'?'':t}}
+function dayN(iso){var d=parseIso(iso);return d?Math.round((d-today())/864e5):'-'}
+function pgcCalc(r){
+  var e=function(at,now){var a=hrs(at),n=hrs(now);return (a.n==null||n.n==null||a.f||n.f)?null:n.n-a.n};
+  var u1=e(r.a1,r.h1),u2=e(r.a2,r.h2),n30=parseIso(r.p30)?addDays(r.p30,30):'-',d30=n30==='-'?'-':dayN(n30);
+  var left=function(u){return u==null?null:250-u};var l1=left(u1),l2=left(u2),hmin=[l1,l2].filter(function(x){return x!=null});hmin=hmin.length?Math.min.apply(null,hmin):null;
+  var ps30=n30==='-'?'-':(d30<=0||(hmin!=null&&hmin<=0))?'OVERDUE':(d30<=7||(hmin!=null&&hmin<=50))?'PLAN FOR PE':'OKAY';
+  var n90=parseIso(r.p90)?addDays(r.p90,90):'-',d90=n90==='-'?'-':dayN(n90),ps90=n90==='-'?'-':d90<=0?'OVERDUE':d90<=10?'PLAN FOR PE':'OKAY';
+  return {u1:u1,u2:u2,l1:l1,l2:l2,n30:n30,d30:d30,ps30:ps30,n90:n90,d90:d90,ps90:ps90};}
+/* colours as in the file: hours left ≤50 yellow, over → red; PE 90 days ≤0 red, ≤7 orange, ≤10 yellow */
+function hrsColor(l){return l==null?'#c08a6a':l<=0?'#ff5b62':l<=50?'#ffd60a':'#3ddc84'}
+function d90Color(d){return d==='-'?'#c08a6a':d<=0?'#ff5b62':d<=7?'#ffa63d':d<=10?'#ffd60a':'#3ddc84'}
+function compPill(t){t=String(t||'').toUpperCase();return t?pill(t,/OK/.test(t)?'#3ddc84':/FAULT/.test(t)?'#ff5b62':'#6c7293'):'–'}
+function pgcChip(id){return '<span class="fb-chip" style="background:'+PGCC[0]+';color:'+PGCC[1]+'">'+esc(id)+'</span>'}
+function hoursCell(at,now,l){var a=hrs(at),n=hrs(now);if(!a.t&&!n.t)return '–';
+  if(a.f||n.f)return '<span class="pf">'+esc(n.t||a.t)+'</span>';
+  return '<b>'+esc(n.t)+'</b><small> since PE '+esc(a.t)+'</small><br>'+(l==null?'':'<span class="dd" style="background:'+hrsColor(l)+'">'+(l<0?'over '+(-l):l)+' h left</span>');}
+function pgcMatch(r){var k=pgcCalc(r);
+  if(PPS==='OVERDUE'&&k.ps30!=='OVERDUE'&&k.ps90!=='OVERDUE')return false;
+  if(PPS==='PLAN'&&k.ps30!=='PLAN FOR PE'&&k.ps90!=='PLAN FOR PE')return false;
+  if(PPS==='FAULT'&&!(hrs(r.h1).f||hrs(r.h2).f||/FAULT/i.test(r.c1+r.c2)))return false;
+  if(PQ&&(r.id+' '+r.l30+' '+r.l90+' '+r.c1+' '+r.c2+' '+r.h1+' '+r.h2+' '+r.bl).toUpperCase().indexOf(PQ.toUpperCase())<0)return false;
+  return true}
+function pgcPlanHtml(){
+  var it=[];P().rows.forEach(function(r,i){var k=pgcCalc(r),w=nowOf(r);
+    if(k.ps30==='OVERDUE'||k.ps30==='PLAN FOR PE')it.push({r:r,i:i,lv:'PE 30',ps:k.ps30,d:k.d30,n:k.n30,k:k,w:w});
+    if(k.ps90==='OVERDUE'||k.ps90==='PLAN FOR PE')it.push({r:r,i:i,lv:'PE 90',ps:k.ps90,d:k.d90,n:k.n90,k:k,w:w});});
+  it.sort(function(a,b){return a.d-b.d});
+  var h='<div class="fb-sec"><h3 style="cursor:pointer" onclick="PE.plan()">'+(PLAN?'▾':'▸')+' 📅 PGC PE Planning <span class="ct">'+it.length+' PE due (PE 30 within 7 days / 50 engine hours · PE 90 within 10 days) · soonest first</span></h3>';
+  if(PLAN){if(!it.length)h+='<div style="color:#3ddc84;font-weight:700;font-size:.82rem">✔ Nothing due soon.</div>';
+    else h+='<div class="pe-cards">'+it.map(function(x){var k=x.k,r=x.r;
+      return '<div class="pe-card" onclick="PE.pedit('+x.i+')"><div class="h">'+pgcChip(r.id)+pill(x.lv,x.lv==='PE 30'?'#ff7e79':'#d5fc79')+pill(x.ps,PSC[x.ps])
+        +'<span class="dd" style="background:'+(x.lv==='PE 30'?dayColor(x.d):d90Color(x.d))+'">'+(x.d<0?'('+(-x.d)+')':x.d)+' d</span></div>'
+        +'<div class="b">Next '+x.lv+' <b>'+fmt(x.n)+'</b>'+(x.lv==='PE 30'&&(k.l1!=null||k.l2!=null)?' · hours left E1 <b>'+(k.l1==null?'–':k.l1)+'</b> · E2 <b>'+(k.l2==null?'–':k.l2)+'</b>':'')
+        +'<br>📍 '+esc((x.lv==='PE 30'?r.l30:r.l90)||'—')+'<br><span class="now">🚆 Now: '+(x.w.w?esc(x.w.w):'<i style="color:#6c7293">not on the Fleet board</i>')+'</span></div>'
+        +'<div class="f"><span style="font-size:.66rem;color:#6c7293;font-weight:700">Last '+x.lv+' '+fmt(x.lv==='PE 30'?r.p30:r.p90)+'</span><button onclick="event.stopPropagation();PE.pdone('+x.i+',\''+x.lv+'\')">✔ '+x.lv+' done today</button></div></div>'}).join('')+'</div>';}
+  return h+'</div>';
+}
+/* ---------- PGC weekly forecast ---------- */
+function curSunP(){var t=today();t.setDate(t.getDate()+PWK*7);return sunOf(t)}
+function pRow(id){var k=keyOf(id),hit=null;P().rows.forEach(function(r,i){if(!hit&&keyOf(r.id)===k)hit={r:r,i:i}});return hit}
+function pgcRunning(r){var c=nowOf(r).cat;return c==='TRAIN'||c==='SPARE'||c==='NONE'}
+function pgcCands(sun){var sat=addDays(sun,6),lim=addDays(sat,7),items=(WP().weeks[sun]||{items:[]}).items,have={},out=[];
+  items.forEach(function(x){have[keyOf(x.id)+'|'+x.lvl]=1});
+  P().rows.forEach(function(r){if(!pgcRunning(r))return;var k=pgcCalc(r);
+    [['PE 30',k.n30,k.d30,k.ps30],['PE 90',k.n90,k.d90,k.ps90]].forEach(function(p){if(p[1]==='-'||have[keyOf(r.id)+'|'+p[0]])return;
+      if(p[1]<=lim||(p[0]==='PE 30'&&p[3]!=='OKAY'))out.push({r:r,k:k,lvl:p[0],next:p[1],d:p[2],must:p[1]<=sat||p[3]==='OVERDUE'});});});
+  return out.sort(function(a,b){return a.d-b.d})}
+function pEst(r,lvl){var k=pgcCalc(r);return lvl==='PE 30'?{e1:k.l1==null?null:-k.l1,d:null,e2:k.l2==null?null:-k.l2}:{e1:null,d:k.d90==='-'?null:-k.d90,e2:null}}
+function pItem(r,lvl,sun){var k=pgcCalc(r),nx=lvl==='PE 30'?k.n30:k.n90,sat=addDays(sun,6),lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;
+  return {id:r.id,lvl:lvl,last:(lvl==='PE 30'?r.p30:r.p90)||'',plan:clampIso(nx==='-'?lo:nx,lo,sat),loc:depotOfNow(r)||(lvl==='PE 30'?r.l30:r.l90)||'',st:'IN OPERATIONS',rem:'',est:pEst(r,lvl)}}
+function estTxt(e){if(!e)return '–';var a=[];if(e.e1!=null)a.push('E1 '+e.e1+' h');if(e.d!=null)a.push(e.d+' d');if(e.e2!=null)a.push('E2 '+e.e2+' h');return a.join(' · ')||'–'}
+function pgcForecastHtml(){
+  var sun=curSunP(),sat=addDays(sun,6),wn=weekNo(sun),items=(WP().weeks[sun]||{items:[]}).items,cands=pgcCands(sun),must=cands.filter(function(c){return c.must});
+  var label=PWK===0?'This week':PWK===1?'Next week':PWK===-1?'Last week':(PWK>0?'In '+PWK+' weeks':Math.abs(PWK)+' weeks ago');
+  var h='<div class="fb-sec pe-wk"><h3>🗓 PGC Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' PE planned</span>'
+    +'<span class="wk-nav"><button class="fb-btn" onclick="PE.pwk(-1)">‹ Prev</button><button class="fb-btn'+(PWK===0?' p':'')+'" onclick="PE.pwk(0)">This week</button><button class="fb-btn" onclick="PE.pwk(1)">Next ›</button>'
+    +'<button class="fb-btn" onclick="PE.pwprint()">🖨 Print week</button><button class="fb-btn" onclick="PE.xlsPW()">⬇ Weekly Excel</button></span></h3>';
+  if(!items.length)h+='<div class="wk-empty">No PGC plan for week '+wn+' yet. '+(must.length?'<button class="fb-btn p" onclick="PE.pwauto()">✨ Fill with the '+must.length+' PE due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')+'</div>';
+  else{
+    var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
+    h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>PGC no.</th><th>PE level</th><th>Last PE date</th><th>Planning date</th><th>Current location</th><th>Status</th><th>Estimate due (E1 h · days · E2 h)</th><th>Remarks</th><th></th></tr></thead><tbody>'
+      +items.map(function(x,i){return '<tr><td class="n">'+(i+1)+'</td><td class="id">'+pgcChip(x.id)+'</td><td>'+pill(x.lvl,x.lvl==='PE 30'?'#ff7e79':'#d5fc79')+'</td><td>'+(x.last?fmt(x.last):'–')+'</td>'
+        +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.pwset('+i+',\'plan\',this.value)"></td>'
+        +'<td><select onchange="PE.pwset('+i+',\'loc\',this.value)">'+locs.map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
+        +'<td>'+pill(x.st||'IN OPERATIONS',STC[x.st||'IN OPERATIONS']||'#a3a8c3')+'</td><td>'+estTxt(x.est)+'</td>'
+        +'<td class="rem"><input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.pwset('+i+',\'rem\',this.value)"></td>'
+        +'<td><button class="wk-x" onclick="PE.pwdel('+i+')">✕</button></td></tr>'}).join('')+'</tbody></table></div>';
+    var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today());
+    h+='<div class="pe-tw" style="margin-top:12px"><table class="pe wkg"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>'
+      +locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).map(function(l){return '<tr><td class="loc">'+esc(l)+'</td>'+DN.map(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
+        return '<td>'+(on.length?on.map(function(x){return pgcChip(x.id+' ('+x.lvl+')')}).join(''):'<i>–</i>')+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
+  }
+  h+='<div class="wk-add"><select onchange="if(this.value)PE.pwadd(this.value)"><option value="">＋ Add PE to week '+wn+'…</option>'
+    +(cands.length?'<optgroup label="Due soon (running PGC only)">'+cands.map(function(c){return '<option value="'+esc(c.r.id+'|'+c.lvl)+'">'+esc(c.r.id)+' · '+c.lvl+' — next '+fmt(c.next)+' ('+(c.d<0?'overdue '+(-c.d):c.d)+' d)</option>'}).join('')+'</optgroup>':'')
+    +'<optgroup label="All PGC">'+P().rows.map(function(r){return '<option value="'+esc(r.id+'|PE 30')+'">'+esc(r.id)+' · PE 30</option><option value="'+esc(r.id+'|PE 90')+'">'+esc(r.id)+' · PE 90</option>'}).join('')+'</optgroup></select>'
+    +(items.length&&must.length?'<button class="fb-btn" onclick="PE.pwauto()">✨ Add the '+must.length+' still due</button>':'')
+    +'<label>Prepared by <input value="'+esc(WP().prep)+'" placeholder="Name / position" onchange="PE.pwprep(this.value)"></label></div>';
+  return h+'</div>';
+}
+function renderPgc(el){
+  var D=P(),rows=D.rows,c={all:rows.length,o30:0,p30:0,o90:0,p90:0,f:0};
+  rows.forEach(function(r){var k=pgcCalc(r);if(k.ps30==='OVERDUE')c.o30++;else if(k.ps30==='PLAN FOR PE')c.p30++;if(k.ps90==='OVERDUE')c.o90++;else if(k.ps90==='PLAN FOR PE')c.p90++;
+    if(hrs(r.h1).f||hrs(r.h2).f||/FAULT/i.test((r.c1||'')+(r.c2||'')))c.f++;});
+  var kt=function(cls,key,v,l){return '<div class="fb-k '+cls+(PPS===key&&key?' on':'')+'" onclick="PE.pps(\''+key+'\')"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'};
+  var h=modeBar()+'<div class="fb-top"><div><h2>🚂 PGC PE Schedule — PE 30 &amp; PE 90</h2><small>'+esc(D.sub)+' · Year '+esc(D.year)+' · PE 30 = 30 days or 250 engine hours · PE 90 = 90 days</small></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="fb-btn" onclick="window.print()">🖨 Print / PDF</button><button class="fb-btn" onclick="PE.xlsPS()">⬇ Download Excel</button>'
+    +'<button class="fb-btn" onclick="PE.padd()">＋ Add PGC</button><button class="fb-btn p" onclick="document.getElementById(\'peFile\').click()">⬆ Import Excel</button>'
+    +'<input type="file" id="peFile" accept=".xlsx,.xls" style="display:none" onchange="PE.imp(this)"></div></div>';
+  h+='<div class="fb-kpis pe-kpis">'+kt('','',c.all,'PGC in schedule')+kt('r','OVERDUE',c.o30+c.o90,'Overdue (PE 30 '+c.o30+' · PE 90 '+c.o90+')')
+    +kt('o','PLAN',c.p30+c.p90,'Plan for PE (PE 30 '+c.p30+' · PE 90 '+c.p90+')')+kt('m','FAULT',c.f,'Faulty hour meter / compressor')+'</div>';
+  h+='<div class="fb-search"><span class="ic">🔍</span><input type="search" placeholder="Find a PGC, location, FAULTY… e.g. 213, TUMPAT" value="'+esc(PQ)+'" oninput="PE.pq(this.value)"></div>';
+  if(!rows.length){h+='<div class="fb-sec"><div style="padding:18px;text-align:center;color:#a3a8c3">No PGC schedule yet — click <b>⬆ Import Excel</b> and choose “PGC SCHEDULE PE 30 &amp; PE 90 2026.xlsx”, then click <b>💾 Save</b>.</div></div>';el.innerHTML=h+'<div id="peWkPrint"></div>';return;}
+  h+=pgcForecastHtml()+pgcPlanHtml();
+  h+='<div class="fb-sec pe-sheet"><h3>📋 PGC PE 30 &amp; PE 90 Schedule <span class="ct">'+(PQ||PPS?'filtered · ':'')+'click a PGC to edit or update daily hours</span></h3>'
+    +'<div class="pe-print-h">'+esc(D.title)+'<br>'+esc(D.sub)+'<br>YEAR : '+esc(D.year)+'</div>'
+    +'<div class="pe-tw"><table class="pe pgt"><thead><tr><th rowspan="2">No.</th><th rowspan="2">PGC</th><th colspan="2" class="hh">Engine hours (daily · since PE 30)</th><th colspan="5" class="h30">PE 30 (engine)</th><th colspan="4" class="h90">PE 90 (bogie)</th>'
+    +'<th rowspan="2" class="hc">Comp. 1</th><th rowspan="2" class="hc">Comp. 2</th><th colspan="3" class="hb">Battery</th></tr>'
+    +'<tr><th class="hh">Engine 1</th><th class="hh">Engine 2</th><th class="h30">Last PE</th><th class="h30">Location</th><th class="h30">Next PE</th><th class="h30">Days</th><th class="h30">Status</th>'
+    +'<th class="h90">Last PE</th><th class="h90">Location</th><th class="h90">Next PE</th><th class="h90">Days</th><th class="hb">Engine 1</th><th class="hb">Engine 2</th><th class="hb">Location</th></tr></thead><tbody>';
+  var shown=0;rows.forEach(function(r,i){if(!pgcMatch(r))return;shown++;var k=pgcCalc(r);
+    h+='<tr class="row" onclick="PE.pedit('+i+')"><td class="n">'+(i+1)+'</td><td class="id">'+pgcChip(r.id)+'</td>'
+      +'<td class="hrs">'+hoursCell(r.a1,r.h1,k.l1)+'</td><td class="hrs">'+hoursCell(r.a2,r.h2,k.l2)+'</td>'
+      +'<td>'+fmt(r.p30)+'</td><td>'+esc(r.l30||'–')+'</td><td><b>'+fmt(k.n30)+'</b></td><td>'+ddHtml(k.d30)+'</td><td>'+pill(k.ps30==='-'?'–':k.ps30,PSC[k.ps30])+'</td>'
+      +'<td>'+fmt(r.p90)+'</td><td>'+esc(r.l90||'–')+'</td><td><b>'+fmt(k.n90)+'</b></td><td><span class="dd" style="background:'+d90Color(k.d90)+'">'+(k.d90==='-'?'–':k.d90<0?'('+(-k.d90)+')':k.d90)+'</span></td>'
+      +'<td>'+compPill(r.c1)+'</td><td>'+compPill(r.c2)+'</td><td>'+fmt(r.b1)+'</td><td>'+fmt(r.b2)+'</td><td>'+esc(r.bl||'–')+'</td></tr>';});
+  h+='</tbody></table>'+(shown?'':'<div style="padding:16px;text-align:center;color:#a3a8c3">No PGC matches.</div>')+'</div></div><div id="peWkPrint"></div>';
+  el.innerHTML=h;
+}
+/* ---------- PGC edit dialog ---------- */
+function pform(r,isNew){
+  document.getElementById('peEdT').textContent=isNew?'Add PGC':'Edit '+r.id;document.getElementById('peDel').style.display=isNew?'none':'';
+  var t=function(id,l,v,ph){return '<div><label>'+l+'</label><input id="'+id+'" value="'+esc(v||'')+'" placeholder="'+(ph||'')+'"></div>'};
+  var d=function(id,l,v){return '<div><label>'+l+'</label><input type="date" id="'+id+'" value="'+(parseIso(v)?v:'')+'"></div>'};
+  var loc=function(id,l,v){return '<div><label>'+l+'</label><input id="'+id+'" list="peLocs" value="'+esc(v||'')+'"></div>'};
+  var cp=function(id,l,v){var o=['OKAY','FAULTY','NONE'];if(v&&o.indexOf(String(v).toUpperCase())<0)o.push(String(v).toUpperCase());return '<div><label>'+l+'</label><select id="'+id+'"><option value="">–</option>'+o.map(function(x){return '<option'+(String(v||'').toUpperCase()===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select></div>'};
+  document.getElementById('peForm').innerHTML='<datalist id="peLocs">'+opt(LOCS,'')+'</datalist>'+t('pgId','PGC number',r.id,'PGC 213')
+    +'<div class="full sub">Daily engine hours (type “FAULTY” if the meter is faulty)</div>'+t('pgH1','Engine 1 — today',r.h1)+t('pgH2','Engine 2 — today',r.h2)
+    +t('pgA1','Engine 1 — at last PE 30',r.a1)+t('pgA2','Engine 2 — at last PE 30',r.a2)
+    +'<div class="full sub">PE 30 (engine)</div>'+d('pgP30','Last PE 30 date',r.p30)+loc('pgL30','PE 30 location',r.l30)
+    +'<div class="full"><button class="btn" type="button" onclick="PE.p30now()">✔ PE 30 done today (also sets “hours at PE 30” = today’s hours)</button></div>'
+    +'<div class="full sub">PE 90 (bogie)</div>'+d('pgP90','Last PE 90 date',r.p90)+loc('pgL90','PE 90 location',r.l90)
+    +'<div class="full"><button class="btn" type="button" onclick="document.getElementById(\'pgP90\').value=\''+isoOf(today())+'\'">✔ PE 90 done today</button></div>'
+    +'<div class="full sub">Compressors &amp; battery</div>'+cp('pgC1','Compressor 1',r.c1)+cp('pgC2','Compressor 2',r.c2)
+    +d('pgB1','Battery date — engine 1',r.b1)+d('pgB2','Battery date — engine 2',r.b2)+loc('pgBL','Battery location',r.bl);
+  document.getElementById('ovPE').classList.add('show');
+}
+/* ---------- PGC import ---------- */
+function parsePgcSchedule(ws){
+  var ref=XLSX.utils.decode_range(ws['!ref']||'A1');ref.s.c=0;ref.s.r=0;var R=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:ref});
+  var s=function(v){var t=v==null?'':String(v).replace(/\s+/g,' ').trim();return t==='-'?'':t},hr=-1,b=-1,out={title:'PGC PERIODICAL EXAMINATION (PE 30 & PE 90)',sub:'ROLLING STOCK AND ENGINEERING (RSM PGC)',year:'',rows:[]};
+  R.forEach(function(row,i){row.forEach(function(v,j){var t=s(v);if(hr<0&&/^PGC NUMBER$/i.test(t)){hr=i;b=j}var m=t.match(/YEAR\s*:\s*(.+)/i);if(m&&!out.year)out.year=m[1].trim();})});
+  if(hr<0)return null;
+  for(var i=hr+1;i<R.length;i++){var row=R[i]||[],id=s(row[b]);if(!/^PGC\s*\d+/i.test(id))continue;var g=function(o){return row[b+o]};
+    out.rows.push({id:id.toUpperCase().replace(/^PGC\s*/,'PGC '),a1:s(g(1)),a2:s(g(2)),h1:s(g(3)),h2:s(g(4)),p30:serialIso(g(5)),l30:s(g(6)).toUpperCase(),
+      p90:serialIso(g(12)),l90:s(g(13)).toUpperCase(),c1:s(g(16)).toUpperCase(),c2:s(g(17)).toUpperCase(),b1:serialIso(g(18)),b2:serialIso(g(19)),bl:s(g(20)).toUpperCase()});}
+  if(!out.year)out.year='JAN-DEC '+(typeof RS_YEAR==='undefined'?2026:RS_YEAR);
+  return out.rows.length?out:null;
+}
+function parsePgcWeeks(wb){var out={},prep='';
+  wb.SheetNames.filter(function(n){return /^WEEK\s*\d+/i.test(n)}).forEach(function(n){var ws=wb.Sheets[n];if(!ws||!ws['!ref'])return;
+    var ref=XLSX.utils.decode_range(ws['!ref']);ref.s.c=0;ref.s.r=0;var R=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:ref});
+    var s=function(v){return v==null?'':String(v).trim()},hdr=-1,loc=-1,col={};
+    R.forEach(function(row,i){if(hdr<0&&row.some(function(v){return /^NO\.?$/i.test(s(v))})&&row.some(function(v){return /PGC/i.test(s(v))}))hdr=i;
+      if(loc<0&&row.some(function(v){return /^LOCATION$/i.test(s(v))}))loc=i;
+      row.forEach(function(v){var m=s(v).match(/^PREPARED BY\s*:?\s*([\s\S]*)$/i);if(m&&m[1].trim())prep=m[1].replace(/\r/g,'').trim()})});
+    if(hdr<0)return;
+    R[hdr].forEach(function(v,j){var t=s(v).toUpperCase();if(/PGC/.test(t))col.id=j;else if(/LEVEL/.test(t))col.lvl=j;else if(/LAST/.test(t))col.last=j;else if(/PLANNING/.test(t))col.plan=j;
+      else if(/LOCATION/.test(t))col.loc=j;else if(/STATUS/.test(t))col.st=j;else if(/ESTIMATE/.test(t))col.est=j;else if(/REMARK/.test(t))col.rem=j;});
+    if(col.id==null||col.plan==null)return;var items=[],nb=function(v){var x=parseFloat(v);return isFinite(x)?x:null};
+    /* the location × day grid also gives the planning date ("PGC 209 (PE 30)") when the table cell is empty */
+    var gd={};if(loc>=0){var dr=R[loc+1]||[];for(var gi=loc+2;gi<R.length;gi++)(R[gi]||[]).forEach(function(v,j){var m=s(v).toUpperCase().match(/^(PGC\s*\d+)\s*\((PE\s*\d+)\)/);
+      if(m&&dr[j]!=null)gd[keyOf(m[1])+'|'+m[2].replace(/\s+/,' ')]=serialIso(dr[j]);});}
+    for(var i=hdr+1;i<R.length&&(loc<0||i<loc);i++){var row=R[i]||[],id=s(row[col.id]);if(!/PGC/i.test(id))continue;
+      var lv0=col.lvl!=null?s(row[col.lvl]).toUpperCase().replace(/\s+/,' '):'PE 30',pl=serialIso(row[col.plan])||gd[keyOf(id)+'|'+lv0]||'';
+      items.push({id:id.toUpperCase(),lvl:col.lvl!=null?s(row[col.lvl]).toUpperCase():'PE 30',last:col.last!=null?serialIso(row[col.last]):'',plan:pl,loc:col.loc!=null?s(row[col.loc]).toUpperCase():'',
+        st:col.st!=null?s(row[col.st]).toUpperCase():'IN OPERATIONS',rem:col.rem!=null?s(row[col.rem]).toUpperCase():'',
+        est:col.est!=null?{e1:nb(row[col.est]),d:nb(row[col.est+1]),e2:nb(row[col.est+2])}:null});}
+    if(!items.length)return;var wn=+n.match(/\d+/)[0],pls=items.map(function(x){return x.plan}).filter(Boolean).sort(),
+      yr=pls.length?+pls[0].slice(0,4):(loc>=0&&serialIso((R[loc+1]||[])[2])?+serialIso((R[loc+1]||[])[2]).slice(0,4):(typeof RS_YEAR==='undefined'?2026:RS_YEAR)),sun=sunOfWeek(yr,wn);
+    if(pls.length&&Math.abs((parseIso(pls[0])-parseIso(sun))/864e5)>40)sun=sunOf(parseIso(pls[0]));
+    out[sun]={items:items};});
+  return {weeks:out,prep:prep};}
+/* ---------- PGC Excel ---------- */
+function pgcScheduleSheet(){
+  var D=P(),c={},M=['C2:Q2','H3:L3','A5:A6','B5:B6','C5:D5','E5:F5','G5:M5','N5:Q5','R5:R6','S5:S6','T5:V5','J6:K6','L6:M6'];
+  var hs=function(f){return {b:1,bd:1,fill:f,wrap:1,sz:9}},T={b:1,bd:1,sz:10};
+  c.C2={v:D.title+'\n'+D.sub,s:{b:1,sz:14,wrap:1}};c.H3={v:'YEAR: '+D.year,s:{b:1,sz:11}};
+  var H=[['A5','NO.','73FDD6'],['B5','PGC NUMBER','73FDD6'],['C5','HOURS RECORD AFTER PE 30','FF9300'],['E5','DAILY HOURS RECORD','FF9300'],['G5','PERIODICAL EXAMINATION 30\n(ENGINE)','FF7E79'],
+    ['N5','PERIODICAL EXAMINATION 90\n(BOGIE)','D5FC79'],['R5','COMPRESSOR 1','7A81FF'],['S5','COMPRESSOR 2','7A81FF'],['T5','BATTERY STATUS','FF8AD8'],
+    ['C6','ENGINE 1','FF9300'],['D6','ENGINE 2','FF9300'],['E6','ENGINE 1','FF9300'],['F6','ENGINE 2','FF9300'],['G6','LAST PE DATE','FF7E79'],['H6','PE LOCATION','FF7E79'],['I6','NEXT PE DATE','FF7E79'],
+    ['J6','COUNTDOWN TO PE\nENGINE 1 HOURS','FF7E79'],['L6','COUNTDOWN TO PE\nENGINE 2 HOURS','FF7E79'],['N6','LAST PE DATE','D5FC79'],['O6','PE LOCATION','D5FC79'],['P6','NEXT PE DATE','D5FC79'],['Q6','DAYS COUNTDOWN TO PE','D5FC79'],
+    ['T6','DATE\n(ENGINE 1)','FF8AD8'],['U6','DATE\n(ENGINE 2)','FF8AD8'],['V6','LOCATION','FF8AD8']];
+  H.forEach(function(x){c[x[0]]={v:x[1],s:hs(x[2])}});
+  ['A6','B6','D5','F5','H5','I5','J5','K5','L5','M5','O5','P5','Q5','R6','S6','U5','V5','K6','M6'].forEach(function(a){if(!c[a])c[a]={v:'',s:hs({A:'73FDD6',B:'73FDD6',D:'FF9300',F:'FF9300',R:'7A81FF',S:'7A81FF',U:'FF8AD8',V:'FF8AD8',O:'D5FC79',P:'D5FC79',Q:'D5FC79'}[a[0]]||'FF7E79')}});
+  var num=function(t){var h=hrs(t);return h.f||h.n==null?(t||'-'):h.n};
+  D.rows.forEach(function(r,i){var n=7+i,k=pgcCalc(r),ok1=typeof num(r.a1)==='number'&&typeof num(r.h1)==='number',ok2=typeof num(r.a2)==='number'&&typeof num(r.h2)==='number',s30=serial(r.p30),s90=serial(r.p90);
+    c['A'+n]={v:i+1,s:T};c['B'+n]={v:r.id,s:T};c['C'+n]={v:num(r.a1),s:{b:1,bd:1,sz:10,wrap:1}};c['D'+n]={v:num(r.a2),s:{b:1,bd:1,sz:10,wrap:1}};c['E'+n]={v:num(r.h1),s:{b:1,bd:1,sz:10,wrap:1}};c['F'+n]={v:num(r.h2),s:{b:1,bd:1,sz:10,wrap:1}};
+    c['G'+n]=s30?{v:s30,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};c['H'+n]={v:r.l30||'-',s:T};c['I'+n]=s30?{f:'G'+n+'+30',v:s30+30,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};
+    c['J'+n]=ok1?{f:'SUM(E'+n+'-C'+n+')',v:k.u1,s:T}:{v:'-',s:T};c['K'+n]=ok1?{f:'SUM(J'+n+'-250)',v:k.u1-250,s:T}:{v:'-',s:T};
+    c['L'+n]=ok2?{f:'SUM(F'+n+'-D'+n+')',v:k.u2,s:T}:{v:'-',s:T};c['M'+n]=ok2?{f:'SUM(L'+n+'-250)',v:k.u2-250,s:T}:{v:'-',s:T};
+    c['N'+n]=s90?{v:s90,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};c['O'+n]={v:r.l90||'-',s:T};c['P'+n]=s90?{f:'N'+n+'+90',v:s90+90,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};
+    c['Q'+n]=s90?{f:'TODAY()-P'+n+' &" Day(s) "',v:(-k.d90)+' Day(s) ',s:T}:{v:'-',s:T};
+    c['R'+n]={v:r.c1||'-',s:T};c['S'+n]={v:r.c2||'-',s:T};var b1=serial(r.b1),b2=serial(r.b2);
+    c['T'+n]=b1?{v:b1,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};c['U'+n]=b2?{v:b2,s:{b:1,bd:1,sz:10,date:1}}:{v:'-',s:T};c['V'+n]={v:r.bl||'-',s:T};});
+  var last=6+D.rows.length,cf=last>6?[
+    {ref:'K7:K'+last+' M7:M'+last,rules:[{f:'K7="-"',fill:'A96252'},{f:'AND(ISNUMBER(K7),K7>0)',fill:'FF4535'},{f:'AND(ISNUMBER(K7),K7>=-50)',fill:'FFFF3E'},{f:'ISNUMBER(K7)',fill:'00DD66'}]},
+    {ref:'Q7:Q'+last,rules:[{f:'Q7="-"',fill:'A96252'},{f:'AND(ISNUMBER(P7),P7<=TODAY())',fill:'FF4535'},{f:'AND(ISNUMBER(P7),P7<=TODAY()+7)',fill:'FF9F31'},{f:'AND(ISNUMBER(P7),P7<=TODAY()+10)',fill:'FFFF3E'},{f:'ISNUMBER(P7)',fill:'00DD66'}]},
+    {ref:'R7:S'+last,rules:[{f:'R7="OKAY"',fill:'00DD66'},{f:'R7="FAULTY"',fill:'FF4535'}]}]:[];
+  return {name:(String(D.year).match(/\d{4}/)||['PGC'])[0],cells:c,merges:M,cols:{A:6,B:14,C:13,D:13,E:13,F:13,G:12,H:14,I:12,J:10,K:10,L:10,M:10,N:12,O:14,P:12,Q:16,R:12,S:12,T:12,U:12,V:14},rows:{2:44,6:40},cf:cf,land:1};
+}
+function pgcWeekSheet(sun){
+  var items=(WP().weeks[sun]||{items:[]}).items,c={},M=['C2:L2','C3:L3','E4:J4','B6:B7','C6:C7','D6:D7','E6:E7','F6:F7','G6:G7','H6:H7','I6:K6','L6:L7'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
+  c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM PGC)',s:{b:1,sz:14,wrap:1}};c.C3={v:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.E4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
+  [['B6','NO.'],['C6','PGC NO.'],['D6','PE LEVEL'],['E6','LAST PE DATE'],['F6','PLANNING DATE'],['G6','CURRENT\nLOCATION'],['H6','STATUS'],['I6','ESTIMATE DUE DAYS / HOURS'],['L6','REMARKS'],['I7','ENGINE 1'],['J7','DAYS'],['K7','ENGINE 2']].forEach(function(p){c[p[0]]={v:p[1],s:Y}});
+  ['B7','C7','D7','E7','F7','G7','H7','L7','J6','K6'].forEach(function(a){if(!c[a])c[a]={v:'',s:Y}});
+  var n=Math.max(20,items.length);
+  for(var i=0;i<n;i++){var r=8+i,x=items[i],e=x&&x.est||{};c['B'+r]={v:i+1,s:T};c['C'+r]={v:x?x.id:'',s:T};
+    c['D'+r]={v:x?x.lvl:'',s:x?{b:1,bd:1,sz:10,fill:x.lvl==='PE 30'?'FF7E79':'D5FC79'}:T};var ls=x&&serial(x.last),ps=x&&serial(x.plan);
+    c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['G'+r]={v:x?x.loc:'',s:T};c['H'+r]={v:x?(x.st||'IN OPERATIONS'):'',s:T};
+    c['I'+r]={v:e.e1!=null?e.e1:'',s:T};c['J'+r]={v:e.d!=null?e.d:'',s:T};c['K'+r]={v:e.e2!=null?e.e2:'',s:T};c['L'+r]={v:x?x.rem:'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
+  var r0=8+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
+  WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
+  var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
+  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);return items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id+' ('+x.lvl+')'})});
+    var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));M.push('B'+rr+':B'+(rr+rows-1));
+    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9}}});}rr+=rows;});
+  rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(WP().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
+  var rh={2:44};rh[rr]=48;
+  return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:16,I:11,J:9,K:11,L:24},rows:rh,land:0};
+}
+function pgcForecastDoc(sun){
+  var items=(WP().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),logo='';try{logo=KASSET.logo}catch(x){}
+  var h='<div class="wd"><div class="wd-h">'+(logo?'<img src="'+logo+'">':'')+'<div><b>KERETAPI TANAH MELAYU BERHAD</b><br><b>ROLLING STOCK MAINTENANCE AND ENGINEERING (RSM PGC)</b>'
+    +'<div class="u">PGC PERIODICAL EXAMINATION WEEKLY FORECAST</div><div class="u big">WEEK '+weekNo(sun)+'</div></div></div>'
+    +'<table class="wd-t"><tr><th rowspan="2">NO.</th><th rowspan="2">PGC NO.</th><th rowspan="2">PE LEVEL</th><th rowspan="2">LAST PE DATE</th><th rowspan="2">PLANNING DATE</th><th rowspan="2">CURRENT LOCATION</th><th rowspan="2">STATUS</th><th colspan="3">ESTIMATE DUE DAYS / HOURS</th><th rowspan="2">REMARKS</th></tr><tr><th>ENGINE 1</th><th>DAYS</th><th>ENGINE 2</th></tr>';
+  for(var i=0;i<n;i++){var x=items[i],e=x&&x.est||{};h+='<tr><td>'+(i+1)+'</td><td>'+(x?esc(x.id):'')+'</td><td'+(x?' style="background:'+(x.lvl==='PE 30'?'#ff7e79':'#d5fc79')+'"':'')+'>'+(x?x.lvl:'')+'</td><td>'+(x&&x.last?fmt(x.last):'')+'</td><td>'+(x?fmt(x.plan):'')+'</td><td>'+(x?esc(x.loc):'')+'</td><td>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td>'
+    +'<td>'+(e.e1!=null?e.e1:'')+'</td><td>'+(e.d!=null?e.d:'')+'</td><td>'+(e.e2!=null?e.e2:'')+'</td><td style="color:#e00">'+(x?esc(x.rem):'')+'</td></tr>';}
+  h+='</table><table class="wd-g"><tr><th rowspan="2" class="g">LOCATION</th>'+WDN.map(function(d){return '<th>'+d+'</th>'}).join('')+'</tr><tr>'+WDN.map(function(d,j){return '<th class="b">'+fmt(addDays(sun,j))+'</th>'}).join('')+'</tr>';
+  var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
+  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);return items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id+' ('+x.lvl+')'})});
+    var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));
+    for(var q=0;q<rows;q++)h+='<tr>'+(q===0?'<td rowspan="'+rows+'" class="g">'+esc(l)+'</td>':'')+per.map(function(p){return '<td>'+(p[q]?esc(p[q]):'')+'</td>'}).join('')+'</tr>';});
+  return h+'</table><div class="wd-p">PREPARED BY :<br>'+esc(WP().prep||'').replace(/\n/g,'<br>')+'</div></div>';
+}
+
 function render(){
-  var el=document.getElementById('peArea');if(!el)return;var D=data();if(!D){el.innerHTML='';return;}
+  var el=document.getElementById('peArea');if(!el)return;
+  if(MODE==='pgc'&&typeof S!=='undefined'&&S){renderPgc(el);return;}
+  var D=data();if(!D){el.innerHTML='';return;}
   var c=counts(),total=c.all;
   var k=function(cls,key,v,l){return '<div class="fb-k '+cls+(PS===key&&key?' on':'')+'" onclick="PE.ps(\''+key+'\')"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'};
-  var h='<div class="fb-top"><div><h2>🛠️ Coaches PE Schedule — PE 60 &amp; PE 90</h2><small>'+esc(D.sub)+' · Year '+esc(D.year)+' · days due count from today</small></div>'
+  var h=modeBar()+'<div class="fb-top"><div><h2>🛠️ Coaches PE Schedule — PE 60 &amp; PE 90</h2><small>'+esc(D.sub)+' · Year '+esc(D.year)+' · days due count from today</small></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="fb-btn" onclick="window.print()" title="Print or save as PDF (A4 landscape)">🖨 Print / PDF</button>'
     +'<button class="fb-btn" onclick="PE.xlsS()" title="PE schedule in the COACHES SCHEDULE PE 60 &amp; PE 90 layout">⬇ Download Excel</button>'
     +'<button class="fb-btn" onclick="PE.add()">＋ Add coach</button>'
@@ -7691,6 +7936,29 @@ window.PE={
   q:function(x){Q=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
   ty:function(x){TY=x;render();},
   sort:function(x){SORT=x;render();},
+  mode:function(m){MODE=m==='pgc'?'pgc':'coach';try{localStorage.setItem('rsd_pe_mode_v1',MODE)}catch(x){}render();},
+  pq:function(x){PQ=x;render();var i=document.querySelector('#peArea input[type=search]');if(i){i.focus();i.setSelectionRange(x.length,x.length);}},
+  pps:function(k){PPS=PPS===k?'':k;render();},
+  pedit:function(i){ED={pgc:1,i:i};pform(P().rows[i],false);},
+  padd:function(){ED={pgc:1,i:null};pform({id:'PGC '},true);},
+  p30now:function(){var t=isoOf(today()),g=function(id){return document.getElementById(id)};g('pgP30').value=t;if(g('pgH1').value)g('pgA1').value=g('pgH1').value;if(g('pgH2').value)g('pgA2').value=g('pgH2').value;},
+  pdone:function(i,lv){var r=P().rows[i];if(!confirm(r.id+': '+lv+' done today ('+fmt(isoOf(today()))+')?'))return;
+    if(lv==='PE 30'){r.p30=isoOf(today());r.a1=r.h1;r.a2=r.h2;}else r.p90=isoOf(today());changed();toast(r.id+' '+lv+' recorded — click 💾 Save to keep it',4500);},
+  pwk:function(n){PWK=n===0?0:PWK+n;render();},
+  pwadd:function(v){var p=String(v).split('|'),f=pRow(p[0]);if(!f)return;var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]};w.items.push(pItem(f.r,p[1],sun));changed();},
+  pwauto:function(){var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]},n=0;pgcCands(sun).forEach(function(c){if(c.must){w.items.push(pItem(c.r,c.lvl,sun));n++}});
+    changed();toast(n+' PE added to week '+weekNo(sun)+' — adjust dates / locations, then 💾 Save',5000);},
+  pwset:function(i,k,val){var w=WP().weeks[curSunP()];if(!w||!w.items[i])return;w.items[i][k]=k==='rem'?String(val).toUpperCase():val;
+    if(k==='plan')w.items.sort(function(a,b){return a.plan<b.plan?-1:a.plan>b.plan?1:0});changed();},
+  pwdel:function(i){var sun=curSunP(),w=WP().weeks[sun];if(!w)return;w.items.splice(i,1);if(!w.items.length)delete WP().weeks[sun];changed();},
+  pwprep:function(val){WP().prep=String(val).toUpperCase();changed();},
+  pwprint:function(){var sun=curSunP();if(!(WP().weeks[sun]||{items:[]}).items.length){toast('No PGC PE planned for this week');return;}
+    var el=document.getElementById('peWkPrint');el.innerHTML=pgcForecastDoc(sun);document.body.classList.add('pe-pw');
+    var done=function(){document.body.classList.remove('pe-pw');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);window.print();setTimeout(done,60000);},
+  xlsPS:function(){if(!P().rows.length){toast('No PGC schedule yet');return;}var y=(String(P().year).match(/\d{4}/)||[RS_YEAR])[0];
+    buildXlsx([pgcScheduleSheet()]).then(function(b){saveBlob(b,'PGC SCHEDULE PE 30 & PE 90 '+y+'.xlsx');toast('⬇ PGC schedule downloaded',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
+  xlsPW:function(){var ks=Object.keys(WP().weeks).filter(function(k){return WP().weeks[k].items.length}).sort();if(!ks.length){toast('No PGC weekly plans yet');return;}
+    buildXlsx(ks.map(pgcWeekSheet)).then(function(b){saveBlob(b,'PGC PE WEEKLY PLANNING '+ks[ks.length-1].slice(0,4)+'.xlsx');toast('⬇ PGC weekly planning downloaded ('+ks.length+' weeks)',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
   wk:function(n){WK=n===0?0:WK+n;render();},
   wadd:function(id){var f=findRow(id);if(!f)return;var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]};w.items.push(wkItem(f.r,sun));changed();},
   wauto:function(){var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]},n=0;wkCands(sun).forEach(function(c){if(c.must){w.items.push(wkItem(c.r,sun));n++}});
@@ -7716,12 +7984,17 @@ window.PE={
   add:function(){ED={gi:null,i:null};form({id:'',last:'-',loc:'',st:'IN OPERATIONS',ry:'',by:'',rem:'',iv:90},true);},
   close:function(){document.getElementById('ovPE').classList.remove('show');ED=null;},
   saveRow:function(){
+    if(ED&&ED.pgc){var id=v('pgId').toUpperCase().replace(/^PGC\s*/,'PGC ');if(!/^PGC \d+/.test(id)){toast('Enter the PGC number, e.g. PGC 213');return;}
+      var U=function(k){return v(k).toUpperCase()},r={id:id,h1:U('pgH1'),h2:U('pgH2'),a1:U('pgA1'),a2:U('pgA2'),p30:v('pgP30'),l30:U('pgL30'),p90:v('pgP90'),l90:U('pgL90'),
+        c1:U('pgC1'),c2:U('pgC2'),b1:v('pgB1'),b2:v('pgB2'),bl:U('pgBL')};
+      if(ED.i==null)P().rows.push(r);else P().rows[ED.i]=r;PE.close();changed();toast(id+' updated — click 💾 Save to keep it');return;}
     if(!ED)return;var id=v('peId').toUpperCase();if(!id){toast('Enter the coach number');return;}
     var D=data(),r={id:id,last:v('peLast')||'-',loc:v('peLoc').toUpperCase(),st:v('peSt'),ry:v('peRy'),by:v('peBy').toUpperCase(),rem:v('peRem').toUpperCase(),iv:+v('peIv')||defIv(id)};
     if(document.getElementById('peHl').checked)r.hl=1;
     if(ED.gi==null)D.groups[+v('peG')||0].rows.push(r);else D.groups[ED.gi].rows[ED.i]=r;
     PE.close();changed();toast(id+' updated — click 💾 Save to keep it');},
-  del:function(){if(!ED||ED.gi==null)return;var D=data(),r=D.groups[ED.gi].rows[ED.i];
+  del:function(){if(ED&&ED.pgc){if(ED.i==null)return;var pr=P().rows[ED.i];if(!confirm('Remove '+pr.id+' from the PGC PE schedule?'))return;P().rows.splice(ED.i,1);PE.close();changed();return;}
+    if(!ED||ED.gi==null)return;var D=data(),r=D.groups[ED.gi].rows[ED.i];
     if(!confirm('Remove '+r.id+' from the PE schedule?'))return;D.groups[ED.gi].rows.splice(ED.i,1);PE.close();changed();},
   imp:function(inp){var f=inp.files&&inp.files[0];inp.value='';if(!f)return;var rd=new FileReader();
     rd.onload=function(){try{if(!PE.fromWb(XLSX.read(new Uint8Array(rd.result),{type:'array',cellStyles:true}),f.name))
@@ -7730,6 +8003,14 @@ window.PE={
     rd.readAsArrayBuffer(f);},
   /* returns true if the workbook is a PE 60 & PE 90 schedule (then it is loaded) */
   fromWb:function(wb,name){
+    if(wb.SheetNames.some(function(n){return /^WEEK\s*\d+/i.test(n)})){var pw2=parsePgcWeeks(wb),k2=Object.keys(pw2.weeks).sort();
+      if(k2.length){if(!confirm('Load '+k2.length+' PGC weekly PE plans (week '+weekNo(k2[0])+' – '+weekNo(k2[k2.length-1])+') from '+name+'?'))return true;
+        k2.forEach(function(k){WP().weeks[k]=pw2.weeks[k]});if(pw2.prep&&!WP().prep)WP().prep=pw2.prep.toUpperCase();
+        if(typeof touched==='function')touched();MODE='pgc';try{localStorage.setItem('rsd_pe_mode_v1','pgc')}catch(x){}PE.open();toast('✔ Loaded '+k2.length+' PGC weekly plans — click 💾 Save to keep them',6000);return true;}}
+    for(var q=0;q<wb.SheetNames.length;q++){var ps=parsePgcSchedule(wb.Sheets[wb.SheetNames[q]]);if(ps){
+      if(!confirm('Load the PGC PE 30 & PE 90 schedule — '+ps.rows.length+' PGC from '+name+'?'))return true;
+      S.pePgc=ps;if(typeof touched==='function')touched();MODE='pgc';try{localStorage.setItem('rsd_pe_mode_v1','pgc')}catch(x){}PE.open();
+      toast('✔ PGC schedule loaded: '+ps.rows.length+' PGC — click 💾 Save to keep it',6000);return true;}}
     if(wb.SheetNames.some(function(n){return /^WEEK\s*\d+/i.test(n)})){var pw=parseWeeks(wb),ks=Object.keys(pw.weeks).sort();if(!ks.length)return false;
       if(!confirm('Load '+ks.length+' weekly PE plan'+(ks.length===1?'':'s')+' (week '+weekNo(ks[0])+' – '+weekNo(ks[ks.length-1])+') from '+name+'?\nWeeks already in the dashboard with the same dates are replaced.'))return true;
       ks.forEach(function(k){W().weeks[k]=pw.weeks[k]});if(pw.prep&&!W().prep)W().prep=pw.prep.replace(/\r/g,'').toUpperCase();
