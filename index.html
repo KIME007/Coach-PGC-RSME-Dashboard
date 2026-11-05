@@ -708,7 +708,7 @@ async function doLogin(){
     if(_loginResolve){const r=_loginResolve;_loginResolve=null;r();}
     else if(_keepAfterLock){_keepAfterLock=false;markActive(true);renderUserBox();
       toast("Welcome back "+authId()+" — your unsaved changes are still here. Click 💾 Save.",7000);}
-    else{await cloudHydrate();if(typeof applyYear==="function")applyYear();toast("Logged in as "+authId()+" ✔");}
+    else{await loadRole();await cloudHydrate();if(typeof applyYear==="function")applyYear();toast("Logged in as "+authId()+(RSD_VIEWER?" (view only)":"")+" ✔");}
     markActive(true);
   }catch(e){
     er.textContent=e.network?e.message:(/invalid|credentials|not found|400/i.test(e.message)?"Wrong ID or password":("Could not log in: "+e.message));
@@ -770,11 +770,23 @@ async function idleLogout(){
 ["mousemove","mousedown","keydown","touchstart","wheel","scroll"].forEach(ev=>window.addEventListener(ev,()=>markActive(),{passive:true,capture:true}));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkIdle();});
 setInterval(checkIdle,10000);
+/* ---- view-only accounts (made in SQL Editor with add_dashboard_viewer / set_dashboard_viewer) ----
+   The database refuses their writes; here Save and Import are hidden and edits are never marked unsaved. */
+let RSD_VIEWER=false,_viewNoteAt=0;
+async function loadRole(){
+  let v=false;
+  if(_auth&&sbEnabled()){try{v=(await sbFetch("rpc/dashboard_is_viewer",{method:"POST",body:"{}"}))===true}catch(e){}}
+  RSD_VIEWER=v;document.body.classList.toggle("viewonly",v);renderUserBox();
+  if(v&&typeof setDirty==="function")setDirty(false);
+}
+function viewNote(){const n=Date.now();if(n-_viewNoteAt<8000)return;_viewNoteAt=n;
+  toast("👁 View-only account — you can look and filter, but changes are not saved",4500);}
 function renderUserBox(){
   const el=document.getElementById("userBox");if(!el)return;
   if(!_auth){el.innerHTML="";return;}
   const id=String(_auth.id).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   el.innerHTML='<span class="ulink uname" title="Logged in">👤 '+id+'</span>'
+    +(RSD_VIEWER?'<span class="ulink vbadge" title="This account can only view — Save is switched off">👁 View only</span>':'')
     +'<button class="ulink" type="button" onclick="authLogoutUI()">Log out</button>';
 }
 /* log out also removes this laptop's copy of the data, so the next person sees only the login screen */
@@ -1043,6 +1055,7 @@ async function cloudPushAll(opts){
   finally{_cloudBusy=false;renderCloudPill();}
 }
 async function cloudPushAllInner(opts){
+  if(RSD_VIEWER)throw new Error("View-only account — not saved");
   opts=opts||{};
   if(!opts.force){
     const c=await cloudRemoteStamp();
@@ -1323,11 +1336,11 @@ function persist(src){
     if(wbB64!==ORIG_B64) localStorage.setItem(LSB,wbB64);
   }catch(e){console.warn("persist failed",e)}
 }
-function setDirty(d){dirty=d;const el=document.getElementById('dirtyDot');if(el)el.classList.toggle('dirty',d);
+function setDirty(d){if(RSD_VIEWER)d=false;dirty=d;const el=document.getElementById('dirtyDot');if(el)el.classList.toggle('dirty',d);
   const ei=document.getElementById('editInfo');if(ei)ei.textContent=d?"● Unsaved changes — click 💾 Save (Ctrl+S)":"";
   const b=document.getElementById('btnSave');if(b)b.classList.toggle('clean',!d);
   if(typeof renderCloudPill==="function")renderCloudPill();}
-function touched(){setDirty(true);persist();}
+function touched(){if(RSD_VIEWER){viewNote();return;}setDirty(true);persist();}
 function resetAll(){if(!confirm("Discard the edits for "+RS_YEAR+" and restore that year to its starting data?"))return;
   const all=yrLoadAll();delete all[String(RS_YEAR)];yrSaveAll(all);
   if(RS_YEAR===BASE_YEAR){localStorage.removeItem(LSK);localStorage.removeItem(LSB);wbB64=ORIG_B64;S=onlySystemFailures(deep(DATA));}
@@ -2349,6 +2362,7 @@ function btnBusy(id,labelId,on,text,fallback){
 
 /* ---- 💾 Save ---- */
 async function saveDashboard(){
+  if(RSD_VIEWER){viewNote();return;}
   try{
     lastSaved=new Date().toISOString();
     setDirty(false);
@@ -2403,6 +2417,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     initState();
     renderUserBox();
     await ensureLogin();
+    await loadRole();
     await cloudHydrate();
     buildYearSelect();buildMonthSelects();setSection('coach');setTab('overview');
     const si=document.getElementById('srcInfo');
@@ -7154,6 +7169,11 @@ window.AVX={
 
 <!-- ================= END SYSTEM AVAILABILITY (DAILY) MODULE ================= -->
 
+<style id="viewCss">
+body.viewonly #btnSave,body.viewonly .hbtn[onclick*="fileIn"],body.viewonly #pPE .fb-btn.p,body.viewonly #pPE .pe-card .f button,
+body.viewonly #pPE .wk-x,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty .fb-btn,body.viewonly #ovPE .mfoot .primary,body.viewonly #ovPE #peDel{display:none!important}
+.ubox .vbadge{background:#2a1b26;color:#f06aa8;border:1px solid #AF1763;font-weight:800}
+</style>
 <style id="peCss">
 #pPE .pe-kpis .fb-k{cursor:pointer;border-width:2px;transition:border-color .15s}
 #pPE .pe-kpis .fb-k:hover{border-color:#3b4050}
