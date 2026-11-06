@@ -7438,7 +7438,10 @@ function planHtml(){
    PE level, last PE, status and due days come live from the PE schedule. */
 var WLOCS=['KL SENTRAL','KEMPAS BARU','TUMPAT'];
 /* extra depots offered in the location dropdown (grid shows them only when used) */
-var WXLOCS=['GEMAS','KUALA LIPIS'];function selLocs(l){return l.concat(WXLOCS.filter(function(x){return l.indexOf(x)<0}))}
+var WXLOCS=['GEMAS','KUALA LIPIS'];function curOf(x){return x?(x.cur!=null&&x.cur!==''?x.cur:x.loc||''):''}
+function locSel(fn,i,k,val,locs){var L=selLocs(locs);if(val&&L.indexOf(val)<0)L=L.concat([val]);
+  return '<select onchange="PE.'+fn+'('+i+',\''+k+'\',this.value)">'+L.map(function(l){return '<option'+(l===val?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(val?'':'<option selected value="">—</option>')+'</select>'}
+function selLocs(l){return l.concat(WXLOCS.filter(function(x){return l.indexOf(x)<0}))}
 var WDN=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
 function W(){if(!S.peWeekly)S.peWeekly={prep:'',weeks:{}};if(!S.peWeekly.weeks)S.peWeekly.weeks={};return S.peWeekly}
 function sunOf(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-x.getDay());return isoOf(x)}
@@ -7450,7 +7453,7 @@ function depotOfNow(r){var w=nowOf(r).w||'';var m=w.match(/^Spare\s+(.+)$/i);if(
   return /KEMP/.test(d)?'KEMPAS BARU':/TUM/.test(d)?'TUMPAT':/KL|SENTRAL/.test(d)?'KL SENTRAL':d}
 function clampIso(x,a,b){return x<a?a:x>b?b:x}
 function defPlan(r,sun){var sat=addDays(sun,6),nx=calc(r).next,lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;return clampIso(nx==='-'?lo:nx,lo,sat)}
-function wkItem(r,sun){var d=calc(r).days;return {id:r.id,plan:defPlan(r,sun),loc:depotOfNow(r)||r.loc||'',rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
+function wkItem(r,sun){var d=calc(r).days;var cl=depotOfNow(r)||r.loc||'';return {id:r.id,plan:defPlan(r,sun),loc:cl,cur:cl,rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
 /* what the forecast showed when it was planned; older rows fall back to the schedule */
 function wLast(x,r){return x.last||(r&&r.last!=='-'&&r.last<=x.plan?r.last:'')}
 function wSt(x,r){return x.st||(r?r.st:'')}
@@ -7473,13 +7476,13 @@ function forecastHtml(){
     +(must.length?'<button class="fb-btn p" onclick="PE.wauto()">✨ Fill with the '+must.length+' coach'+(must.length===1?'':'es')+' due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')
     +' <span>You can also add coaches one by one below.</span></div>';
   else{
-    h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>Coaches no.</th><th>PE level</th><th>Last PE date</th><th>PE planning date</th><th>Current location</th><th>Status</th><th>Estimate due days</th><th>Remarks</th><th></th></tr></thead><tbody>';
+    h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>Coaches no.</th><th>PE level</th><th>Last PE date</th><th>PE planning date</th><th>Current location</th><th>PE planning location</th><th>Status</th><th>Estimate due days</th><th>Remarks</th><th></th></tr></thead><tbody>';
     var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
     items.forEach(function(x,i){var f=findRow(x.id),r=f&&f.r,k=r?calc(r):null,over=k&&k.next!=='-'&&x.plan>k.next,lv=wLvl(x,r),la=wLast(x,r),st=wSt(x,r);
       h+='<tr><td class="n">'+(i+1)+'</td><td class="id">'+(r?chipOf(r):esc(x.id))+'</td>'
         +'<td>'+(lv&&lv!=='-'?pill(lv,lv==='PE 60'?'#96f28e':'#5aa9ff'):'–')+'</td><td>'+(la?fmt(la):'–')+'</td>'
         +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.wset('+i+',\'plan\',this.value)"></td>'
-        +'<td><select onchange="PE.wset('+i+',\'loc\',this.value)">'+selLocs(locs).map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
+        +'<td>'+locSel('wset',i,'cur',curOf(x),locs)+'</td><td>'+locSel('wset',i,'loc',x.loc,locs)+'</td>'
         +'<td>'+(st?pill(st,STC[st]||'#a3a8c3'):'–')+'</td><td>'+(k?ddHtml(k.days):'–')+'</td>'
         +'<td class="rem">'+(over?'<b style="color:#ff5b62">OVERDUE</b> ':'')+'<input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.wset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" title="Remove from this week" onclick="PE.wdel('+i+')">✕</button></td></tr>';});
@@ -7554,10 +7557,10 @@ function forecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&R
   var items=(W().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[];
   for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
-      +'<td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+esc(st)+'</td><td'+(over?' class="red"':'')+(x?ce(i,'est'):'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td>'
+      +'<td'+(x?ce(i,'cur'):'')+'>'+(x?esc(curOf(x)):'')+'</td><td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+esc(st)+'</td><td'+(over?' class="red"':'')+(x?ce(i,'est'):'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td>'
       +'<td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
   return sheetDoc({unit:'RSM COACH',title:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),notes:NT(0,sun),prep:W().prep,label:function(x){return x.id},rows:rows,
-    head:{cols:9,html:'<tr><th>NO.</th><th>COACHES NO.</th><th>PE LEVEL</th><th>LAST PE DATE</th><th>PE PLANNING DATE</th><th>CURRENT<br>LOCATION</th><th>STATUS</th><th>ESTIMATE DUE<br>DAYS</th><th>REMARKS</th></tr>'}});
+    head:{cols:10,html:'<tr><th>NO.</th><th>COACHES NO.</th><th>PE LEVEL</th><th>LAST PE DATE</th><th>PE PLANNING DATE</th><th>CURRENT<br>LOCATION</th><th>PE PLANNING<br>LOCATION</th><th>STATUS</th><th>ESTIMATE DUE<br>DAYS</th><th>REMARKS</th></tr>'}});
 }
 
 /* ================= EXCEL WRITER (styled .xlsx, no template) ================= */
@@ -7639,18 +7642,18 @@ function scheduleSheet(){
 }
 /* one week in the "COACH PE WEEKLY PLANNING" layout */
 function weekSheet(sun){
-  var items=(W().weeks[sun]||{items:[]}).items,c={},M=['C2:J2','C3:J3','D4:I4'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
+  var items=(W().weeks[sun]||{items:[]}).items,c={},M=['C2:K2','C3:K3','D4:J4'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
   c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM COACH)',s:{b:1,sz:14,wrap:1}};
   c.C3={v:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.D4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
-  ['NO.','COACHES NO.','PE LEVEL','LAST PE DATE','PE PLANNING DATE','CURRENT\nLOCATION','STATUS','ESTIMATE DUE\nDAYS','REMARKS'].forEach(function(t,j){c[colL(2+j)+'6']={v:t,s:Y}});
+  ['NO.','COACHES NO.','PE LEVEL','LAST PE DATE','PE PLANNING DATE','CURRENT\nLOCATION','PE PLANNING\nLOCATION','STATUS','ESTIMATE DUE\nDAYS','REMARKS'].forEach(function(t,j){c[colL(2+j)+'6']={v:t,s:Y}});
   var n=Math.max(20,items.length);
   for(var i=0;i<n;i++){var r=7+i,x=items[i],f=x&&findRow(x.id),row=f&&f.r,k=row&&calc(row),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,row):'',la=x?wLast(x,row):'',st=x?wSt(x,row):'';if(lv==='-')lv='';
     c['B'+r]={v:i+1,s:T};c['C'+r]={v:x?x.id:'',s:T};c['D'+r]={v:lv,s:lv?{b:1,bd:1,sz:10,fill:lv==='PE 60'?'96F28E':'3F8EFC'}:T};
     var ls=la&&serial(la);c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
     var ps=x&&serial(x.plan);c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
-    c['G'+r]={v:x?x.loc:'',s:T};c['H'+r]={v:st,s:T};
-    c['I'+r]={v:x&&x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):'',s:over?{b:1,bd:1,sz:10,col:'FF0000'}:T};
-    c['J'+r]={v:x?((over?'OVERDUE':'')+(over&&x.rem?' · ':'')+(x.rem||'')):'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
+    c['G'+r]={v:x?curOf(x):'',s:T};c['H'+r]={v:x?x.loc:'',s:T};c['I'+r]={v:st,s:T};
+    c['J'+r]={v:x&&x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):'',s:over?{b:1,bd:1,sz:10,col:'FF0000'}:T};
+    c['K'+r]={v:x?((over?'OVERDUE':'')+(over&&x.rem?' · ':'')+(x.rem||'')):'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
   var r0=7+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
   WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
@@ -7660,7 +7663,7 @@ function weekSheet(sun){
     rr+=rows;});
   rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(W().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
   var rh={2:44};rh[rr]=48;
-  return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:14,D:12,E:13,F:15,G:15,H:19,I:13,J:24},rows:rh,land:0};
+  return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:14,D:12,E:13,F:15,G:15,H:15,I:19,J:13,K:24},rows:rh,land:0};
 }
 /* ---------- weekly Excel import (sheets "WEEK n") ---------- */
 function serialIso(x){if(x instanceof Date)return isoOf(new Date(x.getTime()+12*36e5));if(typeof x==='number'&&x>20000){var d=XLSX.SSF.parse_date_code(x);return d.y+'-'+p2(d.m)+'-'+p2(d.d)}
@@ -7676,10 +7679,11 @@ function parseWeeks(wb){var out={},prep='';
       row.forEach(function(v){var m=s(v).match(/^PREPARED BY\s*:?\s*([\s\S]*)$/i);if(m&&m[1].trim())prep=m[1].replace(/\r/g,'').trim()})});
     if(hdr<0)return;
     /* columns by their titles — older sheets have no LAST PE DATE column */
-    R[hdr].forEach(function(v,j){var t=s(v).toUpperCase();if(/COACH/.test(t))col.id=j;else if(/PLANNING/.test(t))col.plan=j;else if(/LOCATION/.test(t))col.loc=j;else if(/REMARK/.test(t))col.rem=j;else if(/ESTIMATE|DUE/.test(t))col.est=j;else if(/LAST/.test(t))col.last=j;else if(/STATUS/.test(t))col.st=j;else if(/LEVEL/.test(t))col.lvl=j;});
+    R[hdr].forEach(function(v,j){var t=s(v).toUpperCase().replace(/\s+/g,' ');if(/COACH/.test(t))col.id=j;else if(/PLANNING.*LOCATION|PE LOCATION/.test(t))col.ploc=j;else if(/CURRENT/.test(t))col.cur=j;else if(/PLANNING/.test(t))col.plan=j;else if(/LOCATION/.test(t))col.loc=j;else if(/REMARK/.test(t))col.rem=j;else if(/ESTIMATE|DUE/.test(t))col.est=j;else if(/LAST/.test(t))col.last=j;else if(/STATUS/.test(t))col.st=j;else if(/LEVEL/.test(t))col.lvl=j;});
+    if(col.ploc!=null){col.loc=col.ploc}else if(col.cur!=null&&col.loc==null){col.loc=col.cur;col.cur=null}
     if(col.id==null||col.plan==null)return;var items=[];
     for(var i=hdr+1;i<R.length&&(loc<0||i<loc);i++){var row=R[i]||[],id=s(row[col.id]);if(!id)continue;var pl=serialIso(row[col.plan]);if(!pl)continue;
-      items.push({id:id,plan:pl,loc:col.loc!=null?s(row[col.loc]).toUpperCase():'',rem:col.rem!=null?s(row[col.rem]).replace(/^OVERDUE\s*[·-]?\s*/i,'').toUpperCase():'',est:col.est!=null&&isFinite(parseFloat(row[col.est]))?Math.abs(parseFloat(row[col.est])):null,last:col.last!=null?serialIso(row[col.last]):'',st:col.st!=null?s(row[col.st]).toUpperCase():'',lvl:col.lvl!=null?s(row[col.lvl]).toUpperCase():''});}
+      items.push({id:id,plan:pl,loc:col.loc!=null?s(row[col.loc]).toUpperCase():'',cur:col.cur!=null?s(row[col.cur]).toUpperCase():'',rem:col.rem!=null?s(row[col.rem]).replace(/^OVERDUE\s*[·-]?\s*/i,'').toUpperCase():'',est:col.est!=null&&isFinite(parseFloat(row[col.est]))?Math.abs(parseFloat(row[col.est])):null,last:col.last!=null?serialIso(row[col.last]):'',st:col.st!=null?s(row[col.st]).toUpperCase():'',lvl:col.lvl!=null?s(row[col.lvl]).toUpperCase():''});}
     if(!items.length)return;
     var wn=+n.match(/\d+/)[0],yr=+items.map(function(x){return x.plan}).sort()[0].slice(0,4),sun=sunOfWeek(yr,wn);
     if(Math.abs((parseIso(items[0].plan)-parseIso(sun))/864e5)>40)sun=sunOf(parseIso(items.map(function(x){return x.plan}).sort()[0]));   /* name does not fit the dates */
@@ -7781,7 +7785,7 @@ function pgcCands(sun){var sat=addDays(sun,6),lim=addDays(sat,7),items=(WP().wee
   return out.sort(function(a,b){return a.d-b.d})}
 function pEst(r,lvl){var k=pgcCalc(r);return lvl==='PE 30'?{e1:k.l1==null?null:-k.l1,d:null,e2:k.l2==null?null:-k.l2}:{e1:null,d:k.d90==='-'?null:-k.d90,e2:null}}
 function pItem(r,lvl,sun){var k=pgcCalc(r),nx=lvl==='PE 30'?k.n30:k.n90,sat=addDays(sun,6),lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;
-  return {id:r.id,lvl:lvl,last:(lvl==='PE 30'?r.p30:r.p90)||'',plan:clampIso(nx==='-'?lo:nx,lo,sat),loc:depotOfNow(r)||(lvl==='PE 30'?r.l30:r.l90)||'',st:'IN OPERATIONS',rem:'',est:pEst(r,lvl)}}
+  return {id:r.id,lvl:lvl,last:(lvl==='PE 30'?r.p30:r.p90)||'',plan:clampIso(nx==='-'?lo:nx,lo,sat),loc:depotOfNow(r)||(lvl==='PE 30'?r.l30:r.l90)||'',cur:depotOfNow(r)||(lvl==='PE 30'?r.l30:r.l90)||'',st:'IN OPERATIONS',rem:'',est:pEst(r,lvl)}}
 function estTxt(e){if(!e)return '–';var a=[];if(e.e1!=null)a.push('E1 '+e.e1+' h');if(e.d!=null)a.push(e.d+' d');if(e.e2!=null)a.push('E2 '+e.e2+' h');return a.join(' · ')||'–'}
 function pgcForecastHtml(){
   var sun=curSunP(),sat=addDays(sun,6),wn=weekNo(sun),items=(WP().weeks[sun]||{items:[]}).items,cands=pgcCands(sun),must=cands.filter(function(c){return c.must});
@@ -7793,10 +7797,10 @@ function pgcForecastHtml(){
   if(!items.length)h+='<div class="wk-empty">No PGC plan for week '+wn+' yet. '+(must.length?'<button class="fb-btn p" onclick="PE.pwauto()">✨ Fill with the '+must.length+' PE due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')+'</div>';
   else{
     var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
-    h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>PGC no.</th><th>PE level</th><th>Last PE date</th><th>Planning date</th><th>Current location</th><th>Status</th><th>Estimate due (E1 h · days · E2 h)</th><th>Remarks</th><th></th></tr></thead><tbody>'
+    h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>PGC no.</th><th>PE level</th><th>Last PE date</th><th>Planning date</th><th>Current location</th><th>PE planning location</th><th>Status</th><th>Estimate due (E1 h · days · E2 h)</th><th>Remarks</th><th></th></tr></thead><tbody>'
       +items.map(function(x,i){return '<tr><td class="n">'+(i+1)+'</td><td class="id">'+pgcChip(x.id)+'</td><td>'+pill(x.lvl,x.lvl==='PE 30'?'#ff7e79':'#d5fc79')+'</td><td>'+(x.last?fmt(x.last):'–')+'</td>'
         +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.pwset('+i+',\'plan\',this.value)"></td>'
-        +'<td><select onchange="PE.pwset('+i+',\'loc\',this.value)">'+selLocs(locs).map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
+        +'<td>'+locSel('pwset',i,'cur',curOf(x),locs)+'</td><td>'+locSel('pwset',i,'loc',x.loc,locs)+'</td>'
         +'<td>'+pill(x.st||'IN OPERATIONS',STC[x.st||'IN OPERATIONS']||'#a3a8c3')+'</td><td>'+estTxt(x.est)+'</td>'
         +'<td class="rem"><input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.pwset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" onclick="PE.pwdel('+i+')">✕</button></td></tr>'}).join('')+'</tbody></table></div>';
@@ -7880,15 +7884,16 @@ function parsePgcWeeks(wb){var out={},prep='';
       if(loc<0&&row.some(function(v){return /^LOCATION$/i.test(s(v))}))loc=i;
       row.forEach(function(v){var m=s(v).match(/^PREPARED BY\s*:?\s*([\s\S]*)$/i);if(m&&m[1].trim())prep=m[1].replace(/\r/g,'').trim()})});
     if(hdr<0)return;
-    R[hdr].forEach(function(v,j){var t=s(v).toUpperCase();if(/PGC/.test(t))col.id=j;else if(/LEVEL/.test(t))col.lvl=j;else if(/LAST/.test(t))col.last=j;else if(/PLANNING/.test(t))col.plan=j;
+    R[hdr].forEach(function(v,j){var t=s(v).toUpperCase().replace(/\s+/g,' ');if(/PGC/.test(t))col.id=j;else if(/LEVEL/.test(t))col.lvl=j;else if(/LAST/.test(t))col.last=j;else if(/PLANNING.*LOCATION|PE LOCATION/.test(t))col.ploc=j;else if(/CURRENT/.test(t))col.cur=j;else if(/PLANNING/.test(t))col.plan=j;
       else if(/LOCATION/.test(t))col.loc=j;else if(/STATUS/.test(t))col.st=j;else if(/ESTIMATE/.test(t))col.est=j;else if(/REMARK/.test(t))col.rem=j;});
+    if(col.ploc!=null){col.loc=col.ploc}else if(col.cur!=null&&col.loc==null){col.loc=col.cur;col.cur=null}
     if(col.id==null||col.plan==null)return;var items=[],nb=function(v){var x=parseFloat(v);return isFinite(x)?x:null};
     /* the location × day grid also gives the planning date ("PGC 209 (PE 30)") when the table cell is empty */
     var gd={};if(loc>=0){var dr=R[loc+1]||[];for(var gi=loc+2;gi<R.length;gi++)(R[gi]||[]).forEach(function(v,j){var m=s(v).toUpperCase().match(/^(PGC\s*\d+)\s*\((PE\s*\d+)\)/);
       if(m&&dr[j]!=null)gd[keyOf(m[1])+'|'+m[2].replace(/\s+/,' ')]=serialIso(dr[j]);});}
     for(var i=hdr+1;i<R.length&&(loc<0||i<loc);i++){var row=R[i]||[],id=s(row[col.id]);if(!/PGC/i.test(id))continue;
       var lv0=col.lvl!=null?s(row[col.lvl]).toUpperCase().replace(/\s+/,' '):'PE 30',pl=serialIso(row[col.plan])||gd[keyOf(id)+'|'+lv0]||'';
-      items.push({id:id.toUpperCase(),lvl:col.lvl!=null?s(row[col.lvl]).toUpperCase():'PE 30',last:col.last!=null?serialIso(row[col.last]):'',plan:pl,loc:col.loc!=null?s(row[col.loc]).toUpperCase():'',
+      items.push({id:id.toUpperCase(),lvl:col.lvl!=null?s(row[col.lvl]).toUpperCase():'PE 30',last:col.last!=null?serialIso(row[col.last]):'',plan:pl,loc:col.loc!=null?s(row[col.loc]).toUpperCase():'',cur:col.cur!=null?s(row[col.cur]).toUpperCase():'',
         st:col.st!=null?s(row[col.st]).toUpperCase():'IN OPERATIONS',rem:col.rem!=null?s(row[col.rem]).toUpperCase():'',
         est:col.est!=null?{e1:nb(row[col.est]),d:nb(row[col.est+1]),e2:nb(row[col.est+2])}:null});}
     if(!items.length)return;var wn=+n.match(/\d+/)[0],pls=items.map(function(x){return x.plan}).filter(Boolean).sort(),
@@ -7925,15 +7930,15 @@ function pgcScheduleSheet(){
   return {name:(String(D.year).match(/\d{4}/)||['PGC'])[0],cells:c,merges:M,cols:{A:6,B:14,C:13,D:13,E:13,F:13,G:12,H:14,I:12,J:10,K:10,L:10,M:10,N:12,O:14,P:12,Q:16,R:12,S:12,T:12,U:12,V:14},rows:{2:44,6:40},cf:cf,land:1};
 }
 function pgcWeekSheet(sun){
-  var items=(WP().weeks[sun]||{items:[]}).items,c={},M=['C2:L2','C3:L3','E4:J4','B6:B7','C6:C7','D6:D7','E6:E7','F6:F7','G6:G7','H6:H7','I6:K6','L6:L7'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
+  var items=(WP().weeks[sun]||{items:[]}).items,c={},M=['C2:M2','C3:M3','E4:K4','B6:B7','C6:C7','D6:D7','E6:E7','F6:F7','G6:G7','H6:H7','I6:I7','J6:L6','M6:M7'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
   c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM PGC)',s:{b:1,sz:14,wrap:1}};c.C3={v:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.E4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
-  [['B6','NO.'],['C6','PGC NO.'],['D6','PE LEVEL'],['E6','LAST PE DATE'],['F6','PLANNING DATE'],['G6','CURRENT\nLOCATION'],['H6','STATUS'],['I6','ESTIMATE DUE DAYS / HOURS'],['L6','REMARKS'],['I7','ENGINE 1'],['J7','DAYS'],['K7','ENGINE 2']].forEach(function(p){c[p[0]]={v:p[1],s:Y}});
-  ['B7','C7','D7','E7','F7','G7','H7','L7','J6','K6'].forEach(function(a){if(!c[a])c[a]={v:'',s:Y}});
+  [['B6','NO.'],['C6','PGC NO.'],['D6','PE LEVEL'],['E6','LAST PE DATE'],['F6','PLANNING DATE'],['G6','CURRENT\nLOCATION'],['H6','PE PLANNING\nLOCATION'],['I6','STATUS'],['J6','ESTIMATE DUE DAYS / HOURS'],['M6','REMARKS'],['J7','ENGINE 1'],['K7','DAYS'],['L7','ENGINE 2']].forEach(function(p){c[p[0]]={v:p[1],s:Y}});
+  ['B7','C7','D7','E7','F7','G7','H7','I7','M7','K6','L6'].forEach(function(a){if(!c[a])c[a]={v:'',s:Y}});
   var n=Math.max(20,items.length);
   for(var i=0;i<n;i++){var r=8+i,x=items[i],e=x&&x.est||{};c['B'+r]={v:i+1,s:T};c['C'+r]={v:x?x.id:'',s:T};
     c['D'+r]={v:x?x.lvl:'',s:x?{b:1,bd:1,sz:10,fill:x.lvl==='PE 30'?'FF7E79':'D5FC79'}:T};var ls=x&&serial(x.last),ps=x&&serial(x.plan);
-    c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['G'+r]={v:x?x.loc:'',s:T};c['H'+r]={v:x?(x.st||'IN OPERATIONS'):'',s:T};
-    c['I'+r]={v:e.e1!=null?e.e1:'',s:T};c['J'+r]={v:e.d!=null?e.d:'',s:T};c['K'+r]={v:e.e2!=null?e.e2:'',s:T};c['L'+r]={v:x?x.rem:'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
+    c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['G'+r]={v:x?curOf(x):'',s:T};c['H'+r]={v:x?x.loc:'',s:T};c['I'+r]={v:x?(x.st||'IN OPERATIONS'):'',s:T};
+    c['J'+r]={v:e.e1!=null?e.e1:'',s:T};c['K'+r]={v:e.d!=null?e.d:'',s:T};c['L'+r]={v:e.e2!=null?e.e2:'',s:T};c['M'+r]={v:x?x.rem:'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
   var r0=8+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
   WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
@@ -7942,15 +7947,15 @@ function pgcWeekSheet(sun){
     for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9,wrap:1}}});}rr+=rows;});
   rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(WP().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
   var rh={2:44};rh[rr]=48;
-  return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:16,I:11,J:9,K:11,L:24},rows:rh,land:0};
+  return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:15,I:16,J:11,K:9,L:11,M:24},rows:rh,land:0};
 }
 function pgcForecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(WP().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[],nv=function(v){return v==null?'':v};
   for(var i=0;i<n;i++){var x=items[i],e=x&&x.est||{};
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(x?' class="'+(x.lvl==='PE 30'?'q30':'q90')+'"'+ce(i,'lvl'):'')+'>'+(x?x.lvl:'')+'</td><td'+(x?ce(i,'last'):'')+'>'+(x&&x.last?fmt(x.last):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
-      +'<td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td'+(x?ce(i,'e1'):'')+'>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+(x?ce(i,'d'):'')+'>'+nv(e.d)+'</td><td'+(x?ce(i,'e2'):'')+'>'+nv(e.e2)+'</td><td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?esc(x.rem):'')+'</td>');}
+      +'<td'+(x?ce(i,'cur'):'')+'>'+(x?esc(curOf(x)):'')+'</td><td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td'+(x?ce(i,'e1'):'')+'>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+(x?ce(i,'d'):'')+'>'+nv(e.d)+'</td><td'+(x?ce(i,'e2'):'')+'>'+nv(e.e2)+'</td><td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?esc(x.rem):'')+'</td>');}
   return sheetDoc({unit:'RSM PGC',title:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),notes:NT(1,sun),prep:WP().prep,label:function(x){return x.id+' ('+x.lvl+')'},rows:rows,
-    head:{cols:11,html:'<tr><th rowspan="2">NO.</th><th rowspan="2">PGC NO.</th><th rowspan="2">PE LEVEL</th><th rowspan="2">LAST PE DATE</th><th rowspan="2">PLANNING DATE</th><th rowspan="2">CURRENT<br>LOCATION</th><th rowspan="2">STATUS</th><th colspan="3" class="es">ESTIMATE DUE DAYS / HOURS</th><th rowspan="2" class="rm">REMARKS</th></tr><tr><th class="sb">ENGINE 1</th><th class="sb">DAYS</th><th class="sb">ENGINE 2</th></tr>'}});
+    head:{cols:12,html:'<tr><th rowspan="2">NO.</th><th rowspan="2">PGC NO.</th><th rowspan="2">PE LEVEL</th><th rowspan="2">LAST PE DATE</th><th rowspan="2">PLANNING DATE</th><th rowspan="2">CURRENT<br>LOCATION</th><th rowspan="2">PE PLANNING<br>LOCATION</th><th rowspan="2">STATUS</th><th colspan="3" class="es">ESTIMATE DUE DAYS / HOURS</th><th rowspan="2" class="rm">REMARKS</th></tr><tr><th class="sb">ENGINE 1</th><th class="sb">DAYS</th><th class="sb">ENGINE 2</th></tr>'}});
 }
 
 function render(){
