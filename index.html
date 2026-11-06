@@ -7503,10 +7503,12 @@ function sheetDoc(o){
   var dw=(8/nc*100).toFixed(3);
   h+='</table><table class="wd-g" style="width:'+dw+'%"><colgroup>'+Array(9).join('<col>')+'</colgroup><tr><th rowspan="2" class="g">LOCATION</th>'+WDN.map(function(d){return '<th>'+d+'</th>'}).join('')+'</tr><tr>'
     +WDN.map(function(d,j){return '<th class="b">'+fmt(addDays(o.sun,j))+'</th>'}).join('')+'</tr>';
-  o.locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(o.sun,j);return o.items.filter(function(x){return x.loc===l&&x.plan===dd}).map(o.label)});
+  o.locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(o.sun,j);return o.items.filter(function(x){return x.loc===l&&x.plan===dd})});
     var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));
-    for(var q=0;q<rows;q++)h+='<tr class="'+(q===rows-1?'lst':'')+'">'+(q===0?'<td rowspan="'+rows+'" class="g">'+esc(l)+'</td>':'')
-      +per.map(function(p,j){return '<td>'+(p[q]?esc(p[q]):(j===0||j===6)?'-':'')+'</td>'}).join('')+'</tr>';});
+    /* in sheet view every grid cell is editable: data-loc / data-day say where it is, data-cur which item it shows */
+    var ga=function(dd,x){return SHEET_ED?' contenteditable="true" spellcheck="false" data-k="grid" data-loc="'+esc(l)+'" data-day="'+dd+'" data-cur="'+(x?esc(o.label(x)):'')+'"':''};
+    for(var q=0;q<rows;q++)h+='<tr class="'+(q===rows-1?'lst':'')+'">'+(q===0?'<td rowspan="'+rows+'" class="g"'+(SHEET_ED?' contenteditable="true" spellcheck="false" data-k="gloc" data-loc="'+esc(l)+'"':'')+'>'+esc(l)+'</td>':'')
+      +per.map(function(p,j){var x=p[q];return '<td'+ga(addDays(o.sun,j),x)+'>'+(x?esc(o.label(x)):(j===0||j===6)&&!SHEET_ED?'-':'')+'</td>'}).join('')+'</tr>';});
   var pw=(3/nc*100).toFixed(3);
   return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br><span'+ce(-1,'prep')+'>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</span></div></div></div>';
 }
@@ -8072,6 +8074,20 @@ window.PE={
       v=String(el.innerText||'').replace(/\s+/g,' ').trim(),V=v.toUpperCase();
     if(k==='prep'){var pv=String(el.innerText||'').replace(/\r/g,'').trim().toUpperCase();if(pv!==(store.prep||'')){store.prep=pv;PE._chg(e);}return;}
     var w=store.weeks[sun]=store.weeks[sun]||{items:[]},x=w.items[i];
+    if(k==='gloc'){var ol=el.getAttribute('data-loc');if(!V||V===ol){if(!V)el.innerText=ol;return;}w.items.forEach(function(it){if(it.loc===ol)it.loc=V});PE._chg(e);return;}
+    if(k==='grid'){var day=el.getAttribute('data-day'),loc=el.getAttribute('data-loc'),cur=el.getAttribute('data-cur'),lab=function(it){return pgc?it.id+' ('+it.lvl+')':it.id};
+      var curIt=cur?w.items.filter(function(it){return lab(it)===cur})[0]:null;if(V==='-')V='';
+      if(curIt&&V&&keyOf(lab(curIt))===keyOf(V))return;
+      var drop=function(it){var ix=w.items.indexOf(it);if(ix>=0)w.items.splice(ix,1)};
+      if(!V){if(curIt){drop(curIt);if(!w.items.length)delete store.weeks[sun];PE._chg(e);}return;}
+      var id,lv;if(pgc){var mm=V.match(/(PGC\s*\d+|^\d+)\s*(?:\((PE\s*\d+)\))?/);if(!mm){toast('Type like PGC 213 (PE 30)');render();return;}
+        id=('PGC '+mm[1].replace(/\D/g,''));lv=mm[2]?mm[2].replace(/\s+/,' '):(curIt?curIt.lvl:'PE 30');}else id=V;
+      var ex=w.items.filter(function(it){return keyOf(it.id)===keyOf(id)&&(!pgc||it.lvl===lv)})[0];
+      if(!ex){if(pgc){var pf=pRow(id);ex=pf?pItem(pf.r,lv,sun):{id:id,lvl:lv,last:'',plan:'',loc:'',st:'IN OPERATIONS',rem:'',est:null};}
+        else{var cf=findRow(id);ex=cf?wkItem(cf.r,sun):{id:id,plan:'',loc:'',rem:'',est:null,last:'',st:'IN OPERATIONS',lvl:''};}
+        if(curIt)w.items[w.items.indexOf(curIt)]=ex;else w.items.push(ex);}
+      else if(curIt&&curIt!==ex)drop(curIt);
+      ex.plan=day;ex.loc=loc;w.items.sort(function(a,b){return (a.plan||'~')<(b.plan||'~')?-1:(a.plan||'~')>(b.plan||'~')?1:0});PE._chg(e);return;}
     if(k==='id'){
       if(!V){if(x){w.items.splice(i,1);if(!w.items.length)delete store.weeks[sun];PE._chg(e);}return;}
       if(x&&keyOf(x.id)===keyOf(V))return;
