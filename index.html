@@ -7437,6 +7437,8 @@ function planHtml(){
    S.peWeekly = {prep:'', weeks:{ '<sunday iso>': {items:[{id,plan,loc,rem}]} }}
    PE level, last PE, status and due days come live from the PE schedule. */
 var WLOCS=['KL SENTRAL','KEMPAS BARU','TUMPAT'];
+/* extra depots offered in the location dropdown (grid shows them only when used) */
+var WXLOCS=['GEMAS','KUALA LIPIS'];function selLocs(l){return l.concat(WXLOCS.filter(function(x){return l.indexOf(x)<0}))}
 var WDN=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
 function W(){if(!S.peWeekly)S.peWeekly={prep:'',weeks:{}};if(!S.peWeekly.weeks)S.peWeekly.weeks={};return S.peWeekly}
 function sunOf(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-x.getDay());return isoOf(x)}
@@ -7477,7 +7479,7 @@ function forecastHtml(){
       h+='<tr><td class="n">'+(i+1)+'</td><td class="id">'+(r?chipOf(r):esc(x.id))+'</td>'
         +'<td>'+(lv&&lv!=='-'?pill(lv,lv==='PE 60'?'#96f28e':'#5aa9ff'):'–')+'</td><td>'+(la?fmt(la):'–')+'</td>'
         +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.wset('+i+',\'plan\',this.value)"></td>'
-        +'<td><select onchange="PE.wset('+i+',\'loc\',this.value)">'+locs.map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
+        +'<td><select onchange="PE.wset('+i+',\'loc\',this.value)">'+selLocs(locs).map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
         +'<td>'+(st?pill(st,STC[st]||'#a3a8c3'):'–')+'</td><td>'+(k?ddHtml(k.days):'–')+'</td>'
         +'<td class="rem">'+(over?'<b style="color:#ff5b62">OVERDUE</b> ':'')+'<input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.wset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" title="Remove from this week" onclick="PE.wdel('+i+')">✕</button></td></tr>';});
@@ -7794,7 +7796,7 @@ function pgcForecastHtml(){
     h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>PGC no.</th><th>PE level</th><th>Last PE date</th><th>Planning date</th><th>Current location</th><th>Status</th><th>Estimate due (E1 h · days · E2 h)</th><th>Remarks</th><th></th></tr></thead><tbody>'
       +items.map(function(x,i){return '<tr><td class="n">'+(i+1)+'</td><td class="id">'+pgcChip(x.id)+'</td><td>'+pill(x.lvl,x.lvl==='PE 30'?'#ff7e79':'#d5fc79')+'</td><td>'+(x.last?fmt(x.last):'–')+'</td>'
         +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.pwset('+i+',\'plan\',this.value)"></td>'
-        +'<td><select onchange="PE.pwset('+i+',\'loc\',this.value)">'+locs.map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
+        +'<td><select onchange="PE.pwset('+i+',\'loc\',this.value)">'+selLocs(locs).map(function(l){return '<option'+(l===x.loc?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(x.loc?'':'<option selected value="">—</option>')+'</select></td>'
         +'<td>'+pill(x.st||'IN OPERATIONS',STC[x.st||'IN OPERATIONS']||'#a3a8c3')+'</td><td>'+estTxt(x.est)+'</td>'
         +'<td class="rem"><input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.pwset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" onclick="PE.pwdel('+i+')">✕</button></td></tr>'}).join('')+'</tbody></table></div>';
