@@ -7249,6 +7249,9 @@ body.viewonly #pPE .wk-x,body.viewonly #pPE .wg-x,body.viewonly #pPE .wg-add,bod
 #pPE .wg-it:hover .wg-x{opacity:1}
 #pPE .wg-add{position:absolute;left:50%;bottom:3px;transform:translateX(-50%);border:1px dashed #3b4050;background:none;color:#6c7293;border-radius:6px;font-size:.7rem;font-weight:800;padding:0 9px;cursor:pointer;opacity:0;transition:opacity .12s}
 #pPE table.wg-ed td:hover .wg-add{opacity:1}#pPE .wg-add:hover{color:#fff;border-color:#AF1763}
+#pPE .wg-note{font-size:.72rem;color:#ffd60a;font-weight:700;white-space:pre-wrap;word-break:break-word;text-align:center;margin:3px 2px 0;padding:2px 4px;border-radius:5px;min-height:1.1em;outline:none;cursor:text;line-height:1.25}
+#pPE .wg-note:focus{background:#13151b;outline:1px solid #AF1763;color:#fff}
+#pPE .wg-note:empty:before{content:attr(data-ph);color:#6c7293;font-weight:600;opacity:0}#pPE td:hover .wg-note:empty:before,#pPE .wg-note:focus:empty:before{opacity:1}
 #pPE .wg-sel{display:block;margin:4px auto 0;max-width:130px;font-size:.7rem}
 @media (hover:none){#pPE .wg-x,#pPE .wg-add{opacity:1}}#pPE table.wkg td i{color:#4b5064;font-style:normal}
 #peWkPrint{display:none}
@@ -7262,7 +7265,7 @@ body.viewonly #pPE .wk-x,body.viewonly #pPE .wg-x,body.viewonly #pPE .wg-add,bod
 .wd .wd-t th.es{height:12px}.wd .wd-t th.rm{background:#7a81ff}
 .wd .p90{background:#3f8efc}.wd .p60{background:#96f28e}.wd .q30{background:#00f5a0}.wd .q90{background:#0096ff}.wd .red{color:#e00}
 .wd .wd-g{border:2px solid #000;margin-top:26px}.wd .wd-g th{background:#ff0;height:12px;font-size:7.5px}.wd .wd-g th.b{background:#0096ff}.wd .wd-g .g{background:#73fb79;font-size:7.5px}
-.wd .wd-g td{height:12px;font-size:7.5px;border-top:1px solid #000;border-bottom:1px solid #000}.wd .wd-g tr.lst td{border-bottom:2px solid #000}
+.wd .wd-g td{height:12px;font-size:7.5px;border-top:1px solid #000;border-bottom:1px solid #000}html body .wd .wd-g td.nt{white-space:normal!important;overflow-wrap:break-word;line-height:1.15;color:#c00!important}.wd .wd-g tr.lst td{border-bottom:2px solid #000}
 .wd .wd-p{display:grid;grid-template-columns:30% 1fr;align-items:center;border:2px solid #000;margin-top:26px;min-height:52px;box-sizing:border-box}
 .wd .wd-p img{width:88%;margin-left:4px}.wd .wd-p .tx{text-align:center;font-size:6px;line-height:1.6;padding:4px 2px;white-space:nowrap}
 html body .wd td,html body .wd th{background:#fff!important;color:#000!important;font-size:7.5px!important;font-weight:700!important;line-height:1.15!important;padding:0 2px!important;letter-spacing:0!important;text-transform:none!important;box-shadow:none!important;position:static!important;white-space:nowrap!important}
@@ -7491,19 +7494,26 @@ function forecastHtml(){
 }
 /* editable location × day grid (dashboard view): drag a chip to move it, ✕ removes, ＋ adds, click a location to rename */
 var GSEL=null;
+/* free-text notes typed into a grid cell: store.notes = {'<sunday>': {'LOC|iso': 'text'}} */
+function NT(pgc,sun){var st=pgc?WP():W();return (st.notes&&st.notes[sun])||{}}
+function setNT(pgc,sun,loc,day,t){var st=pgc?WP():W();st.notes=st.notes||{};var m=st.notes[sun]=st.notes[sun]||{},k=loc+'|'+day;if(t)m[k]=t;else delete m[k];if(!Object.keys(m).length)delete st.notes[sun];}
+function renNT(pgc,sun,ol,nl){var m=NT(pgc,sun),n=0;Object.keys(m).forEach(function(k){var p=k.split('|');if(p[0]===ol){var t=m[k];delete m[k];var q=nl+'|'+p[1];m[q]=m[q]?m[q]+'\n'+t:t;n++}});return n}
+function ntHtml(t){return esc(t||'').replace(/\n/g,'<br>')}
 function gridHtml(pgc,sun,items,locs){
   var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today()),ro=typeof RSD_VIEWER!=='undefined'&&!!RSD_VIEWER;
   var chip=function(x){var i=items.indexOf(x),c;if(pgc)c=pgcChip(x.id+' ('+x.lvl+')');else{var f=findRow(x.id);c=f?chipOf(f.r):'<span class="fb-chip" style="background:#3b4050;color:#fff">'+esc(x.id)+'</span>'}
     if(ro)return c;var sel=GSEL&&GSEL.p===pgc&&GSEL.i===i;
     return '<span class="wg-it'+(sel?' sel':'')+'" draggable="true" data-i="'+i+'" title="Drag to another day / location — or click it, then click the new cell" ondragstart="PE.gdrag(event,'+pgc+','+i+')" onclick="event.stopPropagation();PE.gpick('+pgc+','+i+')">'+c
       +'<b class="wg-x" title="Remove from this week" onclick="event.stopPropagation();PE.gdel('+pgc+','+i+')">✕</b></span>'};
-  var h='<div class="pe-tw" style="margin-top:12px">'+(ro?'':'<div class="wg-hint">✏️ Drag a '+(pgc?'PGC':'coach')+' to another day / location (or click it, then click the new cell) · ＋ adds one to that cell · ✕ removes · click a location name to rename it</div>')
+  var h='<div class="pe-tw" style="margin-top:12px">'+(ro?'':'<div class="wg-hint">✏️ Drag a '+(pgc?'PGC':'coach')+' to another day / location (or click it, then click the new cell) · ＋ adds one to that cell · ✕ removes · ✎ click under a cell to type your own note · click a location name to rename it</div>')
     +'<table class="pe wkg'+(ro?'':' wg-ed')+'"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>';
   locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).forEach(function(l){
     h+='<tr><td class="loc"'+(ro?'':' title="Click to rename this location" style="cursor:pointer" onclick="PE.gloc('+pgc+',this.getAttribute(\'data-loc\'))" data-loc="'+esc(l)+'"')+'>'+esc(l)+'</td>';
     DN.forEach(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
+      var nt=NT(pgc,sun)[l+'|'+dd]||'';
       h+='<td'+(ro?'':' data-day="'+dd+'" data-loc="'+esc(l)+'" ondragover="event.preventDefault();this.classList.add(\'ov\')" ondragleave="this.classList.remove(\'ov\')" ondrop="PE.gdrop(event,this)" onclick="PE.gput(this)"')+'>'
-        +(on.length?on.map(chip).join(''):'<i>–</i>')+(ro?'':'<button class="wg-add" title="Add to '+esc(l)+' · '+fmt(dd)+'" onclick="event.stopPropagation();PE.gadd(this,'+pgc+')">＋</button>')+'</td>'});
+        +(on.length?on.map(chip).join(''):nt?'':'<i>–</i>')
+        +(ro?(nt?'<div class="wg-note">'+ntHtml(nt)+'</div>':''):'<div class="wg-note" contenteditable="true" spellcheck="false" data-ph="✎ type a note" title="Type your own text for this day / location · Enter = done · Shift+Enter = new line" onclick="event.stopPropagation()" onfocusout="PE.gnote('+pgc+',this)" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();this.blur()}">'+ntHtml(nt)+'</div>')+(ro?'':'<button class="wg-add" title="Add to '+esc(l)+' · '+fmt(dd)+'" onclick="event.stopPropagation();PE.gadd(this,'+pgc+')">＋</button>')+'</td>'});
     h+='</tr>'});
   return h+'</tbody></table></div>';}
 /* ---------- print: the week as the forecast sheet ---------- */
@@ -7525,12 +7535,15 @@ function sheetDoc(o){
   var dw=(8/nc*100).toFixed(3);
   h+='</table><table class="wd-g" style="width:'+dw+'%"><colgroup>'+Array(9).join('<col>')+'</colgroup><tr><th rowspan="2" class="g">LOCATION</th>'+WDN.map(function(d){return '<th>'+d+'</th>'}).join('')+'</tr><tr>'
     +WDN.map(function(d,j){return '<th class="b">'+fmt(addDays(o.sun,j))+'</th>'}).join('')+'</tr>';
-  o.locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(o.sun,j);return o.items.filter(function(x){return x.loc===l&&x.plan===dd})});
-    var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));
+  var NTS=o.notes||{};
+  o.locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(o.sun,j);return o.items.filter(function(x){return x.loc===l&&x.plan===dd})}),nts=WDN.map(function(d,j){return NTS[l+'|'+addDays(o.sun,j)]||''});
+    var rows=Math.max(2,Math.max.apply(null,per.map(function(p,j){return p.length+(nts[j]?1:0)})));
     /* in sheet view every grid cell is editable: data-loc / data-day say where it is, data-cur which item it shows */
     var ga=function(dd,x){return SHEET_ED?' contenteditable="true" spellcheck="false" data-k="grid" data-loc="'+esc(l)+'" data-day="'+dd+'" data-cur="'+(x?esc(o.label(x)):'')+'"':''};
     for(var q=0;q<rows;q++)h+='<tr class="'+(q===rows-1?'lst':'')+'">'+(q===0?'<td rowspan="'+rows+'" class="g"'+(SHEET_ED?' contenteditable="true" spellcheck="false" data-k="gloc" data-loc="'+esc(l)+'"':'')+'>'+esc(l)+'</td>':'')
-      +per.map(function(p,j){var x=p[q];return '<td'+ga(addDays(o.sun,j),x)+'>'+(x?esc(o.label(x)):(j===0||j===6)&&!SHEET_ED?'-':'')+'</td>'}).join('')+'</tr>';});
+      +per.map(function(p,j){var x=p[q],dd=addDays(o.sun,j);
+        if(!x&&nts[j]&&q===p.length)return '<td class="nt"'+(SHEET_ED?' contenteditable="true" spellcheck="false" data-k="gnote" data-loc="'+esc(l)+'" data-day="'+dd+'"':'')+'>'+ntHtml(nts[j])+'</td>';
+        return '<td'+ga(dd,x)+'>'+(x?esc(o.label(x)):(j===0||j===6)&&!SHEET_ED&&!nts[j]&&!p.length?'-':'')+'</td>'}).join('')+'</tr>';});
   var pw=(3/nc*100).toFixed(3);
   return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br><span'+ce(-1,'prep')+'>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</span></div></div></div>';
 }
@@ -7541,7 +7554,7 @@ function forecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&R
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
       +'<td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+esc(st)+'</td><td'+(over?' class="red"':'')+(x?ce(i,'est'):'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td>'
       +'<td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
-  return sheetDoc({unit:'RSM COACH',title:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),prep:W().prep,label:function(x){return x.id},rows:rows,
+  return sheetDoc({unit:'RSM COACH',title:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),notes:NT(0,sun),prep:W().prep,label:function(x){return x.id},rows:rows,
     head:{cols:9,html:'<tr><th>NO.</th><th>COACHES NO.</th><th>PE LEVEL</th><th>LAST PE DATE</th><th>PE PLANNING DATE</th><th>CURRENT<br>LOCATION</th><th>STATUS</th><th>ESTIMATE DUE<br>DAYS</th><th>REMARKS</th></tr>'}});
 }
 
@@ -7639,9 +7652,9 @@ function weekSheet(sun){
   var r0=7+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
   WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
-  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);return items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id})});
+  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);var a=items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id}),t=NT(0,sun)[l+'|'+dd];if(t)a.push(t);return a});
     var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));M.push('B'+rr+':B'+(rr+rows-1));
-    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9}}});}
+    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9,wrap:1}}});}
     rr+=rows;});
   rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(W().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
   var rh={2:44};rh[rr]=48;
@@ -7922,9 +7935,9 @@ function pgcWeekSheet(sun){
   var r0=8+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
   WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
-  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);return items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id+' ('+x.lvl+')'})});
+  locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);var a=items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id+' ('+x.lvl+')'}),t=NT(1,sun)[l+'|'+dd];if(t)a.push(t);return a});
     var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));M.push('B'+rr+':B'+(rr+rows-1));
-    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9}}});}rr+=rows;});
+    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9,wrap:1}}});}rr+=rows;});
   rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(WP().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
   var rh={2:44};rh[rr]=48;
   return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:16,I:11,J:9,K:11,L:24},rows:rh,land:0};
@@ -7934,7 +7947,7 @@ function pgcForecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'
   for(var i=0;i<n;i++){var x=items[i],e=x&&x.est||{};
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(x?' class="'+(x.lvl==='PE 30'?'q30':'q90')+'"'+ce(i,'lvl'):'')+'>'+(x?x.lvl:'')+'</td><td'+(x?ce(i,'last'):'')+'>'+(x&&x.last?fmt(x.last):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
       +'<td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td'+(x?ce(i,'e1'):'')+'>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+(x?ce(i,'d'):'')+'>'+nv(e.d)+'</td><td'+(x?ce(i,'e2'):'')+'>'+nv(e.e2)+'</td><td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?esc(x.rem):'')+'</td>');}
-  return sheetDoc({unit:'RSM PGC',title:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),prep:WP().prep,label:function(x){return x.id+' ('+x.lvl+')'},rows:rows,
+  return sheetDoc({unit:'RSM PGC',title:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),notes:NT(1,sun),prep:WP().prep,label:function(x){return x.id+' ('+x.lvl+')'},rows:rows,
     head:{cols:11,html:'<tr><th rowspan="2">NO.</th><th rowspan="2">PGC NO.</th><th rowspan="2">PE LEVEL</th><th rowspan="2">LAST PE DATE</th><th rowspan="2">PLANNING DATE</th><th rowspan="2">CURRENT<br>LOCATION</th><th rowspan="2">STATUS</th><th colspan="3" class="es">ESTIMATE DUE DAYS / HOURS</th><th rowspan="2" class="rm">REMARKS</th></tr><tr><th class="sb">ENGINE 1</th><th class="sb">DAYS</th><th class="sb">ENGINE 2</th></tr>'}});
 }
 
@@ -8095,8 +8108,10 @@ window.PE={
   gput:function(td){if(!GSEL)return;PE.gmove(GSEL.p,GSEL.i,td.getAttribute('data-day'),td.getAttribute('data-loc'));},
   gdel:function(pgc,i){var g=PE._gw(pgc),x=g.w.items[i];if(!x)return;GSEL=null;g.w.items.splice(i,1);if(!g.w.items.length)delete g.st.weeks[g.sun];changed();
     toast((pgc?x.id+' ('+x.lvl+')':x.id)+' removed from this week — click 💾 Save to keep it',3500);},
+  gnote:function(pgc,el){var td=el.closest('td'),sun=pgc?curSunP():curSun(),loc=td.getAttribute('data-loc'),day=td.getAttribute('data-day'),t=String(el.innerText||'').replace(/\r/g,'').replace(/\n{2,}/g,'\n').trim();
+    if(t===(NT(pgc,sun)[loc+'|'+day]||''))return;setNT(pgc,sun,loc,day,t);changed();},
   gloc:function(pgc,ol){var nv=prompt('Rename location "'+ol+'" to:',ol);if(nv==null)return;nv=String(nv).trim().toUpperCase();if(!nv||nv===ol)return;
-    var g=PE._gw(pgc),n=0;g.w.items.forEach(function(x){if(x.loc===ol){x.loc=nv;n++}});if(!n){toast('No '+(pgc?'PGC':'coach')+' at '+ol+' this week — nothing to rename');if(!g.w.items.length)delete g.st.weeks[g.sun];return;}changed();},
+    var g=PE._gw(pgc),n=renNT(pgc,g.sun,ol,nv);g.w.items.forEach(function(x){if(x.loc===ol){x.loc=nv;n++}});if(!n){toast('No '+(pgc?'PGC':'coach')+' at '+ol+' this week — nothing to rename');if(!g.w.items.length)delete g.st.weeks[g.sun];return;}changed();},
   gadd:function(btn,pgc){var td=btn.parentNode,day=td.getAttribute('data-day'),loc=td.getAttribute('data-loc'),g=PE._gw(pgc),items=g.w.items,o='<option value="">Choose…</option>';
     if(!items.length)delete g.st.weeks[g.sun];
     if(pgc){var cs=pgcCands(g.sun);o+=(cs.length?'<optgroup label="Due soon">'+cs.map(function(c){return '<option value="'+esc(c.r.id+'|'+c.lvl)+'">'+esc(c.r.id)+' · '+c.lvl+'</option>'}).join('')+'</optgroup>':'')
@@ -8117,9 +8132,13 @@ window.PE={
       v=String(el.innerText||'').replace(/\s+/g,' ').trim(),V=v.toUpperCase();
     if(k==='prep'){var pv=String(el.innerText||'').replace(/\r/g,'').trim().toUpperCase();if(pv!==(store.prep||'')){store.prep=pv;PE._chg(e);}return;}
     var w=store.weeks[sun]=store.weeks[sun]||{items:[]},x=w.items[i];
-    if(k==='gloc'){var ol=el.getAttribute('data-loc');if(!V||V===ol){if(!V)el.innerText=ol;return;}w.items.forEach(function(it){if(it.loc===ol)it.loc=V});PE._chg(e);return;}
+    if(k==='gloc'){var ol=el.getAttribute('data-loc');if(!V||V===ol){if(!V)el.innerText=ol;return;}renNT(pgc,sun,ol,V);w.items.forEach(function(it){if(it.loc===ol)it.loc=V});PE._chg(e);return;}
+    if(k==='gnote'){var nt=String(el.innerText||'').replace(/\r/g,'').replace(/\n{2,}/g,'\n').trim(),nl=el.getAttribute('data-loc'),nd=el.getAttribute('data-day');if(!w.items.length)delete store.weeks[sun];
+      if(nt===(NT(pgc,sun)[nl+'|'+nd]||''))return;setNT(pgc,sun,nl,nd,nt);PE._chg(e);return;}
     if(k==='grid'){var day=el.getAttribute('data-day'),loc=el.getAttribute('data-loc'),cur=el.getAttribute('data-cur'),lab=function(it){return pgc?it.id+' ('+it.lvl+')':it.id};
       var curIt=cur?w.items.filter(function(it){return lab(it)===cur})[0]:null;if(V==='-')V='';
+      var isCode=!V||(pgc?/^(PGC\s*)?\d{2,3}\s*(\(\s*PE\s*\d+\s*\))?$/.test(V):(!!findRow(V)||/^[A-Z]{2,5}\s*\d{1,4}$/.test(V)));
+      if(!isCode){var raw=String(el.innerText||'').replace(/\r/g,'').trim(),old=NT(pgc,sun)[loc+'|'+day];setNT(pgc,sun,loc,day,old?old+'\n'+raw:raw);if(!w.items.length)delete store.weeks[sun];PE._chg(e);return;}
       if(curIt&&V&&keyOf(lab(curIt))===keyOf(V))return;
       var drop=function(it){var ix=w.items.indexOf(it);if(ix>=0)w.items.splice(ix,1)};
       if(!V){if(curIt){drop(curIt);if(!w.items.length)delete store.weeks[sun];PE._chg(e);}return;}
