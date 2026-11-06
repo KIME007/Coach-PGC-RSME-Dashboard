@@ -7259,6 +7259,11 @@ html body .wd th{white-space:normal!important}html body .wd.n11 td{font-size:6.6
 html body .wd th{background:#ff0!important}html body .wd .wd-t th.rm{background:#7a81ff!important}html body .wd .wd-g th.b{background:#0096ff!important}html body .wd .wd-g .g{background:#73fb79!important}
 html body .wd td.p90{background:#3f8efc!important}html body .wd td.p60{background:#96f28e!important}html body .wd td.q30{background:#00f5a0!important}html body .wd td.q90{background:#0096ff!important}
 html body .wd td.red{color:#e00!important}html body .wd tr:hover td{background:inherit}
+#pPE .wd-hint{font-size:.76rem;color:#f06aa8;font-weight:700;margin-bottom:8px}
+html body #pPE .wd [contenteditable]{cursor:text;outline:none}
+html body #pPE .wd [contenteditable]:hover{box-shadow:inset 0 0 0 2px #AF1763!important}
+html body #pPE .wd [contenteditable]:focus{box-shadow:inset 0 0 0 2px #AF1763!important;background:#fff8d6!important}
+body.viewonly #pPE .wd-hint{display:none}
 #pPE .wd-wrap{background:#3a3d46;border-radius:10px;padding:18px;overflow:auto;max-height:80vh}#pPE .wd-wrap .wd{box-shadow:0 6px 24px rgba(0,0,0,.45)}
 #peWkPrintBody{display:none}
 @media print{
@@ -7447,7 +7452,7 @@ function forecastHtml(){
   var h='<div class="fb-sec pe-wk"><h3>🗓 Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' coach'+(items.length===1?'':'es')+' planned</span>'
     +'<span class="wk-nav"><button class="fb-btn" onclick="PE.wk(-1)">‹ Prev</button><button class="fb-btn'+(WK===0?' p':'')+'" onclick="PE.wk(0)">This week</button><button class="fb-btn" onclick="PE.wk(1)">Next ›</button>'
     +'<button class="fb-btn'+(WSHEET?' p':'')+'" onclick="PE.wsheet()">'+(WSHEET?'✏️ Edit view':'📄 Sheet view')+'</button><button class="fb-btn" onclick="PE.wprint()" title="Save as PDF / print — same page as the PDF sent to the team">⬇ PDF / Print</button><button class="fb-btn" onclick="PE.xlsW()" title="All weeks, one sheet per week">⬇ Weekly Excel</button></span></h3>';
-  if(WSHEET&&items.length)return h+'<div class="wd-wrap">'+forecastDoc(sun)+'</div></div>';
+  if(WSHEET)return h+'<div class="wd-hint">✏️ Click any cell on the page to change it · type a coach number in an empty row to add it · clear the number to remove it · Enter = done</div><div class="wd-wrap" data-kind="coach" onfocusout="PE.cell(event)" onkeydown="PE.cellKey(event)">'+forecastDoc(sun,1)+'</div></div>';
   if(!items.length)h+='<div class="wk-empty">No plan for week '+wn+' yet. '
     +(must.length?'<button class="fb-btn p" onclick="PE.wauto()">✨ Fill with the '+must.length+' coach'+(must.length===1?'':'es')+' due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')
     +' <span>You can also add coaches one by one below.</span></div>';
@@ -7480,6 +7485,14 @@ function forecastHtml(){
   return h+'</div>';
 }
 /* ---------- print: the week as the forecast sheet ---------- */
+/* sheet view editing: cells carry data-i (row) / data-k (field); editing happens in place */
+var SHEET_ED=false;
+function ce(i,k){return SHEET_ED?' contenteditable="true" spellcheck="false" data-i="'+i+'" data-k="'+k+'"':''}
+function parseDay(t){t=String(t||'').trim();if(!t)return '';var m;
+  if((m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)))return m[1]+'-'+p2(+m[2])+'-'+p2(+m[3]);
+  if((m=t.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})$/))){var y=+m[3];if(y<100)y+=2000;return y+'-'+p2(+m[2])+'-'+p2(+m[1]);}
+  if((m=t.match(/^(\d{1,2})[\s-]*([A-Za-z]{3})[A-Za-z]*[\s-]*(\d{2,4})$/))){var mi=MON.map(function(x){return x.toUpperCase()}).indexOf(m[2].toUpperCase());if(mi<0)return null;var yy=+m[3];if(yy<100)yy+=2000;return yy+'-'+p2(mi+1)+'-'+p2(+m[1]);}
+  return null;}
 /* the weekly forecast page exactly like the PDFs sent to the team (A4 portrait) */
 function sheetDoc(o){
   var logo='';try{logo=KASSET.logo}catch(x){}var nc=o.head.cols,img=logo?'<img src="'+logo+'" alt="KTM">':'';
@@ -7495,14 +7508,15 @@ function sheetDoc(o){
     for(var q=0;q<rows;q++)h+='<tr class="'+(q===rows-1?'lst':'')+'">'+(q===0?'<td rowspan="'+rows+'" class="g">'+esc(l)+'</td>':'')
       +per.map(function(p,j){return '<td>'+(p[q]?esc(p[q]):(j===0||j===6)?'-':'')+'</td>'}).join('')+'</tr>';});
   var pw=(3/nc*100).toFixed(3);
-  return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</div></div></div>';
+  return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br><span'+ce(-1,'prep')+'>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</span></div></div></div>';
 }
 function wkLocs(items){var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});return locs}
-function forecastDoc(sun){
+function forecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(W().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[];
   for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
-    rows.push('<td>'+(i+1)+'</td><td>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+'>'+lv+'</td><td>'+(la?fmt(la):'')+'</td><td>'+(x?fmt(x.plan):'')+'</td>'
-      +'<td>'+(x?esc(x.loc):'')+'</td><td>'+esc(st)+'</td><td'+(over?' class="red"':'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td><td class="red">'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
+    rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
+      +'<td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+esc(st)+'</td><td'+(over?' class="red"':'')+(x?ce(i,'est'):'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td>'
+      +'<td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
   return sheetDoc({unit:'RSM COACH',title:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),prep:W().prep,label:function(x){return x.id},rows:rows,
     head:{cols:9,html:'<tr><th>NO.</th><th>COACHES NO.</th><th>PE LEVEL</th><th>LAST PE DATE</th><th>PE PLANNING DATE</th><th>CURRENT<br>LOCATION</th><th>STATUS</th><th>ESTIMATE DUE<br>DAYS</th><th>REMARKS</th></tr>'}});
 }
@@ -7736,7 +7750,7 @@ function pgcForecastHtml(){
   var h='<div class="fb-sec pe-wk"><h3>🗓 PGC Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' PE planned</span>'
     +'<span class="wk-nav"><button class="fb-btn" onclick="PE.pwk(-1)">‹ Prev</button><button class="fb-btn'+(PWK===0?' p':'')+'" onclick="PE.pwk(0)">This week</button><button class="fb-btn" onclick="PE.pwk(1)">Next ›</button>'
     +'<button class="fb-btn'+(WSHEET?' p':'')+'" onclick="PE.wsheet()">'+(WSHEET?'✏️ Edit view':'📄 Sheet view')+'</button><button class="fb-btn" onclick="PE.pwprint()" title="Save as PDF / print — same page as the PDF sent to the team">⬇ PDF / Print</button><button class="fb-btn" onclick="PE.xlsPW()">⬇ Weekly Excel</button></span></h3>';
-  if(WSHEET&&items.length)return h+'<div class="wd-wrap">'+pgcForecastDoc(sun)+'</div></div>';
+  if(WSHEET)return h+'<div class="wd-hint">✏️ Click any cell on the page to change it · type e.g. PGC 213 in an empty row to add it · clear the number to remove it · Enter = done</div><div class="wd-wrap" data-kind="pgc" onfocusout="PE.cell(event)" onkeydown="PE.cellKey(event)">'+pgcForecastDoc(sun,1)+'</div></div>';
   if(!items.length)h+='<div class="wk-empty">No PGC plan for week '+wn+' yet. '+(must.length?'<button class="fb-btn p" onclick="PE.pwauto()">✨ Fill with the '+must.length+' PE due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')+'</div>';
   else{
     var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
@@ -7894,11 +7908,11 @@ function pgcWeekSheet(sun){
   var rh={2:44};rh[rr]=48;
   return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:16,I:11,J:9,K:11,L:24},rows:rh,land:0};
 }
-function pgcForecastDoc(sun){
+function pgcForecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(WP().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[],nv=function(v){return v==null?'':v};
   for(var i=0;i<n;i++){var x=items[i],e=x&&x.est||{};
-    rows.push('<td>'+(i+1)+'</td><td>'+(x?esc(x.id):'')+'</td><td'+(x?' class="'+(x.lvl==='PE 30'?'q30':'q90')+'"':'')+'>'+(x?x.lvl:'')+'</td><td>'+(x&&x.last?fmt(x.last):'')+'</td><td>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
-      +'<td>'+(x?esc(x.loc):'')+'</td><td>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+'>'+nv(e.d)+'</td><td>'+nv(e.e2)+'</td><td class="red">'+(x?esc(x.rem):'')+'</td>');}
+    rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(x?' class="'+(x.lvl==='PE 30'?'q30':'q90')+'"'+ce(i,'lvl'):'')+'>'+(x?x.lvl:'')+'</td><td'+(x?ce(i,'last'):'')+'>'+(x&&x.last?fmt(x.last):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
+      +'<td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td'+(x?ce(i,'e1'):'')+'>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+(x?ce(i,'d'):'')+'>'+nv(e.d)+'</td><td'+(x?ce(i,'e2'):'')+'>'+nv(e.e2)+'</td><td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?esc(x.rem):'')+'</td>');}
   return sheetDoc({unit:'RSM PGC',title:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),prep:WP().prep,label:function(x){return x.id+' ('+x.lvl+')'},rows:rows,
     head:{cols:11,html:'<tr><th rowspan="2">NO.</th><th rowspan="2">PGC NO.</th><th rowspan="2">PE LEVEL</th><th rowspan="2">LAST PE DATE</th><th rowspan="2">PLANNING DATE</th><th rowspan="2">CURRENT<br>LOCATION</th><th rowspan="2">STATUS</th><th colspan="3" class="es">ESTIMATE DUE DAYS / HOURS</th><th rowspan="2" class="rm">REMARKS</th></tr><tr><th class="sb">ENGINE 1</th><th class="sb">DAYS</th><th class="sb">ENGINE 2</th></tr>'}});
 }
@@ -8050,6 +8064,30 @@ window.PE={
     buildXlsx(ks.map(pgcWeekSheet)).then(function(b){saveBlob(b,'PGC PE WEEKLY PLANNING '+ks[ks.length-1].slice(0,4)+'.xlsx');toast('⬇ PGC weekly planning downloaded ('+ks.length+' weeks)',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
   wk:function(n){WK=n===0?0:WK+n;render();},
   wsheet:function(){WSHEET=!WSHEET;render();},
+  cellKey:function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}},
+  _chg:function(e){var nt=e&&e.relatedTarget,nk=nt&&nt.getAttribute&&nt.getAttribute('data-k'),ni=nk&&nt.getAttribute('data-i');changed();
+    if(nk){var t=document.querySelector('.wd-wrap [data-i="'+ni+'"][data-k="'+nk+'"]');if(t){t.focus();var r=document.createRange();r.selectNodeContents(t);var sl=window.getSelection();sl.removeAllRanges();sl.addRange(r);}}},
+  cell:function(e){var el=e.target;if(!el||!el.hasAttribute||!el.hasAttribute('data-k'))return;
+    var pgc=el.closest('.wd-wrap').getAttribute('data-kind')==='pgc',sun=pgc?curSunP():curSun(),store=pgc?WP():W(),k=el.getAttribute('data-k'),i=+el.getAttribute('data-i'),
+      v=String(el.innerText||'').replace(/\s+/g,' ').trim(),V=v.toUpperCase();
+    if(k==='prep'){var pv=String(el.innerText||'').replace(/\r/g,'').trim().toUpperCase();if(pv!==(store.prep||'')){store.prep=pv;PE._chg(e);}return;}
+    var w=store.weeks[sun]=store.weeks[sun]||{items:[]},x=w.items[i];
+    if(k==='id'){
+      if(!V){if(x){w.items.splice(i,1);if(!w.items.length)delete store.weeks[sun];PE._chg(e);}return;}
+      if(x&&keyOf(x.id)===keyOf(V))return;
+      if(pgc){var id=V.replace(/^PGC\s*/,'PGC ').replace(/^(\d+)$/,'PGC $1'),f=pRow(id);
+        if(x){x.id=f?f.r.id:id;}else w.items.push(f?pItem(f.r,'PE 30',sun):{id:id,lvl:'PE 30',last:'',plan:'',loc:'',st:'IN OPERATIONS',rem:'',est:null});}
+      else{var g=findRow(V);if(x){if(g){var nx=wkItem(g.r,sun);nx.plan=x.plan||nx.plan;nx.loc=x.loc||nx.loc;nx.rem=x.rem;w.items[i]=nx;}else x.id=V;}
+        else w.items.push(g?wkItem(g.r,sun):{id:V,plan:'',loc:'',rem:'',est:null,last:'',st:'IN OPERATIONS',lvl:''});}
+      PE._chg(e);return;}
+    if(!x)return;
+    if(k==='plan'||k==='last'){var d=parseDay(v);if(d===null){toast('Date not understood — type like 3-Nov-26 or 3/11/2026');render();return;}if((x[k]||'')===d)return;x[k]=d;}
+    else if(k==='est'){var n=v===''?null:parseFloat(v);if(v!==''&&!isFinite(n)){render();return;}x.est=n;}
+    else if(k==='e1'||k==='d'||k==='e2'){var m=v===''?null:parseFloat(v);if(v!==''&&!isFinite(m)){render();return;}x.est=x.est||{};x.est[k]=m;}
+    else if(k==='lvl'){var L=V.replace(/^PE\s*/,'PE ').replace(/^(\d+)$/,'PE $1');x.lvl=L;}
+    else if(k==='rem'){x.rem=V.replace(/^OVERDUE\s*[·-]?\s*/,'');}
+    else{if((x[k]||'')===V)return;x[k]=V;}
+    PE._chg(e);},
   /* one A4 portrait page: printed on its own (rest of the page removed) and shrunk if a long week would spill over */
   _print:function(html,name){var el=document.getElementById('peWkPrintBody');if(!el){el=document.createElement('div');el.id='peWkPrintBody';document.body.appendChild(el);}
     el.innerHTML=html;var wd=el.querySelector('.wd');
