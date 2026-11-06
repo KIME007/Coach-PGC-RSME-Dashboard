@@ -7260,13 +7260,13 @@ html body .wd th{background:#ff0!important}html body .wd .wd-t th.rm{background:
 html body .wd td.p90{background:#3f8efc!important}html body .wd td.p60{background:#96f28e!important}html body .wd td.q30{background:#00f5a0!important}html body .wd td.q90{background:#0096ff!important}
 html body .wd td.red{color:#e00!important}html body .wd tr:hover td{background:inherit}
 #pPE .wd-wrap{background:#3a3d46;border-radius:10px;padding:18px;overflow:auto;max-height:80vh}#pPE .wd-wrap .wd{box-shadow:0 6px 24px rgba(0,0,0,.45)}
+#peWkPrintBody{display:none}
 @media print{
-  body.pe-pw *{visibility:hidden!important}
-  body.pe-pw #peWkPrint,body.pe-pw #peWkPrint *{visibility:visible!important}
-  body.pe-pw #peWkPrint{display:block;position:absolute;left:0;top:0;width:100%;background:#fff}
-  #peWkPrint .wd{width:100%;min-height:0;margin:0;padding:50px 6px 0}
-  #peWkPrint *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body.pe-pw{background:#fff!important}
+  html body.pe-pw{background:#fff!important;margin:0!important;padding:0!important}
+  body.pe-pw>*:not(#peWkPrintBody){display:none!important}
+  body.pe-pw #peWkPrintBody{display:block!important}
+  body.pe-pw #peWkPrintBody .wd{width:100%;min-height:0;margin:0;padding:24px 0 0;box-shadow:none;break-inside:avoid;page-break-inside:avoid;page-break-after:avoid}
+  #peWkPrintBody *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 #pPE .pe-mode{display:inline-flex;gap:4px;background:#12151c;border:1px solid #2c2e33;border-radius:12px;padding:4px;margin-bottom:12px}
 #pPE .pe-mode span{padding:7px 16px;border-radius:9px;font-weight:800;font-size:.82rem;color:#a3a8c3;cursor:pointer}
@@ -8050,9 +8050,16 @@ window.PE={
     buildXlsx(ks.map(pgcWeekSheet)).then(function(b){saveBlob(b,'PGC PE WEEKLY PLANNING '+ks[ks.length-1].slice(0,4)+'.xlsx');toast('⬇ PGC weekly planning downloaded ('+ks.length+' weeks)',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
   wk:function(n){WK=n===0?0:WK+n;render();},
   wsheet:function(){WSHEET=!WSHEET;render();},
-  _print:function(html,name){var el=document.getElementById('peWkPrint');el.innerHTML=html;document.body.classList.add('pe-pw');var t0=document.title;document.title=name;
-    var done=function(){document.body.classList.remove('pe-pw');document.title=t0;window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
-    setTimeout(function(){window.print();setTimeout(done,60000)},150);},
+  /* one A4 portrait page: printed on its own (rest of the page removed) and shrunk if a long week would spill over */
+  _print:function(html,name){var el=document.getElementById('peWkPrintBody');if(!el){el=document.createElement('div');el.id='peWkPrintBody';document.body.appendChild(el);}
+    el.innerHTML=html;var wd=el.querySelector('.wd');
+    el.style.cssText='display:block;position:absolute;left:-10000px;top:0;width:194mm';wd.style.padding='24px 0 0';wd.style.minHeight='0';wd.style.width='100%';
+    var mm=document.createElement('div');mm.style.height='275mm';el.appendChild(mm);var maxH=mm.offsetHeight;mm.remove();
+    var h=wd.scrollHeight;wd.style.zoom=h>maxH?(maxH/h).toFixed(3):'';el.style.cssText='';
+    var ps=document.createElement('style');ps.id='pePageSt';ps.textContent='@page{size:A4 portrait;margin:8mm}';document.head.appendChild(ps);
+    document.body.classList.add('pe-pw');var t0=document.title;document.title=name;
+    var done=function(){document.body.classList.remove('pe-pw');document.title=t0;var p=document.getElementById('pePageSt');if(p)p.remove();window.removeEventListener('afterprint',done)};
+    window.addEventListener('afterprint',done);setTimeout(function(){window.print();setTimeout(done,60000)},150);},
   wadd:function(id){var f=findRow(id);if(!f)return;var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]};w.items.push(wkItem(f.r,sun));changed();},
   wauto:function(){var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]},n=0;wkCands(sun).forEach(function(c){if(c.must){w.items.push(wkItem(c.r,sun));n++}});
     changed();toast(n+' coach'+(n===1?'':'es')+' added to week '+weekNo(sun)+' — adjust the dates / locations, then 💾 Save',5000);},
