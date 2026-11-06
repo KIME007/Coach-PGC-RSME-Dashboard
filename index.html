@@ -7186,7 +7186,7 @@ body.viewonly #pFleet .fb-chip,body.viewonly #pFleet .fb-col{cursor:default!impo
 body.viewonly::after{content:"👁 VIEW ONLY — nothing can be changed";position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:9999;
   background:#2a1b26;color:#f06aa8;border:1px solid #AF1763;border-radius:99px;padding:5px 14px;font:800 .72rem/1.2 system-ui,sans-serif;letter-spacing:.5px;pointer-events:none}
 body.viewonly #btnSave,body.viewonly .hbtn[onclick*="fileIn"],body.viewonly #pPE .fb-btn.p,body.viewonly #pPE .pe-card .f button,
-body.viewonly #pPE .wk-x,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty .fb-btn,body.viewonly #ovPE .mfoot .primary,body.viewonly #ovPE #peDel{display:none!important}
+body.viewonly #pPE .wk-x,body.viewonly #pPE .wg-x,body.viewonly #pPE .wg-add,body.viewonly #pPE .wg-hint,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty .fb-btn,body.viewonly #ovPE .mfoot .primary,body.viewonly #ovPE #peDel{display:none!important}
 .ubox .vbadge{background:#2a1b26;color:#f06aa8;border:1px solid #AF1763;font-weight:800}
 </style>
 <style id="peCss">
@@ -7239,7 +7239,18 @@ body.viewonly #pPE .wk-x,body.viewonly #pPE .wk-add,body.viewonly #pPE .wk-empty
 #pPE .wk-x{background:transparent;border:0;color:#ff5b62;font-weight:800;cursor:pointer;font-size:.9rem}
 #pPE table.wkg{min-width:860px}#pPE table.wkg td{vertical-align:top}#pPE table.wkg td .fb-chip{margin:2px auto;max-width:110px}
 #pPE table.wkg td.loc{background:#1f3b23;color:#73fb79;font-weight:800;text-align:left;white-space:nowrap}
-#pPE table.wkg th.tdy{color:#fff;background:#AF1763}#pPE table.wkg td i{color:#4b5064;font-style:normal}
+#pPE table.wkg th.tdy{color:#fff;background:#AF1763}
+#pPE .wg-hint{font-size:.7rem;color:#a3a8c3;font-weight:700;margin:0 0 6px}
+#pPE table.wg-ed td:not(.loc){position:relative;padding-bottom:22px;transition:background .12s}
+#pPE table.wg-ed td.ov{background:rgba(175,23,99,.22)!important;outline:2px dashed #AF1763;outline-offset:-3px}
+#pPE .wg-it{position:relative;display:block;cursor:grab}#pPE .wg-it:active{cursor:grabbing}
+#pPE .wg-it.sel .fb-chip{outline:3px solid #fff;outline-offset:1px;box-shadow:0 0 12px #AF1763}
+#pPE .wg-x{position:absolute;top:-4px;right:calc(50% - 63px);width:16px;height:16px;line-height:16px;border-radius:50%;background:#ff5b62;color:#fff;font-size:9px;text-align:center;cursor:pointer;opacity:0;transition:opacity .12s}
+#pPE .wg-it:hover .wg-x{opacity:1}
+#pPE .wg-add{position:absolute;left:50%;bottom:3px;transform:translateX(-50%);border:1px dashed #3b4050;background:none;color:#6c7293;border-radius:6px;font-size:.7rem;font-weight:800;padding:0 9px;cursor:pointer;opacity:0;transition:opacity .12s}
+#pPE table.wg-ed td:hover .wg-add{opacity:1}#pPE .wg-add:hover{color:#fff;border-color:#AF1763}
+#pPE .wg-sel{display:block;margin:4px auto 0;max-width:130px;font-size:.7rem}
+@media (hover:none){#pPE .wg-x,#pPE .wg-add{opacity:1}}#pPE table.wkg td i{color:#4b5064;font-style:normal}
 #peWkPrint{display:none}
 .wd{background:#fff;color:#000;font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;font-weight:700;width:794px;min-height:1123px;box-sizing:border-box;padding:120px 58px 40px;margin:0 auto;font-size:8px;line-height:1.15}
 .wd .wd-h{display:grid;grid-template-columns:100px 1fr 60px;align-items:start;margin-bottom:14px}
@@ -7468,13 +7479,7 @@ function forecastHtml(){
         +'<td class="rem">'+(over?'<b style="color:#ff5b62">OVERDUE</b> ':'')+'<input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.wset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" title="Remove from this week" onclick="PE.wdel('+i+')">✕</button></td></tr>';});
     h+='</tbody></table></div>';
-    /* location × day */
-    var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today());
-    h+='<div class="pe-tw" style="margin-top:12px"><table class="pe wkg"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>'
-      +locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).map(function(l){
-        return '<tr><td class="loc">'+esc(l)+'</td>'+DN.map(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
-          return '<td>'+(on.length?on.map(function(x){var f=findRow(x.id);return f?chipOf(f.r):'<span class="fb-chip" style="background:#3b4050;color:#fff">'+esc(x.id)+'</span>'}).join(''):'<i>–</i>')+'</td>'}).join('')+'</tr>'}).join('')
-      +'</tbody></table></div>';
+    h+=gridHtml(0,sun,items,locs);
   }
   /* add coaches */
   h+='<div class="wk-add"><select onchange="if(this.value)PE.wadd(this.value)"><option value="">＋ Add coach to week '+wn+'…</option>'
@@ -7484,6 +7489,23 @@ function forecastHtml(){
     +'<label>Prepared by <input value="'+esc(W().prep)+'" placeholder="Name / position" onchange="PE.wprep(this.value)"></label></div>';
   return h+'</div>';
 }
+/* editable location × day grid (dashboard view): drag a chip to move it, ✕ removes, ＋ adds, click a location to rename */
+var GSEL=null;
+function gridHtml(pgc,sun,items,locs){
+  var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today()),ro=typeof RSD_VIEWER!=='undefined'&&!!RSD_VIEWER;
+  var chip=function(x){var i=items.indexOf(x),c;if(pgc)c=pgcChip(x.id+' ('+x.lvl+')');else{var f=findRow(x.id);c=f?chipOf(f.r):'<span class="fb-chip" style="background:#3b4050;color:#fff">'+esc(x.id)+'</span>'}
+    if(ro)return c;var sel=GSEL&&GSEL.p===pgc&&GSEL.i===i;
+    return '<span class="wg-it'+(sel?' sel':'')+'" draggable="true" data-i="'+i+'" title="Drag to another day / location — or click it, then click the new cell" ondragstart="PE.gdrag(event,'+pgc+','+i+')" onclick="event.stopPropagation();PE.gpick('+pgc+','+i+')">'+c
+      +'<b class="wg-x" title="Remove from this week" onclick="event.stopPropagation();PE.gdel('+pgc+','+i+')">✕</b></span>'};
+  var h='<div class="pe-tw" style="margin-top:12px">'+(ro?'':'<div class="wg-hint">✏️ Drag a '+(pgc?'PGC':'coach')+' to another day / location (or click it, then click the new cell) · ＋ adds one to that cell · ✕ removes · click a location name to rename it</div>')
+    +'<table class="pe wkg'+(ro?'':' wg-ed')+'"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>';
+  locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).forEach(function(l){
+    h+='<tr><td class="loc"'+(ro?'':' title="Click to rename this location" style="cursor:pointer" onclick="PE.gloc('+pgc+',this.getAttribute(\'data-loc\'))" data-loc="'+esc(l)+'"')+'>'+esc(l)+'</td>';
+    DN.forEach(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
+      h+='<td'+(ro?'':' data-day="'+dd+'" data-loc="'+esc(l)+'" ondragover="event.preventDefault();this.classList.add(\'ov\')" ondragleave="this.classList.remove(\'ov\')" ondrop="PE.gdrop(event,this)" onclick="PE.gput(this)"')+'>'
+        +(on.length?on.map(chip).join(''):'<i>–</i>')+(ro?'':'<button class="wg-add" title="Add to '+esc(l)+' · '+fmt(dd)+'" onclick="event.stopPropagation();PE.gadd(this,'+pgc+')">＋</button>')+'</td>'});
+    h+='</tr>'});
+  return h+'</tbody></table></div>';}
 /* ---------- print: the week as the forecast sheet ---------- */
 /* sheet view editing: cells carry data-i (row) / data-k (field); editing happens in place */
 var SHEET_ED=false;
@@ -7763,10 +7785,7 @@ function pgcForecastHtml(){
         +'<td>'+pill(x.st||'IN OPERATIONS',STC[x.st||'IN OPERATIONS']||'#a3a8c3')+'</td><td>'+estTxt(x.est)+'</td>'
         +'<td class="rem"><input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.pwset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" onclick="PE.pwdel('+i+')">✕</button></td></tr>'}).join('')+'</tbody></table></div>';
-    var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today());
-    h+='<div class="pe-tw" style="margin-top:12px"><table class="pe wkg"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>'
-      +locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).map(function(l){return '<tr><td class="loc">'+esc(l)+'</td>'+DN.map(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
-        return '<td>'+(on.length?on.map(function(x){return pgcChip(x.id+' ('+x.lvl+')')}).join(''):'<i>–</i>')+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
+    h+=gridHtml(1,sun,items,locs);
   }
   h+='<div class="wk-add"><select onchange="if(this.value)PE.pwadd(this.value)"><option value="">＋ Add PE to week '+wn+'…</option>'
     +(cands.length?'<optgroup label="Due soon (running PGC only)">'+cands.map(function(c){return '<option value="'+esc(c.r.id+'|'+c.lvl)+'">'+esc(c.r.id)+' · '+c.lvl+' — next '+fmt(c.next)+' ('+(c.d<0?'overdue '+(-c.d):c.d)+' d)</option>'}).join('')+'</optgroup>':'')
@@ -8050,7 +8069,7 @@ window.PE={
   p30now:function(){var t=isoOf(today()),g=function(id){return document.getElementById(id)};g('pgP30').value=t;if(g('pgH1').value)g('pgA1').value=g('pgH1').value;if(g('pgH2').value)g('pgA2').value=g('pgH2').value;},
   pdone:function(i,lv){var r=P().rows[i];if(!confirm(r.id+': '+lv+' done today ('+fmt(isoOf(today()))+')?'))return;
     if(lv==='PE 30'){r.p30=isoOf(today());r.a1=r.h1;r.a2=r.h2;}else r.p90=isoOf(today());changed();toast(r.id+' '+lv+' recorded — click 💾 Save to keep it',4500);},
-  pwk:function(n){PWK=n===0?0:PWK+n;render();},
+  pwk:function(n){PWK=n===0?0:PWK+n;GSEL=null;render();},
   pwadd:function(v){var p=String(v).split('|'),f=pRow(p[0]);if(!f)return;var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]};w.items.push(pItem(f.r,p[1],sun));changed();},
   pwauto:function(){var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]},n=0;pgcCands(sun).forEach(function(c){if(c.must){w.items.push(pItem(c.r,c.lvl,sun));n++}});
     changed();toast(n+' PE added to week '+weekNo(sun)+' — adjust dates / locations, then 💾 Save',5000);},
@@ -8064,7 +8083,31 @@ window.PE={
     buildXlsx([pgcScheduleSheet()]).then(function(b){saveBlob(b,'PGC SCHEDULE PE 30 & PE 90 '+y+'.xlsx');toast('⬇ PGC schedule downloaded',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
   xlsPW:function(){var ks=Object.keys(WP().weeks).filter(function(k){return WP().weeks[k].items.length}).sort();if(!ks.length){toast('No PGC weekly plans yet');return;}
     buildXlsx(ks.map(pgcWeekSheet)).then(function(b){saveBlob(b,'PGC PE WEEKLY PLANNING '+ks[ks.length-1].slice(0,4)+'.xlsx');toast('⬇ PGC weekly planning downloaded ('+ks.length+' weeks)',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
-  wk:function(n){WK=n===0?0:WK+n;render();},
+  wk:function(n){WK=n===0?0:WK+n;GSEL=null;render();},
+  _gw:function(pgc){var sun=pgc?curSunP():curSun(),st=pgc?WP():W();return {sun:sun,st:st,w:st.weeks[sun]=st.weeks[sun]||{items:[]}}},
+  _gsort:function(w){w.items.sort(function(a,b){return (a.plan||'~')<(b.plan||'~')?-1:(a.plan||'~')>(b.plan||'~')?1:0})},
+  gmove:function(pgc,i,day,loc){var g=PE._gw(pgc),x=g.w.items[i];GSEL=null;if(!x){render();return;}if(x.plan===day&&x.loc===loc){render();return;}
+    x.plan=day;x.loc=loc;PE._gsort(g.w);changed();toast((pgc?x.id+' ('+x.lvl+')':x.id)+' → '+loc+' · '+fmt(day)+' — click 💾 Save to keep it',3500);},
+  gdrag:function(e,pgc,i){if(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER){e.preventDefault();return;}e.dataTransfer.setData('text/plain',pgc+'|'+i);e.dataTransfer.effectAllowed='move';},
+  gdrop:function(e,td){e.preventDefault();td.classList.remove('ov');var p=String(e.dataTransfer.getData('text/plain')).split('|');if(p.length!==2)return;
+    PE.gmove(+p[0],+p[1],td.getAttribute('data-day'),td.getAttribute('data-loc'));},
+  gpick:function(pgc,i){GSEL=GSEL&&GSEL.p===pgc&&GSEL.i===i?null:{p:pgc,i:i};render();if(GSEL)toast('Now click the cell (day / location) to move it to',2500);},
+  gput:function(td){if(!GSEL)return;PE.gmove(GSEL.p,GSEL.i,td.getAttribute('data-day'),td.getAttribute('data-loc'));},
+  gdel:function(pgc,i){var g=PE._gw(pgc),x=g.w.items[i];if(!x)return;GSEL=null;g.w.items.splice(i,1);if(!g.w.items.length)delete g.st.weeks[g.sun];changed();
+    toast((pgc?x.id+' ('+x.lvl+')':x.id)+' removed from this week — click 💾 Save to keep it',3500);},
+  gloc:function(pgc,ol){var nv=prompt('Rename location "'+ol+'" to:',ol);if(nv==null)return;nv=String(nv).trim().toUpperCase();if(!nv||nv===ol)return;
+    var g=PE._gw(pgc),n=0;g.w.items.forEach(function(x){if(x.loc===ol){x.loc=nv;n++}});if(!n){toast('No '+(pgc?'PGC':'coach')+' at '+ol+' this week — nothing to rename');if(!g.w.items.length)delete g.st.weeks[g.sun];return;}changed();},
+  gadd:function(btn,pgc){var td=btn.parentNode,day=td.getAttribute('data-day'),loc=td.getAttribute('data-loc'),g=PE._gw(pgc),items=g.w.items,o='<option value="">Choose…</option>';
+    if(!items.length)delete g.st.weeks[g.sun];
+    if(pgc){var cs=pgcCands(g.sun);o+=(cs.length?'<optgroup label="Due soon">'+cs.map(function(c){return '<option value="'+esc(c.r.id+'|'+c.lvl)+'">'+esc(c.r.id)+' · '+c.lvl+'</option>'}).join('')+'</optgroup>':'')
+      +'<optgroup label="All PGC">'+P().rows.map(function(r){return ['PE 30','PE 90'].filter(function(lv){return !items.some(function(x){return keyOf(x.id)===keyOf(r.id)&&x.lvl===lv})}).map(function(lv){return '<option value="'+esc(r.id+'|'+lv)+'">'+esc(r.id)+' · '+lv+'</option>'}).join('')}).join('')+'</optgroup>';}
+    else{var cc=wkCands(g.sun);o+=(cc.length?'<optgroup label="Due soon">'+cc.map(function(c){return '<option value="'+esc(c.r.id)+'">'+esc(c.r.id)+' — next PE '+fmt(c.k.next)+'</option>'}).join('')+'</optgroup>':'')
+      +'<optgroup label="All IN OPERATIONS coaches">'+data().groups.map(function(gr){return gr.rows.filter(function(r){return r.st==='IN OPERATIONS'&&!items.some(function(x){return keyOf(x.id)===keyOf(r.id)})}).map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.id)+'</option>'}).join('')}).join('')+'</optgroup>';}
+    var sel=document.createElement('select');sel.className='wg-sel';sel.innerHTML=o;btn.replaceWith(sel);sel.onclick=function(e){e.stopPropagation()};
+    sel.onchange=function(){if(!sel.value){render();return;}var G=PE._gw(pgc),it;
+      if(pgc){var p=sel.value.split('|'),f=pRow(p[0]);if(!f){render();return;}it=pItem(f.r,p[1],G.sun);}else{var r=findRow(sel.value);if(!r){render();return;}it=wkItem(r.r,G.sun);}
+      it.plan=day;it.loc=loc;G.w.items.push(it);PE._gsort(G.w);changed();toast((pgc?it.id+' ('+it.lvl+')':it.id)+' added to '+loc+' · '+fmt(day)+' — click 💾 Save to keep it',3500);};
+    sel.onblur=function(){setTimeout(function(){if(sel.isConnected&&!sel.value)render()},200)};sel.focus();},
   wsheet:function(){WSHEET=!WSHEET;render();},
   cellKey:function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}},
   _chg:function(e){var nt=e&&e.relatedTarget,nk=nt&&nt.getAttribute&&nt.getAttribute('data-k'),ni=nk&&nt.getAttribute('data-i');changed();
