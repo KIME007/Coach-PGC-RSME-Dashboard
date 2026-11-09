@@ -3853,7 +3853,7 @@ window.rsdDownload=function(blob,fn){
   box.innerHTML='<div style="font-size:17px;font-weight:800;margin-bottom:6px">✅ Excel is ready</div><div style="color:#a3a8c3;margin-bottom:16px;word-break:break-word"></div>'
     +'<a style="display:inline-block;background:#AF1763;color:#fff;text-decoration:none;font-weight:800;padding:11px 22px;border-radius:9px">⬇ Download</a>'
     +'<div><button style="margin-top:12px;background:none;border:0;color:#6c7293;font:600 13px system-ui;cursor:pointer">Close</button></div>';
-  box.children[1].textContent=fn;var a=box.querySelector('a');a.download=fn;a.target='_blank';a.rel='noopener';
+  box.children[1].textContent=fn;var a=box.querySelector('a');a.download=fn;
   /* Safari refuses blob: links for downloads — use a data: link holding the file itself */
   a.style.opacity='.5';a.style.pointerEvents='none';a.textContent='Preparing…';
   var rd=new FileReader();rd.onload=function(){a.href=String(rd.result).replace(/^data:[^;,]*/,'data:application/octet-stream');a.style.opacity='';a.style.pointerEvents='';a.textContent='⬇ Download';};
