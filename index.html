@@ -3974,7 +3974,7 @@ function exportMonth(y,m){
       +'<printOptions horizontalCentered="1"/><pageMargins left="0.12" right="0.12" top="0.3" bottom="0.3" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/></worksheet>';
     return {name:lab.slice(0,31),xml:xml};};
   var sh=days.map(sheet);
-  if(notes.length){var cl=function(ref,t,st){return '<c r="'+ref+'"'+(st?' s="'+st+'"':'')+' t="inlineStr"><is><t xml:space="preserve">'+e(t)+'</t></is></c>'};
+  if(false&&notes.length){var cl=function(ref,t,st){return '<c r="'+ref+'"'+(st?' s="'+st+'"':'')+' t="inlineStr"><is><t xml:space="preserve">'+e(t)+'</t></is></c>'};
     sh.push({name:'NOTES',xml:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="3" width="10" customWidth="1"/><col min="4" max="4" width="100" customWidth="1"/></cols><sheetData>'
       +'<row r="1">'+cl('A1','DAY',S_H)+cl('B1','CELL',S_H)+cl('C1','UNIT',S_H)+cl('D1','NOTE',S_H)+'</row>'
       +notes.map(function(x,i){var r=i+2;return '<row r="'+r+'">'+cl('A'+r,x[0])+cl('B'+r,x[1])+cl('C'+r,x[2])+cl('D'+r,x[3])+'</row>'}).join('')+'</sheetData></worksheet>'});}
