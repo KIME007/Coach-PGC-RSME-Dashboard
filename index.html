@@ -3916,13 +3916,13 @@ function exportMonth(y,m){
     var note=function(r,c,u){if(u&&u.note)notes.push([lab,A(c)+(r+1),u.id,u.note])};
     var lens=b.service.concat(b.spare).map(function(c){return coaches(c.units).length}).concat(allDetCols(b).map(function(c){return c.units.length}));
     var R=Math.max.apply(null,[15].concat(lens)),U0=4,UE=U0+R-1;                         /* unit rows 5 … 19 */
-    var S0=1,sC=Math.max(16,b.service.length),P0=S0+sC,pC=Math.max(18,b.spare.length),T=P0+pC,Y=T+2,D0=T+3;
+    var S0=1,sC=Math.max(16,b.service.length),P0=S0+sC,pC=Math.max(18,b.spare.length),T=P0+pC,D0=T+2;
     var rOp=UE+1,rSp=rOp+1,rTc=rSp+1,rOP=rTc+1,rSP=rOP+2,rTP=rSP+1,sh=rTP+2;
     var rg=function(c1,c2,r1,r2){return A(c1)+(r1+1)+':'+A(c2)+(r2+1)};
     /* titles */
     put(0,0,'COACHES REVENUE, NON-REVENUE & PGC UTILIZED ON TRAIN SERVICES AS ON '+lab,S_T);mg(0,0,2,P0-1);
     put(0,P0,'SPARE COACHES & PGC AT DEPOTS',S_T);mg(0,P0,2,T-1);
-    put(0,T,'',S_L);mg(0,T,UE,T);put(1,Y,'',S_Y);mg(1,Y,UE-1,Y);
+    put(0,T,'',S_L);mg(0,T,UE,T);
     /* header + units */
     put(3,0,'NO.',S_H);for(var i=0;i<R;i++)put(U0+i,0,i+1,S_N);
     var col=function(c,x,all){put(3,x,c?c.name||'':'',S_H);if(c&&c.note)notes.push([lab,A(x)+'4',c.name||'',c.note]);
@@ -3978,7 +3978,7 @@ function exportMonth(y,m){
     var xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
       +'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" zoomScale="100"/></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>'
       +'<cols><col min="1" max="1" width="11.83" customWidth="1"/><col min="2" max="'+T+'" width="8.83" customWidth="1"/><col min="'+(T+1)+'" max="'+(T+1)+'" width="14.33" customWidth="1"/>'
-      +'<col min="'+(T+2)+'" max="'+(T+2)+'" width="11.5" customWidth="1"/><col min="'+(Y+1)+'" max="'+(Y+1)+'" width="14.83" customWidth="1"/><col min="'+(D0+1)+'" max="'+Math.max(D0+1,maxC+1)+'" width="8.83" customWidth="1"/></cols><sheetData>';
+      +'<col min="'+(T+2)+'" max="'+(T+2)+'" width="5" customWidth="1"/><col min="'+(D0+1)+'" max="'+Math.max(D0+1,maxC+1)+'" width="8.83" customWidth="1"/></cols><sheetData>';
     for(var r=0;r<=maxR;r++){var line='';for(var c=0;c<=maxC;c++){var k=cells[r+','+c];if(!k)continue;var ref=A(c)+(r+1);
         if(k.f)line+='<c r="'+ref+'" s="'+k.s+'"><f>'+e(k.f)+'</f><v>'+(+k.v||0)+'</v></c>';
         else if(typeof k.v==='number')line+='<c r="'+ref+'" s="'+k.s+'"><v>'+k.v+'</v></c>';
