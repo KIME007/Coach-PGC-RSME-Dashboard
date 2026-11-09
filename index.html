@@ -3841,9 +3841,21 @@ function exportBoard(b,iso){
   z.file('xl/_rels/workbook.xml.rels',X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+RS+'worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="'+RS+'worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
   z.file('xl/styles.xml',styles);z.file('xl/worksheets/sheet1.xml',xml);z.file('xl/worksheets/sheet2.xml',nx);
   return z.generateAsync({type:'blob',mimeType:'application/octet-stream'}).then(function(blob){
-    window.__fleetXlsx=blob;var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Fleet_Deployment_'+iso+'.xlsx';a.style.display='none';document.body.appendChild(a);a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},60000);toast('Excel downloaded — Fleet_Deployment_'+iso+'.xlsx');});
+    window.__fleetXlsx=blob;window.rsdDownload(blob,'Fleet_Deployment_'+iso+'.xlsx');toast('Excel downloaded — Fleet_Deployment_'+iso+'.xlsx');});
 }
+/* Safari only downloads when the click comes straight from the user: once the file is built, show a real link to click */
+window.rsdDownload=function(blob,fn){
+  var url=URL.createObjectURL(blob),isSafari=/^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
+  if(!isSafari){var a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove()},60000);return;}
+  var old=document.getElementById('rsdDl');if(old)old.remove();
+  var box=document.createElement('div');box.id='rsdDl';
+  box.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100000;background:#191c24;color:#e4e6ef;border:2px solid #AF1763;border-radius:14px;padding:22px 26px;box-shadow:0 20px 60px rgba(0,0,0,.6);font:600 14px/1.4 system-ui,sans-serif;text-align:center;max-width:90vw';
+  box.innerHTML='<div style="font-size:17px;font-weight:800;margin-bottom:6px">✅ Excel is ready</div><div style="color:#a3a8c3;margin-bottom:16px;word-break:break-word"></div>'
+    +'<a style="display:inline-block;background:#AF1763;color:#fff;text-decoration:none;font-weight:800;padding:11px 22px;border-radius:9px">⬇ Download</a>'
+    +'<div><button style="margin-top:12px;background:none;border:0;color:#6c7293;font:600 13px system-ui;cursor:pointer">Close</button></div>';
+  box.children[1].textContent=fn;var a=box.querySelector('a');a.href=url;a.download=fn;
+  var close=function(){box.remove();setTimeout(function(){URL.revokeObjectURL(url)},120000)};
+  a.addEventListener('click',function(){setTimeout(close,400)});box.querySelector('button').onclick=close;document.body.appendChild(box);};
 /* ---------------- monthly Excel: one sheet per recorded day, laid out like "COACH & PGC PERFORMANCE …" ---------------- */
 function dayLabel(iso){var d=new Date(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10)),p=new Date(d.getTime());p.setDate(p.getDate()-1);
   return p.getDate()+'-'+d.getDate()+' '+MNAMES[d.getMonth()]+' '+d.getFullYear()}
@@ -3958,8 +3970,7 @@ function exportMonth(y,m){
   z.file('xl/styles.xml',styles);sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
   var fn='COACH AND PGC PERFORMANCE '+(+days[0].slice(8,10))+'-'+(+days[days.length-1].slice(8,10))+' '+MNAMES[m]+' '+y+'.xlsx';
   return z.generateAsync({type:'blob',mimeType:'application/octet-stream'}).then(function(blob){
-    window.__fleetXlsx=blob;var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},60000);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);});
+    window.__fleetXlsx=blob;window.rsdDownload(blob,fn);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);});
 }
 function allDetCols(b){var a=[];b.detained.forEach(function(g){a=a.concat(g.cols)});return a}
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&SEL.length&&visible()){SEL=[];render();}});
@@ -7733,7 +7744,7 @@ function buildXlsx(sheets){
     +'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="'+dxfs.length+'">'+dxfs.join('')+'</dxfs></styleSheet>');
   return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-function saveBlob(b,name){var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},3000)}
+function saveBlob(b,name){if(window.rsdDownload)return window.rsdDownload(b,name);var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},3000)}
 /* PE schedule in the "COACHES SCHEDULE PE 60 & PE 90" layout — NEXT PE, STATUS and DAYS DUE stay live formulas */
 function scheduleSheet(){
   var D=data(),c={},M=['C2:M2','C5:C6','E5:J5','K5:K6','L5:L6','M5:M6'],H={b:1,bd:1,fill:'83CCEB',wrap:1,sz:9},T={b:1,bd:1,sz:10},TL={b:1,bd:1,sz:10,h:'center',wrap:1};
