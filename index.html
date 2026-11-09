@@ -3890,17 +3890,24 @@ function exportMonth(y,m){
   var FC={ABC:'FFFF00',ADNF:'9437FF',ADNS:'00B0F0',AFC:'00FA00',ASC:'FF0000',SPECIAL:'FF9300',PGC:'76D6FF',OTHER:'D9D9D9'};
   var fills=['163E64','4E95D9','A6CAEC','FFFFFF','FFD579'].concat(Object.keys(FC).map(function(k){return FC[k]}));
   var fi=function(hex){return fills.indexOf(hex)+2};
-  var X=[],xf=function(font,fill,brd,h,wrap){X.push('<xf numFmtId="0" fontId="'+font+'" fillId="'+(fill?fi(fill):0)+'" borderId="'+brd+'" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="'+(h||'center')+'" vertical="center"'+(wrap?' wrapText="1"':'')+'/></xf>');return X.length-1};
+  /* borders: thin / medium per side; boxes get a bold outer line (edge()) */
+  var BD=[{},{l:'thin',r:'thin',t:'thin',b:'thin'},{l:'medium',r:'medium',t:'medium',b:'medium'},{t:'medium',b:'medium'}],BK={};
+  var bkey=function(b){return ['l','r','t','b'].map(function(k){return b[k]||''}).join('|')};BD.forEach(function(b,i){BK[bkey(b)]=i});
+  var bid=function(b){var k=bkey(b);if(BK[k]==null){BK[k]=BD.length;BD.push(b)}return BK[k]};
+  var X=[],XD=[],XK={},xf=function(font,fill,brd,h,wrap){var key=[font,fill,brd,h||'center',wrap?1:0].join(',');if(XK[key]!=null)return XK[key];
+    X.push('<xf numFmtId="0" fontId="'+font+'" fillId="'+(fill?fi(fill):0)+'" borderId="'+brd+'" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="'+(h||'center')+'" vertical="center"'+(wrap?' wrapText="1"':'')+'/></xf>');
+    XD.push([font,fill,brd,h,wrap]);return XK[key]=X.length-1};
+  var edge=function(sid,sides){var d=XD[sid],b={},o=BD[d[2]];for(var k in o)b[k]=o[k];sides.forEach(function(x){b[x]='medium'});return xf(d[0],d[1],bid(b),d[3],d[4])};
   xf(0,null,0);
   var S_T=xf(2,'163E64',2),S_G=xf(3,'4E95D9',2),S_H=xf(1,'4E95D9',1,0,1),S_N=xf(1,'FFFFFF',1),S_E=xf(1,'FFFFFF',1),
       S_L=xf(1,'A6CAEC',2,0,1),S_V=xf(1,'A6CAEC',1),S_B=xf(4,'A6CAEC',2),S_BR=xf(4,'A6CAEC',2,'right'),S_Y=xf(1,'FFD579',3),S_14=xf(3,'A6CAEC',2),S_SH=xf(1,'4E95D9',2,0,1),S_SL=xf(1,'A6CAEC',2,0,1),
       S_C={};Object.keys(FC).forEach(function(k){S_C[k]=xf(1,FC[k],1,0,1)});
   var S_CH={};['ABC','ADNF','ADNS','AFC','ASC','SPECIAL'].forEach(function(k){S_CH[k]=xf(1,FC[k],2,0,1)});
-  var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+  var styles=function(){return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
     +'<fonts count="5"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="9"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><b/><sz val="15"/><name val="Arial"/></font></fonts>'
     +'<fills count="'+(fills.length+2)+'"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+fills.map(function(h){return '<fill><patternFill patternType="solid"><fgColor rgb="FF'+h+'"/><bgColor indexed="64"/></patternFill></fill>'}).join('')+'</fills>'
-    +'<borders count="4"><border/><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/></border><border><left style="medium"/><right style="medium"/><top style="medium"/><bottom style="medium"/></border><border><top style="medium"/><bottom style="medium"/></border></borders>'
-    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+X.length+'">'+X.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    +'<borders count="'+BD.length+'">'+BD.map(function(b){return '<border>'+[['l','left'],['r','right'],['t','top'],['b','bottom']].map(function(p){return b[p[0]]?'<'+p[1]+' style="'+b[p[0]]+'"/>':'<'+p[1]+'/>'}).join('')+'<diagonal/></border>'}).join('')+'</borders>'
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+X.length+'">'+X.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'};
   var notes=[];
   var sheet=function(iso){
     var b=boards()[iso],lab=dayLabel(iso),cells={},MG=[],MR=[],maxC=0,maxR=0;
@@ -3958,8 +3965,15 @@ function exportMonth(y,m){
       put(yy,10,r.tot,S_V,'SUM('+rg(4,9,yy,yy+1)+')');mg(yy,10,yy+1,10);tot[6]+=r.tot;
       put(yy,11,r.pgc,S_V,a?'COUNTIFS('+a.p+',">=200",'+a.p+',"<300")':null);mg(yy,11,yy+1,11);tot[7]+=r.pgc;});
     var yt=sh+12;put(yt,0,'TOTAL EACH ASSET',S_14);mg(yt,0,yt,3);tot.forEach(function(v,j){put(yt,4+j,v,S_14,'SUM('+rg(4+j,4+j,sh,yt-1)+')')});
+    /* bold outer line around each block (like the team file) */
+    var box=function(r1,c1,r2,c2){if(c2<c1||r2<r1)return;for(var r=r1;r<=r2;r++)for(var c=c1;c<=c2;c++){var sd=[];if(r===r1)sd.push('t');if(r===r2)sd.push('b');if(c===c1)sd.push('l');if(c===c2)sd.push('r');
+      if(!sd.length)continue;var k=cells[r+','+c];if(!k){put(r,c,'',0);k=cells[r+','+c];}k.s=edge(k.s,sd);}};
+    var BX=function(){box(0,0,2,P0-1);box(0,P0,2,T-1);box(3,0,UE,0);box(3,S0,UE,P0-1);box(3,P0,UE,T-1);box(0,T,UE,T);
+      if(dc>D0){box(0,D0,UE,dc-1);b.detained.forEach(function(g){if(g._c0!=null)box(1,g._c0,UE,g._c1)});}
+      box(rOp,0,rTc,T);box(rOP,0,rTP,T);box(sh,0,sh+1,11);box(sh,0,yt,11);};
     /* every cell of a merged block carries the style so the borders draw */
     MR.forEach(function(q){var t=cells[q[0]+','+q[1]],st=t?t.s:0;for(var r=q[0];r<=q[2];r++)for(var c=q[1];c<=q[3];c++)if(!cells[r+','+c])put(r,c,'',st);});
+    BX();
     var H={0:23,1:32,2:8,3:36.5};H[rOp]=H[rSp]=H[rTc]=27;H[rOP]=H[rOP+1]=26;H[rSP]=H[rTP]=27;
     var xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
       +'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" zoomScale="100"/></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>'
@@ -3987,7 +4001,7 @@ function exportMonth(y,m){
     +sh.map(function(s,i){return '<sheet name="'+e(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'}).join('')+'</sheets><calcPr fullCalcOnLoad="1"/></workbook>');
   z.file('xl/_rels/workbook.xml.rels',XH+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     +sh.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RS+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')+'<Relationship Id="rId'+(sh.length+1)+'" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
-  z.file('xl/styles.xml',styles);sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
+  z.file('xl/styles.xml',styles());sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
   var endDay=thisMonth?now.getDate():+days[days.length-1].slice(8,10),fn='COACH & PGC PERFORMANCES 1-'+endDay+' '+MNAMES[m]+'.xlsx';   /* e.g. COACH & PGC PERFORMANCES 1-9 NOVEMBER.xlsx (end = the day you download) */
   var blob=z.blob();return Promise.resolve((function(blob){
     window.__fleetXlsx=blob;rsdDataDownload(z,fn);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);})(blob));
