@@ -3866,14 +3866,22 @@ SyncZip.prototype.bytes=function(){
   var all=parts.concat(cen,[end]),n=all.reduce(function(a,b){return a+b.length},0),out=new Uint8Array(n),o=0;all.forEach(function(b){out.set(b,o);o+=b.length});return out;};
 /* Safari: save through a data: link (the file is inside the link) — blob: links give "Safari Can't Open the Page" */
 function rsdDataDownload(z,fn){var u=z.bytes(),bin='',CH=0x8000;for(var i=0;i<u.length;i+=CH)bin+=String.fromCharCode.apply(null,u.subarray(i,i+CH));
-  var a=document.createElement('a');a.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,'+btoa(bin);a.download=fn;a.style.display='none';
+  var b64=btoa(bin);
+  /* on the website: post the file to /api/download, which sends it back as a named download (Safari keeps the name, the page stays) */
+  if(/^https?:$/.test(location.protocol)){
+    var fr=document.getElementById('rsdDlFrame');if(!fr){fr=document.createElement('iframe');fr.name=fr.id='rsdDlFrame';fr.style.display='none';document.body.appendChild(fr);}
+    var f=document.createElement('form');f.method='POST';f.action='/api/download';f.target='rsdDlFrame';f.style.display='none';
+    [['name',fn],['data',b64]].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i)});
+    document.body.appendChild(f);f.submit();setTimeout(function(){f.remove()},60000);return;}
+  var a=document.createElement('a');a.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,'+b64;a.download=fn;a.style.display='none';
   document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},60000);}
 
 /* ---------------- monthly Excel: one sheet per recorded day, laid out like "COACH & PGC PERFORMANCE …" ---------------- */
 function dayLabel(iso){var d=new Date(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10)),p=new Date(d.getTime());p.setDate(p.getDate()-1);
   return p.getDate()+'-'+d.getDate()+' '+MNAMES[d.getMonth()]+' '+d.getFullYear()}
 function exportMonth(y,m){
-  var pre=y+'-'+p2(m+1)+'-',days=dates().filter(function(d){return d.indexOf(pre)===0});
+  var pre=y+'-'+p2(m+1)+'-',now=new Date(),thisMonth=now.getFullYear()===y&&now.getMonth()===m,
+      days=dates().filter(function(d){return d.indexOf(pre)===0&&(!thisMonth||+d.slice(8,10)<=now.getDate())});
   if(!days.length){toast('No days recorded in '+MNAMES[m]+' '+y+' yet');return;}
   var e=function(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
   var A=function(c){var s='';c++;while(c){var k=(c-1)%26;s=String.fromCharCode(65+k)+s;c=(c-k-1)/26|0}return s};
@@ -3980,7 +3988,7 @@ function exportMonth(y,m){
   z.file('xl/_rels/workbook.xml.rels',XH+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     +sh.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RS+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')+'<Relationship Id="rId'+(sh.length+1)+'" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
   z.file('xl/styles.xml',styles);sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
-  var fn='COACH AND PGC PERFORMANCE '+(+days[0].slice(8,10))+'-'+(+days[days.length-1].slice(8,10))+' '+MNAMES[m]+' '+y+'.xlsx';
+  var endDay=thisMonth?now.getDate():+days[days.length-1].slice(8,10),fn='COACH & PGC PERFORMANCES 1-'+endDay+' '+MNAMES[m]+'.xlsx';   /* e.g. COACH & PGC PERFORMANCES 1-9 NOVEMBER.xlsx (end = the day you download) */
   var blob=z.blob();return Promise.resolve((function(blob){
     window.__fleetXlsx=blob;rsdDataDownload(z,fn);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);})(blob));
 }
