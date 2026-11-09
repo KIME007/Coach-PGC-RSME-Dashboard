@@ -3431,7 +3431,7 @@ function render(){
   h+='<div class="fb-top"><div><h2>Coaches Revenue, Non-Revenue &amp; PGC Utilized</h2><small>Train services · spare at depots · detained coaches — click a column title to edit it</small></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="fb-asof">AS ON <input id="fbAsOf" value="'+esc(b.asOf)+'" onchange="FLEET.asOf(this.value)"></span>'
     +'<button class="fb-btn p" onclick="document.getElementById(\'fbFile\').click()" title="Load the daily deployment Excel (same layout as Book1) into this day">⬆ Import Excel</button>'
-    +(has?'<button class="fb-btn" onclick="FLEET.exportXlsx()" title="Download this day as an Excel file">⬇ Export Excel</button>'
+    +(has?'<button class="fb-btn" onclick="FLEET.exportXlsx()" title="Download the whole month shown — one sheet per day, like COACH &amp; PGC PERFORMANCE">⬇ Export Excel (month)</button>'
       +'<button class="fb-btn" onclick="FLEET.sync()" title="Fill the Daily Status record of this day from the board">⇄ Sync Daily Status</button>'
       +'<label class="fb-auto" title="Update Daily Status automatically after every change"><input type="checkbox" '+(autoSync()?'checked':'')+' onchange="FLEET.auto(this.checked)"> auto</label>'
       +'<button class="fb-btn" onclick="FLEET.clearDay()" title="Delete this day\'s board">🗑 Clear day</button>':'')+'</div></div>'+cal;
@@ -3670,7 +3670,8 @@ window.FLEET={
     x.el.classList.remove('flash');void x.el.offsetWidth;x.el.classList.add('flash');},
   save:async function(btn){if(typeof saveDashboard!=='function')return;if(btn){btn.disabled=true;btn.textContent='💾 Saving…';}
     try{await saveDashboard();}finally{render();}},
-  exportXlsx:function(){try{return exportBoard(board(),curDate());}catch(e){console.error(e);toast('Export failed: '+e.message,6000);}},
+  exportXlsx:function(){try{var iso=curDate(),y=+iso.slice(0,4),m=VM!=null?VM:+iso.slice(5,7)-1;return exportMonth(y,m);}catch(e){console.error(e);toast('Export failed: '+e.message,6000);}},
+  exportDay:function(){try{return exportBoard(board(),curDate());}catch(e){console.error(e);toast('Export failed: '+e.message,6000);}},
   empty:function(on){SHOW_EMPTY=!!on;render();},
   asOf:function(v){board().asOf=String(v).trim();changed();},
   go:function(iso){CUR=iso;VM=null;PICK=null;SEL=[];UNDO=[];render();},
@@ -3843,6 +3844,124 @@ function exportBoard(b,iso){
     window.__fleetXlsx=blob;var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Fleet_Deployment_'+iso+'.xlsx';a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href)},3000);toast('Excel downloaded — Fleet_Deployment_'+iso+'.xlsx');});
 }
+/* ---------------- monthly Excel: one sheet per recorded day, laid out like "COACH & PGC PERFORMANCE …" ---------------- */
+function dayLabel(iso){var d=new Date(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10)),p=new Date(d.getTime());p.setDate(p.getDate()-1);
+  return p.getDate()+'-'+d.getDate()+' '+MNAMES[d.getMonth()]+' '+d.getFullYear()}
+function exportMonth(y,m){
+  if(typeof JSZip==='undefined')throw new Error('Excel library not loaded');
+  var pre=y+'-'+p2(m+1)+'-',days=dates().filter(function(d){return d.indexOf(pre)===0});
+  if(!days.length){toast('No days recorded in '+MNAMES[m]+' '+y+' yet');return;}
+  var e=function(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+  var A=function(c){var s='';c++;while(c){var k=(c-1)%26;s=String.fromCharCode(65+k)+s;c=(c-k-1)/26|0}return s};
+  var num=function(v){return /^\d+$/.test(String(v).trim())?+String(v).trim():String(v)};
+  /* styles — colours from the team file (theme "text 2" 0E2841 with its tints) */
+  var FC={ABC:'FFFF00',ADNF:'9437FF',ADNS:'00B0F0',AFC:'00FA00',ASC:'FF0000',SPECIAL:'FF9300',PGC:'76D6FF',OTHER:'D9D9D9'};
+  var fills=['163E64','4E95D9','A6CAEC','FFFFFF','FFD579'].concat(Object.keys(FC).map(function(k){return FC[k]}));
+  var fi=function(hex){return fills.indexOf(hex)+2};
+  var X=[],xf=function(font,fill,brd,h,wrap){X.push('<xf numFmtId="0" fontId="'+font+'" fillId="'+(fill?fi(fill):0)+'" borderId="'+brd+'" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="'+(h||'center')+'" vertical="center"'+(wrap?' wrapText="1"':'')+'/></xf>');return X.length-1};
+  xf(0,null,0);
+  var S_T=xf(2,'163E64',2),S_G=xf(3,'4E95D9',2),S_H=xf(1,'4E95D9',1,0,1),S_N=xf(1,'FFFFFF',1),S_E=xf(1,'FFFFFF',1),
+      S_L=xf(1,'A6CAEC',2,0,1),S_V=xf(1,'A6CAEC',1),S_B=xf(4,'A6CAEC',2),S_BR=xf(4,'A6CAEC',2,'right'),S_Y=xf(1,'FFD579',3),S_14=xf(3,'A6CAEC',2),S_SH=xf(1,'4E95D9',2,0,1),S_SL=xf(1,'A6CAEC',2,0,1),
+      S_C={};Object.keys(FC).forEach(function(k){S_C[k]=xf(1,FC[k],1,0,1)});
+  var S_CH={};['ABC','ADNF','ADNS','AFC','ASC','SPECIAL'].forEach(function(k){S_CH[k]=xf(1,FC[k],2,0,1)});
+  var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    +'<fonts count="5"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="9"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><b/><sz val="15"/><name val="Arial"/></font></fonts>'
+    +'<fills count="'+(fills.length+2)+'"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+fills.map(function(h){return '<fill><patternFill patternType="solid"><fgColor rgb="FF'+h+'"/><bgColor indexed="64"/></patternFill></fill>'}).join('')+'</fills>'
+    +'<borders count="4"><border/><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/></border><border><left style="medium"/><right style="medium"/><top style="medium"/><bottom style="medium"/></border><border><top style="medium"/><bottom style="medium"/></border></borders>'
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+X.length+'">'+X.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  var notes=[];
+  var sheet=function(iso){
+    var b=boards()[iso],lab=dayLabel(iso),cells={},MG=[],MR=[],maxC=0,maxR=0;
+    var put=function(r,c,v,s,f){cells[r+','+c]={v:v,s:s,f:f};if(c>maxC)maxC=c;if(r>maxR)maxR=r;};
+    var mg=function(r1,c1,r2,c2){if(r1===r2&&c1===c2)return;MG.push(A(c1)+(r1+1)+':'+A(c2)+(r2+1));MR.push([r1,c1,r2,c2]);};
+    var note=function(r,c,u){if(u&&u.note)notes.push([lab,A(c)+(r+1),u.id,u.note])};
+    var lens=b.service.concat(b.spare).map(function(c){return coaches(c.units).length}).concat(allDetCols(b).map(function(c){return c.units.length}));
+    var R=Math.max.apply(null,[15].concat(lens)),U0=4,UE=U0+R-1;                         /* unit rows 5 … 19 */
+    var S0=1,sC=Math.max(16,b.service.length),P0=S0+sC,pC=Math.max(18,b.spare.length),T=P0+pC,Y=T+2,D0=T+3;
+    var rOp=UE+1,rSp=rOp+1,rTc=rSp+1,rOP=rTc+1,rSP=rOP+2,rTP=rSP+1,sh=rTP+2;
+    var rg=function(c1,c2,r1,r2){return A(c1)+(r1+1)+':'+A(c2)+(r2+1)};
+    /* titles */
+    put(0,0,'COACHES REVENUE, NON-REVENUE & PGC UTILIZED ON TRAIN SERVICES AS ON '+lab,S_T);mg(0,0,2,P0-1);
+    put(0,P0,'SPARE COACHES & PGC AT DEPOTS',S_T);mg(0,P0,2,T-1);
+    put(0,T,'',S_L);mg(0,T,UE,T);put(1,Y,'',S_Y);mg(1,Y,UE-1,Y);
+    /* header + units */
+    put(3,0,'NO.',S_H);for(var i=0;i<R;i++)put(U0+i,0,i+1,S_N);
+    var col=function(c,x,all){put(3,x,c?c.name||'':'',S_H);if(c&&c.note)notes.push([lab,A(x)+'4',c.name||'',c.note]);
+      var L=c?(all?c.units:coaches(c.units)):[];for(var r=0;r<R;r++){var u=L[r];if(u){put(U0+r,x,num(u.id),S_C[classOf(u.id)]||S_C.OTHER);note(U0+r,x,u);}else put(U0+r,x,'',S_E);}};
+    for(i=0;i<sC;i++)col(b.service[i],S0+i);for(i=0;i<pC;i++)col(b.spare[i],P0+i);
+    /* detained */
+    var DEF={REFURB:7,MINOR:6,MAJOR:6},dc=D0;
+    b.detained.forEach(function(g){var k=Object.keys(DEF).filter(function(x){return g.name.toUpperCase().indexOf(x)>=0})[0],w=Math.max(k?DEF[k]:1,g.cols.length);
+      g._c0=dc;g._c1=dc+w-1;put(1,dc,g.name,S_G);mg(1,dc,2,dc+w-1);for(var j=0;j<w;j++)col(g.cols[j],dc+j,true);dc+=w;});
+    if(dc>D0){put(0,D0,'DETAINED COACHES',S_T);mg(0,D0,0,dc-1);}
+    /* coach totals */
+    var cnt=function(c){return c?coaches(c.units).length:0},n=counts(b);
+    put(rOp,0,'OPERATION\nCOACH',S_L);for(i=0;i<sC;i++)put(rOp,S0+i,cnt(b.service[i]),S_V,'COUNTA('+rg(S0+i,S0+i,U0,UE)+')');put(rOp,P0,'',S_V);mg(rOp,P0,rOp,T-1);
+    put(rOp,T,n.opC,S_B,'SUM('+rg(S0,T-1,rOp,rOp)+')');
+    put(rSp,0,'SPARE\nCOACH',S_L);put(rSp,S0,'',S_V);mg(rSp,S0,rSp,P0-1);for(i=0;i<pC;i++)put(rSp,P0+i,cnt(b.spare[i]),S_V,'COUNTA('+rg(P0+i,P0+i,U0,UE)+')');
+    put(rSp,T,n.spC,S_B,'SUM('+rg(S0,T-1,rSp,rSp)+')');
+    put(rTc,0,'TOTAL AVAILABLE COACH',S_BR);mg(rTc,0,rTc,T-1);put(rTc,T,n.opC+n.spC,S_B,'SUM('+rg(T,T,rOp,rSp)+')');
+    /* PGC */
+    var pg=function(c){return c?(c.pgc||[]).concat(pgcs(c.units)):[]};
+    put(rOP,0,'OPERATION\nPGC',S_L);mg(rOP,0,rOP+1,0);
+    for(i=0;i<sC;i++){var p=pg(b.service[i]),x=S0+i;put(rOP,x,p[0]?num(p[0].id):'',S_V);note(rOP,x,p[0]);
+      put(rOP+1,x,p.length>1?(p.length===2?num(p[1].id):p.slice(1).map(function(u){return u.id}).join(', ')):'',S_V);note(rOP+1,x,p[1]);}
+    put(rOP,P0,'',S_V);mg(rOP,P0,rOP+1,T-1);put(rOP,T,n.opP,S_B,'COUNT('+rg(S0,T-1,rOP,rOP+1)+')');mg(rOP,T,rOP+1,T);
+    put(rSP,0,'SPARE\nPGC',S_L);put(rSP,S0,'',S_V);mg(rSP,S0,rSP,P0-1);
+    for(i=0;i<pC;i++){var q=pg(b.spare[i]);put(rSP,P0+i,q.length===1?num(q[0].id):q.map(function(u){return u.id}).join(', '),S_V);note(rSP,P0+i,q[0]);}
+    put(rSP,T,n.spP,S_B,'COUNT('+rg(S0,T-1,rSP,rSP)+')');
+    put(rTP,0,'TOTAL AVAILABLE PGC',S_BR);mg(rTP,0,rTP,T-1);put(rTP,T,n.opP+n.spP,S_B,'SUM('+rg(T,T,rOP,rSP)+')');
+    /* status summary (codes A–E) */
+    var KS=['ABC','ADNF','ADNS','AFC','ASC','SPECIAL'],LIM={ABC:[4000,5000],ADNF:[1000,1100],ADNS:[2600,2700],AFC:[1400,1500],ASC:[2000,2600]};
+    put(sh,0,'CODE',S_SH);mg(sh,0,sh+1,0);put(sh,1,'STATUS DESCRIPTIONS',S_SH);mg(sh,1,sh+1,3);
+    KS.forEach(function(k,j){put(sh,4+j,k==='SPECIAL'?'SPECIAL\nCOACH':k,S_CH[k]);mg(sh,4+j,sh+1,4+j)});put(sh,10,'TOTAL\nCOACHES',S_SH);mg(sh,10,sh+1,10);put(sh,11,'TOTAL\nPGC',S_SH);mg(sh,11,sh+1,11);
+    var grp=function(n){return b.detained.filter(function(g){return g.name.toUpperCase().indexOf(n)>=0})[0]};
+    var area=[grp('REFURB'),grp('MAJOR'),grp('MINOR')].map(function(g){return g?{u:rg(g._c0,g._c1,U0,UE),p:rg(g._c0,g._c1,U0,UE)}:null})
+      .concat([{u:rg(S0,P0-1,U0,UE),p:rg(S0,P0-1,rOP,rOP+1)},{u:rg(P0,T-1,U0,UE),p:rg(P0,T-1,rSP,rSP)}]);
+    var sm=summary(b),tot=[0,0,0,0,0,0,0,0];
+    sm.forEach(function(r,k){var yy=sh+2+2*k,a=area[k],cf=function(c,f){return a?f:null};
+      put(yy,0,r.code,S_SL);mg(yy,0,yy+1,0);put(yy,1,r.name.replace('; ',';\n'),S_SL);mg(yy,1,yy+1,3);
+      KS.forEach(function(kk,j){var f=null;if(a)f=kk==='SPECIAL'?'COUNTIFS('+a.u+',"*")':'COUNTIFS('+a.u+',">'+LIM[kk][0]+'",'+a.u+',"<='+LIM[kk][1]+'")';
+        put(yy,4+j,r.per[j],S_V,f);mg(yy,4+j,yy+1,4+j);tot[j]+=r.per[j];});
+      put(yy,10,r.tot,S_V,'SUM('+rg(4,9,yy,yy+1)+')');mg(yy,10,yy+1,10);tot[6]+=r.tot;
+      put(yy,11,r.pgc,S_V,a?'COUNTIFS('+a.p+',">=200",'+a.p+',"<300")':null);mg(yy,11,yy+1,11);tot[7]+=r.pgc;});
+    var yt=sh+12;put(yt,0,'TOTAL EACH ASSET',S_14);mg(yt,0,yt,3);tot.forEach(function(v,j){put(yt,4+j,v,S_14,'SUM('+rg(4+j,4+j,sh,yt-1)+')')});
+    /* every cell of a merged block carries the style so the borders draw */
+    MR.forEach(function(q){var t=cells[q[0]+','+q[1]],st=t?t.s:0;for(var r=q[0];r<=q[2];r++)for(var c=q[1];c<=q[3];c++)if(!cells[r+','+c])put(r,c,'',st);});
+    var H={0:23,1:32,2:8,3:36.5};H[rOp]=H[rSp]=H[rTc]=27;H[rOP]=H[rOP+1]=26;H[rSP]=H[rTP]=27;
+    var xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      +'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" zoomScale="100"/></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>'
+      +'<cols><col min="1" max="1" width="11.83" customWidth="1"/><col min="2" max="'+T+'" width="8.83" customWidth="1"/><col min="'+(T+1)+'" max="'+(T+1)+'" width="14.33" customWidth="1"/>'
+      +'<col min="'+(T+2)+'" max="'+(T+2)+'" width="11.5" customWidth="1"/><col min="'+(Y+1)+'" max="'+(Y+1)+'" width="14.83" customWidth="1"/><col min="'+(D0+1)+'" max="'+Math.max(D0+1,maxC+1)+'" width="8.83" customWidth="1"/></cols><sheetData>';
+    for(var r=0;r<=maxR;r++){var line='';for(var c=0;c<=maxC;c++){var k=cells[r+','+c];if(!k)continue;var ref=A(c)+(r+1);
+        if(k.f)line+='<c r="'+ref+'" s="'+k.s+'"><f>'+e(k.f)+'</f><v>'+(+k.v||0)+'</v></c>';
+        else if(typeof k.v==='number')line+='<c r="'+ref+'" s="'+k.s+'"><v>'+k.v+'</v></c>';
+        else line+=k.v===''?'<c r="'+ref+'" s="'+k.s+'"/>':'<c r="'+ref+'" s="'+k.s+'" t="inlineStr"><is><t xml:space="preserve">'+e(k.v)+'</t></is></c>';}
+      xml+='<row r="'+(r+1)+'" ht="'+(H[r]||(r>=U0&&r<=UE?14:14.5))+'" customHeight="1">'+line+'</row>';}
+    xml+='</sheetData><mergeCells count="'+MG.length+'">'+MG.map(function(q){return '<mergeCell ref="'+q+'"/>'}).join('')+'</mergeCells>'
+      +'<printOptions horizontalCentered="1"/><pageMargins left="0.12" right="0.12" top="0.3" bottom="0.3" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/></worksheet>';
+    return {name:lab.slice(0,31),xml:xml};};
+  var sh=days.map(sheet);
+  if(notes.length){var cl=function(ref,t,st){return '<c r="'+ref+'"'+(st?' s="'+st+'"':'')+' t="inlineStr"><is><t xml:space="preserve">'+e(t)+'</t></is></c>'};
+    sh.push({name:'NOTES',xml:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="3" width="10" customWidth="1"/><col min="4" max="4" width="100" customWidth="1"/></cols><sheetData>'
+      +'<row r="1">'+cl('A1','DAY',S_H)+cl('B1','CELL',S_H)+cl('C1','UNIT',S_H)+cl('D1','NOTE',S_H)+'</row>'
+      +notes.map(function(x,i){var r=i+2;return '<row r="'+r+'">'+cl('A'+r,x[0])+cl('B'+r,x[1])+cl('C'+r,x[2])+cl('D'+r,x[3])+'</row>'}).join('')+'</sheetData></worksheet>'});}
+  var z=new JSZip(),XH='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',RS='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+  z.file('[Content_Types].xml',XH+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+    +sh.map(function(s,i){return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'}).join('')
+    +'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+  z.file('_rels/.rels',XH+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+RS+'officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml',XH+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="'+(days.length-1)+'"/></bookViews><sheets>'
+    +sh.map(function(s,i){return '<sheet name="'+e(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'}).join('')+'</sheets><calcPr fullCalcOnLoad="1"/></workbook>');
+  z.file('xl/_rels/workbook.xml.rels',XH+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    +sh.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RS+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')+'<Relationship Id="rId'+(sh.length+1)+'" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
+  z.file('xl/styles.xml',styles);sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
+  var fn='COACH & PGC PERFORMANCE '+(+days[0].slice(8,10))+'-'+(+days[days.length-1].slice(8,10))+' '+MNAMES[m]+' '+y+'.xlsx';
+  return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}).then(function(blob){
+    window.__fleetXlsx=blob;var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},3000);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);});
+}
+function allDetCols(b){var a=[];b.detained.forEach(function(g){a=a.concat(g.cols)});return a}
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&SEL.length&&visible()){SEL=[];render();}});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(mount,400)});else setTimeout(mount,400);
 })();
