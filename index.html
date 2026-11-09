@@ -4002,7 +4002,7 @@ function exportMonth(y,m){
   z.file('xl/_rels/workbook.xml.rels',XH+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     +sh.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RS+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')+'<Relationship Id="rId'+(sh.length+1)+'" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
   z.file('xl/styles.xml',styles());sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
-  var endDay=thisMonth?now.getDate():+days[days.length-1].slice(8,10),fn='COACH & PGC PERFORMANCES 1-'+endDay+' '+MNAMES[m]+'.xlsx';   /* e.g. COACH & PGC PERFORMANCES 1-9 NOVEMBER.xlsx (end = the day you download) */
+  var endDay=thisMonth?now.getDate():+days[days.length-1].slice(8,10),fn='COACH & PGC PERFORMANCES 1-'+endDay+' '+MNAMES[m]+' '+y+'.xlsx';   /* e.g. COACH & PGC PERFORMANCES 1-9 NOVEMBER.xlsx (end = the day you download) */
   var blob=z.blob();return Promise.resolve((function(blob){
     window.__fleetXlsx=blob;rsdDataDownload(z,fn);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);})(blob));
 }
