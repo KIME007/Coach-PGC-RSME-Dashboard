@@ -3840,7 +3840,7 @@ function exportBoard(b,iso){
   z.file('xl/workbook.xml',X+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+e(sn)+'" sheetId="1" r:id="rId1"/><sheet name="NOTES" sheetId="2" r:id="rId2"/></sheets></workbook>');
   z.file('xl/_rels/workbook.xml.rels',X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+RS+'worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="'+RS+'worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
   z.file('xl/styles.xml',styles);z.file('xl/worksheets/sheet1.xml',xml);z.file('xl/worksheets/sheet2.xml',nx);
-  return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}).then(function(blob){
+  return z.generateAsync({type:'blob',mimeType:'application/octet-stream'}).then(function(blob){
     window.__fleetXlsx=blob;var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Fleet_Deployment_'+iso+'.xlsx';a.style.display='none';document.body.appendChild(a);a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},60000);toast('Excel downloaded — Fleet_Deployment_'+iso+'.xlsx');});
 }
@@ -3957,7 +3957,7 @@ function exportMonth(y,m){
     +sh.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+RS+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')+'<Relationship Id="rId'+(sh.length+1)+'" Type="'+RS+'styles" Target="styles.xml"/></Relationships>');
   z.file('xl/styles.xml',styles);sh.forEach(function(s,i){z.file('xl/worksheets/sheet'+(i+1)+'.xml',s.xml)});
   var fn='COACH AND PGC PERFORMANCE '+(+days[0].slice(8,10))+'-'+(+days[days.length-1].slice(8,10))+' '+MNAMES[m]+' '+y+'.xlsx';
-  return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}).then(function(blob){
+  return z.generateAsync({type:'blob',mimeType:'application/octet-stream'}).then(function(blob){
     window.__fleetXlsx=blob;var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},60000);toast('⬇ '+fn+' — '+days.length+' day'+(days.length===1?'':'s')+', one sheet each',5000);});
 }
