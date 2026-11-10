@@ -2345,7 +2345,7 @@ async function generatePpt(){try{
   Chart.defaults.font.family=oldFam;
   const p=new PptxGenJS();
   buildKtmDeck(p,{imgs,a,b,now,srcName:SRC_NAME,year:(typeof RS_YEAR!=='undefined'?RS_YEAR:now.getFullYear())});
-  await p.writeFile({fileName:`KTM_Rolling_Stock_Performance_${(typeof RS_YEAR!=='undefined'?RS_YEAR:now.getFullYear())}_${now.toISOString().slice(0,10)}.pptx`});
+  await p.writeFile({fileName:`KTM_Rolling_Stock_Performance_${(typeof RS_YEAR!=='undefined'?RS_YEAR:now.getFullYear())}_${now.toISOString().slice(0,10)}.pptx`,compression:true});
   toast("KTM presentation downloaded ✔");
 }catch(e){console.error(e);toast("PPT generation failed: "+e.message);}}
 
@@ -2812,7 +2812,7 @@ window.DLO={
       Chart.defaults.font.family=old;
       var p=new PptxGenJS();build(p,data);
       var tag=from===to?MN[from]:MN[from]+'-'+MN[to];
-      await p.writeFile({fileName:'DLO_Rolling_Stock_Performance_'+tag+'_'+yr()+'.pptx'});
+      await p.writeFile({fileName:'DLO_Rolling_Stock_Performance_'+tag+'_'+yr()+'.pptx',compression:true});
       closeOv('ovDeck');toast('DLO presentation downloaded ✔');
     }catch(e){console.error(e);toast('Presentation failed: '+e.message);}
     finally{btn.disabled=false;btn.textContent='📊 Generate presentation';}
@@ -3339,6 +3339,22 @@ window.PROJ.slides=function(p,H){
     [['name',name],['data',b64]].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i)});
     document.body.appendChild(f);f.submit();setTimeout(function(){f.remove()},60000);}
   window.rsdPost=post;
+  /* big files (e.g. the presentation): put in the user's private cloud folder, then download from there with its name */
+  async function big(name,blob){
+    var c=sbCfg(),tok=await authToken();if(!c||!c.url||!tok)throw new Error('not logged in');
+    var uid=JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;
+    var ext=(name.match(/\.([a-z0-9]+)$/i)||[,'bin'])[1].toLowerCase(),path=uid+'/download.'+ext,base=c.url+'/storage/v1/object/';
+    var h={apikey:c.key,Authorization:'Bearer '+tok};
+    var up=await fetch(base+'downloads/'+path,{method:'POST',headers:Object.assign({'x-upsert':'true','Content-Type':blob.type||'application/octet-stream'},h),body:blob});
+    if(!up.ok)throw new Error('upload '+up.status);
+    var sg=await fetch(base+'sign/downloads/'+path,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},h),body:JSON.stringify({expiresIn:600})});
+    var j=await sg.json();if(!sg.ok||!j.signedURL)throw new Error('sign '+sg.status);
+    var u=c.url+'/storage/v1'+j.signedURL+(j.signedURL.indexOf('?')<0?'?':'&')+'download='+encodeURIComponent(name);
+    var fr=document.getElementById('rsdDlFrame');if(!fr){fr=document.createElement('iframe');fr.name=fr.id='rsdDlFrame';fr.style.display='none';document.body.appendChild(fr);}
+    fr.src=u;
+    setTimeout(function(){fetch(base+'downloads/'+path,{method:'DELETE',headers:h}).catch(function(){})},180000);
+  }
+  window.rsdBig=big;
   var click=HTMLAnchorElement.prototype.click,LIM=3.2e6;
   HTMLAnchorElement.prototype.click=function(){
     var h=this.href||'',n=this.getAttribute('download');
@@ -3346,6 +3362,10 @@ window.PROJ.slides=function(p,H){
       if(h.indexOf('blob:')===0&&MAP[h]&&MAP[h].size<=LIM){var b=MAP[h],r=new FileReader();
         r.onload=function(){post(n,String(r.result).split(',')[1])};r.onerror=function(){};r.readAsDataURL(b);return;}
       if(/^data:[^,]*;base64,/.test(h)&&h.length<LIM*1.37){post(n,h.slice(h.indexOf(',')+1));return;}
+      var bb=h.indexOf('blob:')===0?MAP[h]:null;
+      if(!bb&&/^data:[^,]*;base64,/.test(h)){try{var bin=atob(h.slice(h.indexOf(',')+1)),ar=new Uint8Array(bin.length);for(var q=0;q<bin.length;q++)ar[q]=bin.charCodeAt(q);bb=new Blob([ar])}catch(e){}}
+      if(bb&&typeof sbCfg==='function'){var me=this,args=arguments;
+        big(n,bb).catch(function(e){console.warn('big download',e);click.apply(me,args)});return;}
     }
     return click.apply(this,arguments);};
 })();
