@@ -3325,6 +3325,31 @@ window.PROJ.slides=function(p,H){
 .fb-form textarea{min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:.82rem}
 .fb-form .hint{font-size:.7rem;color:var(--mut);margin-top:3px}
 </style>
+<script id="dlFix">
+/* Safari on this site will not save blob:/data: download links ("Safari Can't Open the Page" / "Unknown").
+   Every download in the dashboard (Excel, report, backup, slides) is sent through /api/download instead,
+   which hands the file back with its name — the page itself never moves. */
+(function(){
+  if(!/^https?:$/.test(location.protocol))return;
+  var MAP={},oc=URL.createObjectURL;
+  URL.createObjectURL=function(o){var u=oc.apply(URL,arguments);try{if(o instanceof Blob)MAP[u]=o}catch(e){}return u};
+  function post(name,b64){
+    var fr=document.getElementById('rsdDlFrame');if(!fr){fr=document.createElement('iframe');fr.name=fr.id='rsdDlFrame';fr.style.display='none';document.body.appendChild(fr);}
+    var f=document.createElement('form');f.method='POST';f.action='/api/download';f.target='rsdDlFrame';f.style.display='none';
+    [['name',name],['data',b64]].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i)});
+    document.body.appendChild(f);f.submit();setTimeout(function(){f.remove()},60000);}
+  window.rsdPost=post;
+  var click=HTMLAnchorElement.prototype.click,LIM=3.2e6;
+  HTMLAnchorElement.prototype.click=function(){
+    var h=this.href||'',n=this.getAttribute('download');
+    if(n){
+      if(h.indexOf('blob:')===0&&MAP[h]&&MAP[h].size<=LIM){var b=MAP[h],r=new FileReader();
+        r.onload=function(){post(n,String(r.result).split(',')[1])};r.onerror=function(){};r.readAsDataURL(b);return;}
+      if(/^data:[^,]*;base64,/.test(h)&&h.length<LIM*1.37){post(n,h.slice(h.indexOf(',')+1));return;}
+    }
+    return click.apply(this,arguments);};
+})();
+</script>
 <script id="fleetJs">
 /* =====================================================================
    FLEET DEPLOYMENT — coaches & PGC on train services, spare at depots,
@@ -3868,6 +3893,7 @@ SyncZip.prototype.bytes=function(){
 function rsdDataDownload(z,fn){var u=z.bytes(),bin='',CH=0x8000;for(var i=0;i<u.length;i+=CH)bin+=String.fromCharCode.apply(null,u.subarray(i,i+CH));
   var b64=btoa(bin);
   /* on the website: post the file to /api/download, which sends it back as a named download (Safari keeps the name, the page stays) */
+  if(/^https?:$/.test(location.protocol)&&window.rsdPost){window.rsdPost(fn,b64);return;}
   if(/^https?:$/.test(location.protocol)){
     var fr=document.getElementById('rsdDlFrame');if(!fr){fr=document.createElement('iframe');fr.name=fr.id='rsdDlFrame';fr.style.display='none';document.body.appendChild(fr);}
     var f=document.createElement('form');f.method='POST';f.action='/api/download';f.target='rsdDlFrame';f.style.display='none';
