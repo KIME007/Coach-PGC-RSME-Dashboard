@@ -3287,7 +3287,7 @@ window.PROJ.slides=function(p,H){
 .fb-day.has{border-style:solid;border-color:rgba(25,135,84,.6);background:rgba(25,135,84,.22)}.fb-day.has small{color:#3ddc84}
 .fb-day.fut{opacity:.4}.fb-day.today{box-shadow:0 0 0 2px #0DCAF0}.fb-day.cur{background:#AF1763;border-color:#AF1763}.fb-day.cur b,.fb-day.cur small,.fb-day.cur i{color:#fff}
 .fb-new p{color:#a3a8c3;font-size:.84rem;margin:0 0 10px}
-.fb-search{position:relative;display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;border-radius:12px;background:#12151c;border:2px solid #AF1763}
+.fb-search{position:sticky;top:calc(var(--stickTop,0px) + 4px);z-index:40;box-shadow:0 6px 14px -6px rgba(0,0,0,.7);display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;border-radius:12px;background:#12151c;border:2px solid #AF1763}
 .fb-search .ic{font-size:1rem}.fb-search input{flex:1;background:transparent;border:0;color:#fff;font-size:.95rem;font-weight:700;outline:none;padding:4px 0}
 .fb-res{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#1d2029;border:1px solid #3b4050;border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.5);padding:6px;max-height:360px;overflow:auto}
 .fb-res .r{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:9px;cursor:pointer;flex-wrap:wrap}.fb-res .r:hover{background:#2a2d37}
@@ -8757,6 +8757,7 @@ td input[type=number]:not(.rpt-doc *):not(#dlySheet *){background-color:#191C24}
 (function(){var nav=document.querySelector('nav.tabs'),hdr=document.querySelector('.hdr');if(!nav)return;
   function fix(){var h=hdr&&getComputedStyle(hdr).position==='sticky'?hdr.getBoundingClientRect().height:0;
     nav.style.position='sticky';nav.style.top=Math.round(h)+'px';nav.style.zIndex=45;
+    document.documentElement.style.setProperty('--stickTop',Math.round(h+nav.getBoundingClientRect().height)+'px');
     var bg=getComputedStyle(document.body).backgroundColor;nav.style.background=(bg&&bg!=='rgba(0, 0, 0, 0)'&&bg!=='transparent')?bg:'#0b0c10';}
   fix();addEventListener('resize',fix);if(window.ResizeObserver&&hdr)new ResizeObserver(fix).observe(hdr);
   var POS={},cur=function(){var b=nav.querySelector('.tab.on');return b&&b.id};
