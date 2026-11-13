@@ -7660,7 +7660,8 @@ function offName(iso){return ['Sunday','Monday','Tuesday','Wednesday','Thursday'
 function workDay(loc,iso,sun){var sat=addDays(sun,6),d=iso;for(var n=0;n<7&&offDay(loc,d);n++){d=addDays(d,1);if(d>sat)d=sun;}return d}
 /* extra depots offered in the location dropdown (grid shows them only when used) */
 var WXLOCS=['GEMAS','KUALA LIPIS'];function curOf(x){return x?(x.cur!=null&&x.cur!==''?x.cur:x.loc||''):''}
-function locSel(fn,i,k,val,locs){var L=selLocs(locs);if(val&&L.indexOf(val)<0)L=L.concat([val]);
+var TRAINLOCS=['T26','T27'];
+function locSel(fn,i,k,val,locs){var L=selLocs(locs);if(k==='cur')L=L.concat(TRAINLOCS.filter(function(t){return L.indexOf(t)<0}));if(val&&L.indexOf(val)<0)L=L.concat([val]);
   return '<select onchange="PE.'+fn+'('+i+',\''+k+'\',this.value)">'+L.map(function(l){return '<option'+(l===val?' selected':'')+'>'+esc(l)+'</option>'}).join('')+(val?'':'<option selected value="">—</option>')+'</select>'}
 function selLocs(l){return l.concat(WXLOCS.filter(function(x){return l.indexOf(x)<0}))}
 var WDN=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
@@ -7690,9 +7691,11 @@ function overFirst(st,pgc){var t=isoOf(today());Object.keys(st.weeks||{}).forEac
   w.items.sort(function(a,b){var oa=a._u<=0?0:1,ob=b._u<=0?0:1;return oa-ob||(oa===0?a._u-b._u:0)||(a.plan<b.plan?-1:a.plan>b.plan?1:0)||a._u-b._u});
   w.items.forEach(function(x){delete x._u});});}
 /* keep this week onwards in line with the Fleet board: current location always; PE location unless you picked one */
+/* current location: the train (T26 / T27) when the coach is running on one, else its depot */
+function curOfNow(r){var w=nowOf(r).w||'',m=w.match(/^(T\s*\d+)\b/i);return m?m[1].replace(/\s+/g,'').toUpperCase():depotOfNow(r)}
 function syncLoc(st,pgc){var t=isoOf(today());Object.keys(st.weeks||{}).forEach(function(sun){if(addDays(sun,6)<t)return;
-  (st.weeks[sun].items||[]).forEach(function(x){var f=pgc?pRow(x.id):findRow(x.id),r=f&&f.r,d=r?depotOfNow(r):'';if(!d)return;
-    if(!x.curSet)x.cur=d;if(!x.locSet)x.loc=d;})});}
+  (st.weeks[sun].items||[]).forEach(function(x){var f=pgc?pRow(x.id):findRow(x.id),r=f&&f.r,d=r?depotOfNow(r):'',c=r?curOfNow(r):'';
+    if(c&&!x.curSet)x.cur=c;if(d&&!x.locSet)x.loc=d;})});}
 function clampIso(x,a,b){return x<a?a:x>b?b:x}
 function defPlan(r,sun){var sat=addDays(sun,6),nx=calc(r).next,lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;return clampIso(nx==='-'?lo:nx,lo,sat)}
 function wkItem(r,sun){var d=calc(r).days;var cl=depotOfNow(r)||r.loc||'';return {id:r.id,plan:workDay(cl,defPlan(r,sun),sun),loc:cl,cur:cl,rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
