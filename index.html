@@ -7682,7 +7682,7 @@ function depotOfNow(r){var w=nowOf(r).w||'',m;if(!w)return '';
 /* keep this week onwards in line with the Fleet board: current location always; PE location unless you picked one */
 function syncLoc(st,pgc){var t=isoOf(today());Object.keys(st.weeks||{}).forEach(function(sun){if(addDays(sun,6)<t)return;
   (st.weeks[sun].items||[]).forEach(function(x){var f=pgc?pRow(x.id):findRow(x.id),r=f&&f.r,d=r?depotOfNow(r):'';if(!d)return;
-    x.cur=d;if(!x.locSet)x.loc=d;})});}
+    if(!x.curSet)x.cur=d;if(!x.locSet)x.loc=d;})});}
 function clampIso(x,a,b){return x<a?a:x>b?b:x}
 function defPlan(r,sun){var sat=addDays(sun,6),nx=calc(r).next,lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;return clampIso(nx==='-'?lo:nx,lo,sat)}
 function wkItem(r,sun){var d=calc(r).days;var cl=depotOfNow(r)||r.loc||'';return {id:r.id,plan:workDay(cl,defPlan(r,sun),sun),loc:cl,cur:cl,rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
@@ -8334,7 +8334,7 @@ window.PE={
   pwadd:function(v){var p=String(v).split('|'),f=pRow(p[0]);if(!f)return;var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]};w.items.push(pItem(f.r,p[1],sun));changed();},
   pwauto:function(){var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]},n=0;pgcCands(sun).forEach(function(c){if(c.must){w.items.push(pItem(c.r,c.lvl,sun));n++}});
     changed();toast(n+' PE added to week '+weekNo(sun)+' — adjust dates / locations, then 💾 Save',5000);},
-  pwset:function(i,k,val){var w=WP().weeks[curSunP()];if(!w||!w.items[i])return;if(k==='loc')w.items[i].locSet=1;w.items[i][k]=k==='rem'?String(val).toUpperCase():val;
+  pwset:function(i,k,val){var w=WP().weeks[curSunP()];if(!w||!w.items[i])return;if(k==='loc')w.items[i].locSet=1;if(k==='cur')w.items[i].curSet=1;w.items[i][k]=k==='rem'?String(val).toUpperCase():val;
     if(k==='plan')w.items.sort(function(a,b){return a.plan<b.plan?-1:a.plan>b.plan?1:0});changed();},
   pwdel:function(i){var sun=curSunP(),w=WP().weeks[sun];if(!w)return;w.items.splice(i,1);if(!w.items.length)delete WP().weeks[sun];changed();},
   pwprep:function(val){WP().prep=String(val).toUpperCase();changed();},
@@ -8427,7 +8427,7 @@ window.PE={
   wadd:function(id){var f=findRow(id);if(!f)return;var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]};w.items.push(wkItem(f.r,sun));changed();},
   wauto:function(){var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]},n=0;wkCands(sun).forEach(function(c){if(c.must){w.items.push(wkItem(c.r,sun));n++}});
     changed();toast(n+' coach'+(n===1?'':'es')+' added to week '+weekNo(sun)+' — adjust the dates / locations, then 💾 Save',5000);},
-  wset:function(i,k,v){var w=W().weeks[curSun()];if(!w||!w.items[i])return;if(k==='loc')w.items[i].locSet=1;w.items[i][k]=k==='rem'?String(v).toUpperCase():v;
+  wset:function(i,k,v){var w=W().weeks[curSun()];if(!w||!w.items[i])return;if(k==='loc')w.items[i].locSet=1;if(k==='cur')w.items[i].curSet=1;w.items[i][k]=k==='rem'?String(v).toUpperCase():v;
     if(k==='plan')w.items.sort(function(a,b){return a.plan<b.plan?-1:a.plan>b.plan?1:0});changed();},
   wdel:function(i){var sun=curSun(),w=W().weeks[sun];if(!w)return;w.items.splice(i,1);if(!w.items.length)delete W().weeks[sun];changed();},
   wprep:function(v){W().prep=String(v).toUpperCase();changed();},
