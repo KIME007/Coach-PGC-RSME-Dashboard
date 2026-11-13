@@ -8748,5 +8748,18 @@ td input[type=number]:not(.rpt-doc *):not(#dlySheet *){background-color:#191C24}
 @media (min-width:2400px){html{font-size:17.5px}}
 @media (min-width:3000px){html{font-size:19px}}
 </style>
+<script id="tabStick">
+/* tab bar stays fixed under the header while scrolling, and each tab keeps its own scroll position
+   (switch Fleet Deployment <-> PE Schedule to cross-check without losing your place) */
+(function(){var nav=document.querySelector('nav.tabs'),hdr=document.querySelector('.hdr');if(!nav)return;
+  function fix(){var h=hdr&&getComputedStyle(hdr).position==='sticky'?hdr.getBoundingClientRect().height:0;
+    nav.style.position='sticky';nav.style.top=Math.round(h)+'px';nav.style.zIndex=45;
+    var bg=getComputedStyle(document.body).backgroundColor;nav.style.background=(bg&&bg!=='rgba(0, 0, 0, 0)'&&bg!=='transparent')?bg:'#0b0c10';}
+  fix();addEventListener('resize',fix);if(window.ResizeObserver&&hdr)new ResizeObserver(fix).observe(hdr);
+  var POS={},cur=function(){var b=nav.querySelector('.tab.on');return b&&b.id};
+  nav.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.tab');if(!b)return;var from=cur();if(from)POS[from]=scrollY;
+    setTimeout(function(){var to=cur();if(to&&to!==from&&POS[to]!=null)scrollTo(0,POS[to]);},80);},true);
+})();
+</script>
 </body>
 </html>
