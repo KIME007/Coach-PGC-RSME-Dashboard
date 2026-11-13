@@ -7675,7 +7675,15 @@ function wkCands(sun){var sat=addDays(sun,6),lim=addDays(sat,7),items=(W().weeks
     if(k.next<=lim)out.push({r:r,k:k,must:k.next<=sat});})});
   return out.sort(function(a,b){return a.k.days-b.k.days})}
 function wkLevel(r){return r?'PE '+(r.iv||defIv(r.id)):'-'}
+/* follows the schedule: a coach whose Last PE date (schedule) is newer than the one it was planned with has had its PE.
+   done before that week starts -> it drops out of the week; done in/after the week -> stays, marked PE DONE */
+function wDone(x,r){return !!(r&&x&&x.last&&r.last&&r.last!=='-'&&r.last>x.last)}
+function pruneDone(){var ws=W().weeks;Object.keys(ws).forEach(function(sun){var w=ws[sun];if(!w||!w.items)return;
+  w.items=w.items.filter(function(x){var f=findRow(x.id),r=f&&f.r;return !(wDone(x,r)&&r.last<sun)});
+  if(!w.items.length&&!(W().notes&&W().notes[sun]))delete ws[sun];});}
+function doneTag(x,r){return wDone(x,r)?'<b style="color:#3ddc84">✔ PE DONE '+fmt(r.last)+'</b> ':''}
 function forecastHtml(){
+  pruneDone();
   var sun=curSun(),sat=addDays(sun,6),wn=weekNo(sun),wk=W().weeks[sun]||{items:[]},items=wk.items,cands=wkCands(sun),must=cands.filter(function(c){return c.must});
   var label=WK===0?'This week':WK===1?'Next week':WK===-1?'Last week':(WK>0?'In '+WK+' weeks':Math.abs(WK)+' weeks ago');
   var h='<div class="fb-sec pe-wk"><h3>🗓 Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' coach'+(items.length===1?'':'es')+' planned</span>'
@@ -7694,7 +7702,7 @@ function forecastHtml(){
         +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.wset('+i+',\'plan\',this.value)"></td>'
         +'<td>'+locSel('wset',i,'cur',curOf(x),locs)+'</td><td>'+locSel('wset',i,'loc',x.loc,locs)+'</td>'
         +'<td>'+(st?pill(st,STC[st]||'#a3a8c3'):'–')+'</td><td>'+(k?ddHtml(k.days):'–')+'</td>'
-        +'<td class="rem">'+(over?'<b style="color:#ff5b62">OVERDUE</b> ':'')+'<input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.wset('+i+',\'rem\',this.value)"></td>'
+        +'<td class="rem">'+(wDone(x,r)?doneTag(x,r):over?'<b style="color:#ff5b62">OVERDUE</b> ':'')+'<input value="'+esc(x.rem)+'" placeholder="remark" onchange="PE.wset('+i+',\'rem\',this.value)"></td>'
         +'<td><button class="wk-x" title="Remove from this week" onclick="PE.wdel('+i+')">✕</button></td></tr>';});
     h+='</tbody></table></div>';
     h+=gridHtml(0,sun,items,locs);
@@ -7763,7 +7771,7 @@ function sheetDoc(o){
   return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br><span'+ce(-1,'prep')+'>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</span></div></div></div>';
 }
 function wkLocs(items){var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});return locs}
-function forecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
+function forecastDoc(sun,ed){pruneDone();SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(W().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[];
   for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
@@ -7851,7 +7859,7 @@ function scheduleSheet(){
   return {name:String(D.year).match(/\d{4}/)?String(D.year).match(/\d{4}/)[0]:'PE',cells:c,merges:M,cols:{A:3,B:3,C:6,D:16,E:13,F:15,G:13,H:19,I:14,J:11,K:16,L:17,M:42},rows:{2:44},cf:cf,land:1};
 }
 /* one week in the "COACH PE WEEKLY PLANNING" layout */
-function weekSheet(sun){
+function weekSheet(sun){pruneDone();
   var items=(W().weeks[sun]||{items:[]}).items,c={},M=['C2:K2','C3:K3','D4:J4'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
   c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM COACH)',s:{b:1,sz:14,wrap:1}};
   c.C3={v:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.D4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
@@ -8402,7 +8410,7 @@ window.PE={
   wprep:function(v){W().prep=String(v).toUpperCase();changed();},
   wprint:function(){var sun=curSun();if(!(W().weeks[sun]||{items:[]}).items.length){toast('No coaches planned for this week');return;}
     PE._print(forecastDoc(sun),'COACH PE WEEKLY PLANNING (WEEK '+weekNo(sun)+') '+sun.slice(0,4));},
-  xlsW:function(){var ks=Object.keys(W().weeks).filter(function(k){return W().weeks[k].items.length}).sort();if(!ks.length){toast('No weekly plans yet');return;}
+  xlsW:function(){pruneDone();var ks=Object.keys(W().weeks).filter(function(k){return W().weeks[k].items.length}).sort();if(!ks.length){toast('No weekly plans yet');return;}
     buildXlsx(ks.map(weekSheet)).then(function(b){saveBlob(b,'COACH PE WEEKLY PLANNING '+ks[ks.length-1].slice(0,4)+'.xlsx');toast('⬇ Weekly planning downloaded ('+ks.length+' week'+(ks.length===1?'':'s')+')',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
   xlsS:function(){if(!data().groups.some(function(g){return g.rows.length})){toast('No PE schedule yet');return;}
     var y=(String(data().year).match(/\d{4}/)||[RS_YEAR])[0];buildXlsx([scheduleSheet()]).then(function(b){saveBlob(b,'COACHES SCHEDULE PE 60 & PE 90 '+y+'.xlsx');toast('⬇ PE schedule downloaded',4000)}).catch(function(e){toast('Excel failed: '+e.message,6000)});},
