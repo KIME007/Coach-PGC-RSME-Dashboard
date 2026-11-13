@@ -7728,7 +7728,7 @@ function forecastHtml(){
   else{
     h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>Coaches no.</th><th>PE level</th><th>Last PE date</th><th>PE planning date</th><th>Current location</th><th>PE planning location</th><th>Status</th><th>Estimate due days</th><th>Remarks</th><th></th></tr></thead><tbody>';
     var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});
-    items.forEach(function(x,i){var f=findRow(x.id),r=f&&f.r,k=r?calc(r):null,over=k&&k.next!=='-'&&x.plan>k.next,lv=wLvl(x,r),la=wLast(x,r),st=wSt(x,r);
+    items.forEach(function(x,i){var f=findRow(x.id),r=f&&f.r,k=r?calc(r):null,over=k&&k.days!=='-'&&k.days<=0,lv=wLvl(x,r),la=wLast(x,r),st=wSt(x,r);
       h+='<tr><td class="n">'+(i+1)+'</td><td class="id">'+(r?chipOf(r):esc(x.id))+'</td>'
         +'<td>'+(lv&&lv!=='-'?pill(lv,lv==='PE 60'?'#96f28e':'#5aa9ff'):'–')+'</td><td>'+(la?fmt(la):'–')+'</td>'
         +'<td><input type="date" value="'+esc(x.plan)+'" min="'+sun+'" max="'+sat+'" onchange="PE.wset('+i+',\'plan\',this.value)"></td>'
@@ -7807,7 +7807,7 @@ function sheetDoc(o){
 function wkLocs(items){var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});return locs}
 function forecastDoc(sun,ed){pruneDone();syncLoc(W());overFirst(W());fixOff(W());SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(W().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[];
-  for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
+  for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.days!=='-'&&k.days<=0,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
       +'<td'+(x?ce(i,'cur'):'')+'>'+(x?esc(curOf(x)):'')+'</td><td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+esc(st)+'</td><td'+(over?' class="red"':'')+(x?ce(i,'est'):'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td>'
       +'<td class="red wrap"'+(x?ce(i,'rem'):'')+'>'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
@@ -7899,7 +7899,7 @@ function weekSheet(sun){pruneDone();syncLoc(W());overFirst(W());fixOff(W());
   c.C3={v:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.D4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
   ['NO.','COACHES NO.','PE LEVEL','LAST PE DATE','PE PLANNING DATE','CURRENT\nLOCATION','PE PLANNING\nLOCATION','STATUS','ESTIMATE DUE\nDAYS','REMARKS'].forEach(function(t,j){c[colL(2+j)+'6']={v:t,s:Y}});
   var n=Math.max(20,items.length);
-  for(var i=0;i<n;i++){var r=7+i,x=items[i],f=x&&findRow(x.id),row=f&&f.r,k=row&&calc(row),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,row):'',la=x?wLast(x,row):'',st=x?wSt(x,row):'';if(lv==='-')lv='';
+  for(var i=0;i<n;i++){var r=7+i,x=items[i],f=x&&findRow(x.id),row=f&&f.r,k=row&&calc(row),over=k&&k.days!=='-'&&k.days<=0,lv=x?wLvl(x,row):'',la=x?wLast(x,row):'',st=x?wSt(x,row):'';if(lv==='-')lv='';
     c['B'+r]={v:i+1,s:T};c['C'+r]={v:x?x.id:'',s:T};c['D'+r]={v:lv,s:lv?{b:1,bd:1,sz:10,fill:lv==='PE 60'?'96F28E':'3F8EFC'}:T};
     var ls=la&&serial(la);c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
     var ps=x&&serial(x.plan);c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
