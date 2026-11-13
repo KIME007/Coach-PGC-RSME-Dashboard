@@ -7453,7 +7453,9 @@ body.viewonly #pPE .wk-x,body.viewonly #pPE .wg-x,body.viewonly #pPE .wg-add,bod
 #pPE .wg-hint{font-size:.7rem;color:#a3a8c3;font-weight:700;margin:0 0 6px}
 #pPE table.wg-ed td:not(.loc){position:relative;padding-bottom:22px;transition:background .12s}
 #pPE table.wg-ed td.ov{background:rgba(175,23,99,.22)!important;outline:2px dashed #AF1763;outline-offset:-3px}
-#pPE .wg-it{position:relative;display:block;cursor:grab}#pPE .wg-it:active{cursor:grabbing}
+#pPE .wg-it{position:relative;display:block;cursor:grab}
+#pPE table.wkg td.wg-off{background:repeating-linear-gradient(135deg,#23262f 0 8px,#1b1d24 8px 16px)}#pPE .wg-offl{display:block;color:#8a8fa6;font-weight:800;font-size:.72rem;letter-spacing:.08em;text-align:center;margin:4px 0}
+#pPE .wg-it.offw .fb-chip{outline:2px dashed #ffd60a;outline-offset:1px}#pPE .wg-it:active{cursor:grabbing}
 #pPE .wg-it.sel .fb-chip{outline:3px solid #fff;outline-offset:1px;box-shadow:0 0 12px #AF1763}
 #pPE .wg-x{position:absolute;top:-4px;right:calc(50% - 63px);width:16px;height:16px;line-height:16px;border-radius:50%;background:#ff5b62;color:#fff;font-size:9px;text-align:center;cursor:pointer;opacity:0;transition:opacity .12s}
 #pPE .wg-it:hover .wg-x{opacity:1}
@@ -7647,6 +7649,10 @@ function planHtml(){
    S.peWeekly = {prep:'', weeks:{ '<sunday iso>': {items:[{id,plan,loc,rem}]} }}
    PE level, last PE, status and due days come live from the PE schedule. */
 var WLOCS=['KL SENTRAL','KEMPAS BARU','TUMPAT'];
+/* depot off days: Sunday — KL Sentral & Kempas Baru off (Tumpat works); Friday — Tumpat off (KL Sentral & Kempas Baru work) */
+function offDay(loc,iso){var d=parseIso(iso);if(!d)return false;var w=d.getDay(),l=String(loc||'').toUpperCase();
+  if(w===0)return /KL\s*SENTRAL|KEMPAS/.test(l);if(w===5)return /TUMPAT/.test(l);return false}
+function workDay(loc,iso,sun){var sat=addDays(sun,6),d=iso;for(var n=0;n<7&&offDay(loc,d);n++){d=addDays(d,1);if(d>sat)d=sun;}return d}
 /* extra depots offered in the location dropdown (grid shows them only when used) */
 var WXLOCS=['GEMAS','KUALA LIPIS'];function curOf(x){return x?(x.cur!=null&&x.cur!==''?x.cur:x.loc||''):''}
 function locSel(fn,i,k,val,locs){var L=selLocs(locs);if(val&&L.indexOf(val)<0)L=L.concat([val]);
@@ -7663,7 +7669,7 @@ function depotOfNow(r){var w=nowOf(r).w||'';var m=w.match(/^Spare\s+(.+)$/i);if(
   return /KEMP/.test(d)?'KEMPAS BARU':/TUM/.test(d)?'TUMPAT':/KL|SENTRAL/.test(d)?'KL SENTRAL':d}
 function clampIso(x,a,b){return x<a?a:x>b?b:x}
 function defPlan(r,sun){var sat=addDays(sun,6),nx=calc(r).next,lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;return clampIso(nx==='-'?lo:nx,lo,sat)}
-function wkItem(r,sun){var d=calc(r).days;var cl=depotOfNow(r)||r.loc||'';return {id:r.id,plan:defPlan(r,sun),loc:cl,cur:cl,rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
+function wkItem(r,sun){var d=calc(r).days;var cl=depotOfNow(r)||r.loc||'';return {id:r.id,plan:workDay(cl,defPlan(r,sun),sun),loc:cl,cur:cl,rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
 /* what the forecast showed when it was planned; older rows fall back to the schedule */
 function wLast(x,r){return x.last||(r&&r.last!=='-'&&r.last<=x.plan?r.last:'')}
 function wSt(x,r){return x.st||(r?r.st:'')}
@@ -7725,17 +7731,17 @@ function ntHtml(t){return esc(t||'').replace(/\n/g,'<br>')}
 function gridHtml(pgc,sun,items,locs){
   var DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],td=isoOf(today()),ro=typeof RSD_VIEWER!=='undefined'&&!!RSD_VIEWER;
   var chip=function(x){var i=items.indexOf(x),c;if(pgc)c=pgcChip(x.id+' ('+x.lvl+')');else{var f=findRow(x.id);c=f?chipOf(f.r):'<span class="fb-chip" style="background:#3b4050;color:#fff">'+esc(x.id)+'</span>'}
-    if(ro)return c;var sel=GSEL&&GSEL.p===pgc&&GSEL.i===i;
-    return '<span class="wg-it'+(sel?' sel':'')+'" draggable="true" data-i="'+i+'" title="Drag to another day / location — or click it, then click the new cell" ondragstart="PE.gdrag(event,'+pgc+','+i+')" onclick="event.stopPropagation();PE.gpick('+pgc+','+i+')">'+c
+    var off=offDay(x.loc,x.plan);if(ro)return off?'<span class="wg-it offw" title="Off day at '+esc(x.loc)+'">'+c+'</span>':c;var sel=GSEL&&GSEL.p===pgc&&GSEL.i===i;
+    return '<span class="wg-it'+(sel?' sel':'')+(off?' offw':'')+'" draggable="true" data-i="'+i+'" title="'+(off?'Off day at '+esc(x.loc)+' · drag to another day / location if needed':'Drag to another day / location — or click it, then click the new cell')+'" ondragstart="PE.gdrag(event,'+pgc+','+i+')" onclick="event.stopPropagation();PE.gpick('+pgc+','+i+')">'+c
       +'<b class="wg-x" title="Remove from this week" onclick="event.stopPropagation();PE.gdel('+pgc+','+i+')">✕</b></span>'};
   var h='<div class="pe-tw" style="margin-top:12px">'+(ro?'':'<div class="wg-hint">✏️ Drag a '+(pgc?'PGC':'coach')+' to another day / location (or click it, then click the new cell) · ＋ adds one to that cell · ✕ removes · ✎ click under a cell to type your own note · click a location name to rename it</div>')
     +'<table class="pe wkg'+(ro?'':' wg-ed')+'"><thead><tr><th>Location</th>'+DN.map(function(d,n){var dd=addDays(sun,n);return '<th class="'+(dd===td?'tdy':'')+'">'+d+'<br><small>'+fmt(dd)+'</small></th>'}).join('')+'</tr></thead><tbody>';
   locs.filter(function(l){return items.some(function(x){return x.loc===l})||WLOCS.indexOf(l)>=0}).forEach(function(l){
     h+='<tr><td class="loc"'+(ro?'':' title="Click to rename this location" style="cursor:pointer" onclick="PE.gloc('+pgc+',this.getAttribute(\'data-loc\'))" data-loc="'+esc(l)+'"')+'>'+esc(l)+'</td>';
     DN.forEach(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
-      var nt=NT(pgc,sun)[l+'|'+dd]||'';
-      h+='<td'+(ro?'':' data-day="'+dd+'" data-loc="'+esc(l)+'" ondragover="event.preventDefault();this.classList.add(\'ov\')" ondragleave="this.classList.remove(\'ov\')" ondrop="PE.gdrop(event,this)" onclick="PE.gput(this)"')+'>'
-        +(on.length?on.map(chip).join(''):nt?'':'<i>–</i>')
+      var nt=NT(pgc,sun)[l+'|'+dd]||'',off=offDay(l,dd);
+      h+='<td'+(off?' class="wg-off"':'')+(ro?'':' data-day="'+dd+'" data-loc="'+esc(l)+'" ondragover="event.preventDefault();this.classList.add(\'ov\')" ondragleave="this.classList.remove(\'ov\')" ondrop="PE.gdrop(event,this)" onclick="PE.gput(this)"')+'>'
+        +(off?'<span class="wg-offl">OFF DAY</span>':'')+(on.length?on.map(chip).join(''):nt||off?'':'<i>–</i>')
         +(ro?(nt?'<div class="wg-note">'+ntHtml(nt)+'</div>':''):'<div class="wg-note" contenteditable="true" spellcheck="false" data-ph="✎ type a note" title="Type your own text for this day / location · Enter = done · Shift+Enter = new line" onclick="event.stopPropagation()" onfocusout="PE.gnote('+pgc+',this)" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();this.blur()}">'+ntHtml(nt)+'</div>')+(ro?'':'<button class="wg-add" title="Add to '+esc(l)+' · '+fmt(dd)+'" onclick="event.stopPropagation();PE.gadd(this,'+pgc+')">＋</button>')+'</td>'});
     h+='</tr>'});
   return h+'</tbody></table></div>';}
@@ -7766,7 +7772,8 @@ function sheetDoc(o){
     for(var q=0;q<rows;q++)h+='<tr class="'+(q===rows-1?'lst':'')+'">'+(q===0?'<td rowspan="'+rows+'" class="g"'+(SHEET_ED?' contenteditable="true" spellcheck="false" data-k="gloc" data-loc="'+esc(l)+'"':'')+'>'+esc(l)+'</td>':'')
       +per.map(function(p,j){var x=p[q],dd=addDays(o.sun,j);
         if(!x&&nts[j]&&q===p.length)return '<td class="nt"'+(SHEET_ED?' contenteditable="true" spellcheck="false" data-k="gnote" data-loc="'+esc(l)+'" data-day="'+dd+'"':'')+'>'+ntHtml(nts[j])+'</td>';
-        return '<td'+ga(dd,x)+'>'+(x?esc(o.label(x)):(j===0||j===6)&&!SHEET_ED&&!nts[j]&&!p.length?'-':'')+'</td>'}).join('')+'</tr>';});
+        var off=offDay(l,dd);
+        return '<td'+ga(dd,x)+(off?' style="background:#d9d9d9"':'')+'>'+(x?esc(o.label(x)):off&&q===0&&!p.length&&!nts[j]?'OFF DAY':!off&&j===6&&!SHEET_ED&&!nts[j]&&!p.length?'-':'')+'</td>'}).join('')+'</tr>';});
   var pw=(3/nc*100).toFixed(3);
   return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br><span'+ce(-1,'prep')+'>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</span></div></div></div>';
 }
@@ -7877,7 +7884,7 @@ function weekSheet(sun){pruneDone();
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
   locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);var a=items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id}),t=NT(0,sun)[l+'|'+dd];if(t)a.push(t);return a});
     var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));M.push('B'+rr+':B'+(rr+rows-1));
-    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9,wrap:1}}});}
+    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){var off=offDay(l,addDays(sun,j));c[colL(3+j)+(rr+q)]={v:p[q]||(off&&q===0&&!p.length?'OFF DAY':''),s:off?{b:1,bd:1,sz:9,wrap:1,fill:'D9D9D9'}:{b:1,bd:1,sz:9,wrap:1}}});}
     rr+=rows;});
   rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(W().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
   var rh={2:44};rh[rr]=48;
@@ -8162,7 +8169,7 @@ function pgcWeekSheet(sun){
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
   locs.forEach(function(l){var per=WDN.map(function(d,j){var dd=addDays(sun,j);var a=items.filter(function(x){return x.loc===l&&x.plan===dd}).map(function(x){return x.id+' ('+x.lvl+')'}),t=NT(1,sun)[l+'|'+dd];if(t)a.push(t);return a});
     var rows=Math.max(2,Math.max.apply(null,per.map(function(p){return p.length})));M.push('B'+rr+':B'+(rr+rows-1));
-    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){c[colL(3+j)+(rr+q)]={v:p[q]||'',s:{b:1,bd:1,sz:9,wrap:1}}});}rr+=rows;});
+    for(var q=0;q<rows;q++){c['B'+(rr+q)]={v:q?'':l,s:{b:1,bd:1,fill:'73FB79',sz:10}};per.forEach(function(p,j){var off=offDay(l,addDays(sun,j));c[colL(3+j)+(rr+q)]={v:p[q]||(off&&q===0&&!p.length?'OFF DAY':''),s:off?{b:1,bd:1,sz:9,wrap:1,fill:'D9D9D9'}:{b:1,bd:1,sz:9,wrap:1}}});}rr+=rows;});
   rr+=1;M.push('C'+rr+':E'+rr);c['C'+rr]={v:'PREPARED BY :\n'+(WP().prep||''),s:{b:1,sz:9,wrap:1,bd:'m'}};c['D'+rr]={v:'',s:{bd:'m'}};c['E'+rr]={v:'',s:{bd:'m'}};
   var rh={2:44};rh[rr]=48;
   return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:15,I:16,J:11,K:9,L:11,M:24},rows:rh,land:0};
