@@ -7640,7 +7640,7 @@ function planHtml(){
     else h+='<div class="pe-cards">'+items.map(function(x){var r=x.r,k=x.k,w=window.FLEET&&FLEET.whereIs?FLEET.whereIs(fleetKey(r.id)):null;
       return '<div class="pe-card" onclick="PE.edit('+x.gi+','+x.i+')"><div class="h">'+chipOf(r)+pill(k.ps,PSC[k.ps])+'<span class="dd" style="background:'+dayColor(k.days)+'">'+(k.days<0?'('+(-k.days)+')':k.days)+' d</span></div>'
         +'<div class="b">Next PE <b>'+fmt(k.next)+'</b> · PE '+(r.iv||defIv(r.id))+'<br>📍 '+esc(r.loc||'—')+' · '+esc(r.st)
-        +'<br><span class="now">🚆 Now: '+(w&&w.where?esc(w.where):'<i style="color:#6c7293">not on the Fleet board</i>')+'</span></div>'
+        +'<br><span class="now">🚆 Now: '+(w&&w.where?esc(w.where):'<i style="color:#6c7293">not on the Fleet board</i>')+'</span>'+(depotOfNow(r)?'<br><b style="color:#73fb79">🛠 PE location (est.): '+esc(depotOfNow(r))+'</b>':'')+'</div>'
         +'<div class="f"><span style="font-size:.66rem;color:#6c7293;font-weight:700">Last PE '+fmt(r.last)+'</span><button onclick="event.stopPropagation();PE.done('+x.gi+','+x.i+')">✔ PE done today</button></div></div>'}).join('')+'</div>';
   }
   return h+'</div>';
@@ -7652,6 +7652,11 @@ var WLOCS=['KL SENTRAL','KEMPAS BARU','TUMPAT'];
 /* depot off days: Sunday — KL Sentral & Kempas Baru off (Tumpat works); Friday — Tumpat off (KL Sentral & Kempas Baru work) */
 function offDay(loc,iso){var d=parseIso(iso);if(!d)return false;var w=d.getDay(),l=String(loc||'').toUpperCase();
   if(w===0)return /KL\s*SENTRAL|KEMPAS/.test(l);if(w===5)return /TUMPAT/.test(l);return false}
+/* no PE on an off day: anything planned on one (this week onwards) moves to the depot's next working day */
+function fixOff(st){var t=isoOf(today()),n=0;Object.keys(st.weeks||{}).forEach(function(sun){if(addDays(sun,6)<t)return;var w=st.weeks[sun];
+  (w&&w.items||[]).forEach(function(x){if(x.plan&&offDay(x.loc,x.plan)){x.plan=workDay(x.loc,x.plan,sun);n++}})});
+  if(n&&typeof toast==='function')toast('No PE on off days — moved '+n+' to the next working day (click 💾 Save to keep)');return n}
+function offName(iso){return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][parseIso(iso).getDay()]}
 function workDay(loc,iso,sun){var sat=addDays(sun,6),d=iso;for(var n=0;n<7&&offDay(loc,d);n++){d=addDays(d,1);if(d>sat)d=sun;}return d}
 /* extra depots offered in the location dropdown (grid shows them only when used) */
 var WXLOCS=['GEMAS','KUALA LIPIS'];function curOf(x){return x?(x.cur!=null&&x.cur!==''?x.cur:x.loc||''):''}
@@ -7665,8 +7670,19 @@ function weekNo(iso){var d=parseIso(iso),j=new Date(d.getFullYear(),0,1);return 
 function curSun(){var t=today();t.setDate(t.getDate()+WK*7);return sunOf(t)}
 function keyOf(id){return String(id||'').toUpperCase().replace(/\s+/g,'')}
 function findRow(id){var k=keyOf(id),D=data(),hit=null;D.groups.forEach(function(g,gi){g.rows.forEach(function(r,i){if(!hit&&keyOf(r.id)===k)hit={r:r,gi:gi,i:i}})});return hit}
-function depotOfNow(r){var w=nowOf(r).w||'';var m=w.match(/^Spare\s+(.+)$/i);if(!m)return '';var d=m[1].toUpperCase();
-  return /KEMP/.test(d)?'KEMPAS BARU':/TUM/.test(d)?'TUMPAT':/KL|SENTRAL/.test(d)?'KL SENTRAL':d}
+/* estimated PE location from the latest Fleet Deployment board:
+   spare / workshop depot -> that depot; on a train -> the depot at the train's destination */
+function placeDepot(t){t=String(t||'').toUpperCase();
+  return /TUMP|TUMD|WAKAF|KOTA BH/.test(t)?'TUMPAT':/KEMP|KEMD|JB|JOHOR|TEBRAU/.test(t)?'KEMPAS BARU':/LIPIS/.test(t)?'KUALA LIPIS':/GEM/.test(t)?'GEMAS':/KL|SENTRAL/.test(t)?'KL SENTRAL':''}
+function depotOfNow(r){var w=nowOf(r).w||'',m;if(!w)return '';
+  if((m=w.match(/^Spare\s+(.+)$/i)))return placeDepot(m[1])||m[1].toUpperCase();
+  if((m=w.match(/·\s*(.+)$/)))return placeDepot(m[1]);                       /* workshop column */
+  if((m=w.match(/\(([^()]*-[^()]*)\)\s*$/)))return placeDepot(m[1].split('-').pop());   /* train: destination */
+  return ''}
+/* keep this week onwards in line with the Fleet board: current location always; PE location unless you picked one */
+function syncLoc(st,pgc){var t=isoOf(today());Object.keys(st.weeks||{}).forEach(function(sun){if(addDays(sun,6)<t)return;
+  (st.weeks[sun].items||[]).forEach(function(x){var f=pgc?pRow(x.id):findRow(x.id),r=f&&f.r,d=r?depotOfNow(r):'';if(!d)return;
+    x.cur=d;if(!x.locSet)x.loc=d;})});}
 function clampIso(x,a,b){return x<a?a:x>b?b:x}
 function defPlan(r,sun){var sat=addDays(sun,6),nx=calc(r).next,lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;return clampIso(nx==='-'?lo:nx,lo,sat)}
 function wkItem(r,sun){var d=calc(r).days;var cl=depotOfNow(r)||r.loc||'';return {id:r.id,plan:workDay(cl,defPlan(r,sun),sun),loc:cl,cur:cl,rem:'',est:d==='-'?null:Math.abs(d),last:r.last==='-'?'':r.last,st:r.st,lvl:wkLevel(r)}}
@@ -7689,7 +7705,7 @@ function pruneDone(){var ws=W().weeks;Object.keys(ws).forEach(function(sun){var 
   if(!w.items.length&&!(W().notes&&W().notes[sun]))delete ws[sun];});}
 function doneTag(x,r){return wDone(x,r)?'<b style="color:#3ddc84">✔ PE DONE '+fmt(r.last)+'</b> ':''}
 function forecastHtml(){
-  pruneDone();
+  pruneDone();syncLoc(W());fixOff(W());
   var sun=curSun(),sat=addDays(sun,6),wn=weekNo(sun),wk=W().weeks[sun]||{items:[]},items=wk.items,cands=wkCands(sun),must=cands.filter(function(c){return c.must});
   var label=WK===0?'This week':WK===1?'Next week':WK===-1?'Last week':(WK>0?'In '+WK+' weeks':Math.abs(WK)+' weeks ago');
   var h='<div class="fb-sec pe-wk"><h3>🗓 Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' coach'+(items.length===1?'':'es')+' planned</span>'
@@ -7740,9 +7756,9 @@ function gridHtml(pgc,sun,items,locs){
     h+='<tr><td class="loc"'+(ro?'':' title="Click to rename this location" style="cursor:pointer" onclick="PE.gloc('+pgc+',this.getAttribute(\'data-loc\'))" data-loc="'+esc(l)+'"')+'>'+esc(l)+'</td>';
     DN.forEach(function(d,n){var dd=addDays(sun,n),on=items.filter(function(x){return x.loc===l&&x.plan===dd});
       var nt=NT(pgc,sun)[l+'|'+dd]||'',off=offDay(l,dd);
-      h+='<td'+(off?' class="wg-off"':'')+(ro?'':' data-day="'+dd+'" data-loc="'+esc(l)+'" ondragover="event.preventDefault();this.classList.add(\'ov\')" ondragleave="this.classList.remove(\'ov\')" ondrop="PE.gdrop(event,this)" onclick="PE.gput(this)"')+'>'
+      h+='<td'+(off?' class="wg-off"':'')+(ro?'':' data-day="'+dd+'" data-loc="'+esc(l)+'"'+(off?' title="Off day — no PE at '+esc(l)+' on '+offName(dd)+'" onclick="PE.gput(this)"':' ondragover="event.preventDefault();this.classList.add(\'ov\')" ondragleave="this.classList.remove(\'ov\')" ondrop="PE.gdrop(event,this)" onclick="PE.gput(this)"'))+'>'
         +(off?'<span class="wg-offl">OFF DAY</span>':'')+(on.length?on.map(chip).join(''):nt||off?'':'<i>–</i>')
-        +(ro?(nt?'<div class="wg-note">'+ntHtml(nt)+'</div>':''):'<div class="wg-note" contenteditable="true" spellcheck="false" data-ph="✎ type a note" title="Type your own text for this day / location · Enter = done · Shift+Enter = new line" onclick="event.stopPropagation()" onfocusout="PE.gnote('+pgc+',this)" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();this.blur()}">'+ntHtml(nt)+'</div>')+(ro?'':'<button class="wg-add" title="Add to '+esc(l)+' · '+fmt(dd)+'" onclick="event.stopPropagation();PE.gadd(this,'+pgc+')">＋</button>')+'</td>'});
+        +(ro?(nt?'<div class="wg-note">'+ntHtml(nt)+'</div>':''):'<div class="wg-note" contenteditable="true" spellcheck="false" data-ph="✎ type a note" title="Type your own text for this day / location · Enter = done · Shift+Enter = new line" onclick="event.stopPropagation()" onfocusout="PE.gnote('+pgc+',this)" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();this.blur()}">'+ntHtml(nt)+'</div>')+(ro||off?'':'<button class="wg-add" title="Add to '+esc(l)+' · '+fmt(dd)+'" onclick="event.stopPropagation();PE.gadd(this,'+pgc+')">＋</button>')+'</td>'});
     h+='</tr>'});
   return h+'</tbody></table></div>';}
 /* ---------- print: the week as the forecast sheet ---------- */
@@ -7778,7 +7794,7 @@ function sheetDoc(o){
   return h+'</table><div class="wd-p" style="width:'+pw+'%"><div class="lg">'+img+'</div><div class="tx">PREPARED BY :<br><span'+ce(-1,'prep')+'>'+esc(o.prep||'').replace(/\n/g,'<br>')+'</span></div></div></div>';
 }
 function wkLocs(items){var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});return locs}
-function forecastDoc(sun,ed){pruneDone();SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
+function forecastDoc(sun,ed){pruneDone();syncLoc(W());fixOff(W());SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(W().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[];
   for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
@@ -7866,7 +7882,7 @@ function scheduleSheet(){
   return {name:String(D.year).match(/\d{4}/)?String(D.year).match(/\d{4}/)[0]:'PE',cells:c,merges:M,cols:{A:3,B:3,C:6,D:16,E:13,F:15,G:13,H:19,I:14,J:11,K:16,L:17,M:42},rows:{2:44},cf:cf,land:1};
 }
 /* one week in the "COACH PE WEEKLY PLANNING" layout */
-function weekSheet(sun){pruneDone();
+function weekSheet(sun){pruneDone();syncLoc(W());fixOff(W());
   var items=(W().weeks[sun]||{items:[]}).items,c={},M=['C2:K2','C3:K3','D4:J4'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
   c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM COACH)',s:{b:1,sz:14,wrap:1}};
   c.C3={v:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.D4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
@@ -7994,7 +8010,7 @@ function pgcPlanHtml(){
       return '<div class="pe-card" onclick="PE.pedit('+x.i+')"><div class="h">'+pgcChip(r.id)+pill(x.lv,x.lv==='PE 30'?'#ff7e79':'#d5fc79')+pill(x.ps,PSC[x.ps])
         +'<span class="dd" style="background:'+(x.lv==='PE 30'?dayColor(x.d):d90Color(x.d))+'">'+(x.d<0?'('+(-x.d)+')':x.d)+' d</span></div>'
         +'<div class="b">Next '+x.lv+' <b>'+fmt(x.n)+'</b>'+(x.lv==='PE 30'&&(k.l1!=null||k.l2!=null)?' · hours left E1 <b>'+(k.l1==null?'–':k.l1)+'</b> · E2 <b>'+(k.l2==null?'–':k.l2)+'</b>':'')
-        +'<br>📍 '+esc((x.lv==='PE 30'?r.l30:r.l90)||'—')+'<br><span class="now">🚆 Now: '+(x.w.w?esc(x.w.w):'<i style="color:#6c7293">not on the Fleet board</i>')+'</span></div>'
+        +'<br>📍 '+esc((x.lv==='PE 30'?r.l30:r.l90)||'—')+'<br><span class="now">🚆 Now: '+(x.w.w?esc(x.w.w):'<i style="color:#6c7293">not on the Fleet board</i>')+'</span>'+(depotOfNow(r)?'<br><b style="color:#73fb79">🛠 PE location (est.): '+esc(depotOfNow(r))+'</b>':'')+'</div>'
         +'<div class="f"><span style="font-size:.66rem;color:#6c7293;font-weight:700">Last '+x.lv+' '+fmt(x.lv==='PE 30'?r.p30:r.p90)+'</span><button onclick="event.stopPropagation();PE.pdone('+x.i+',\''+x.lv+'\')">✔ '+x.lv+' done today</button></div></div>'}).join('')+'</div>';}
   return h+'</div>';
 }
@@ -8012,7 +8028,7 @@ function pEst(r,lvl){var k=pgcCalc(r);return lvl==='PE 30'?{e1:k.l1==null?null:-
 function pItem(r,lvl,sun){var k=pgcCalc(r),nx=lvl==='PE 30'?k.n30:k.n90,sat=addDays(sun,6),lo=sun,t=isoOf(today());if(t>sun&&t<=sat)lo=t;
   return {id:r.id,lvl:lvl,last:(lvl==='PE 30'?r.p30:r.p90)||'',plan:clampIso(nx==='-'?lo:nx,lo,sat),loc:depotOfNow(r)||(lvl==='PE 30'?r.l30:r.l90)||'',cur:depotOfNow(r)||(lvl==='PE 30'?r.l30:r.l90)||'',st:'IN OPERATIONS',rem:'',est:pEst(r,lvl)}}
 function estTxt(e){if(!e)return '–';var a=[];if(e.e1!=null)a.push('E1 '+e.e1+' h');if(e.d!=null)a.push(e.d+' d');if(e.e2!=null)a.push('E2 '+e.e2+' h');return a.join(' · ')||'–'}
-function pgcForecastHtml(){
+function pgcForecastHtml(){syncLoc(WP(),1);fixOff(WP());
   var sun=curSunP(),sat=addDays(sun,6),wn=weekNo(sun),items=(WP().weeks[sun]||{items:[]}).items,cands=pgcCands(sun),must=cands.filter(function(c){return c.must});
   var label=PWK===0?'This week':PWK===1?'Next week':PWK===-1?'Last week':(PWK>0?'In '+PWK+' weeks':Math.abs(PWK)+' weeks ago');
   var h='<div class="fb-sec pe-wk"><h3>🗓 PGC Weekly PE Forecast — Week '+wn+' <span class="ct">'+label+' · '+fmt(sun)+' – '+fmt(sat)+' · '+items.length+' PE planned</span>'
@@ -8154,7 +8170,7 @@ function pgcScheduleSheet(){
     {ref:'R7:S'+last,rules:[{f:'R7="OKAY"',fill:'00DD66'},{f:'R7="FAULTY"',fill:'FF4535'}]}]:[];
   return {name:(String(D.year).match(/\d{4}/)||['PGC'])[0],cells:c,merges:M,cols:{A:6,B:14,C:13,D:13,E:13,F:13,G:12,H:14,I:12,J:10,K:10,L:10,M:10,N:12,O:14,P:12,Q:16,R:12,S:12,T:12,U:12,V:14},rows:{2:44,6:40},cf:cf,land:1};
 }
-function pgcWeekSheet(sun){
+function pgcWeekSheet(sun){syncLoc(WP(),1);fixOff(WP());
   var items=(WP().weeks[sun]||{items:[]}).items,c={},M=['C2:M2','C3:M3','E4:K4','B6:B7','C6:C7','D6:D7','E6:E7','F6:F7','G6:G7','H6:H7','I6:I7','J6:L6','M6:M7'],Y={b:1,bd:1,fill:'FFFF00',sz:9,wrap:1},T={b:1,bd:1,sz:10};
   c.C2={v:'KERETAPI TANAH MELAYU BERHAD\nROLLING STOCK MAINTENANCE AND ENGINEERING (RSM PGC)',s:{b:1,sz:14,wrap:1}};c.C3={v:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',s:{b:1,u:1,sz:13}};c.E4={v:'WEEK '+weekNo(sun),s:{b:1,u:1,sz:14}};
   [['B6','NO.'],['C6','PGC NO.'],['D6','PE LEVEL'],['E6','LAST PE DATE'],['F6','PLANNING DATE'],['G6','CURRENT\nLOCATION'],['H6','PE PLANNING\nLOCATION'],['I6','STATUS'],['J6','ESTIMATE DUE DAYS / HOURS'],['M6','REMARKS'],['J7','ENGINE 1'],['K7','DAYS'],['L7','ENGINE 2']].forEach(function(p){c[p[0]]={v:p[1],s:Y}});
@@ -8174,7 +8190,7 @@ function pgcWeekSheet(sun){
   var rh={2:44};rh[rr]=48;
   return {name:'WEEK '+weekNo(sun),cells:c,merges:M,cols:{A:3,B:15,C:13,D:11,E:13,F:13,G:15,H:15,I:16,J:11,K:9,L:11,M:24},rows:rh,land:0};
 }
-function pgcForecastDoc(sun,ed){SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
+function pgcForecastDoc(sun,ed){syncLoc(WP(),1);fixOff(WP());SHEET_ED=!!ed&&!(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER);
   var items=(WP().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[],nv=function(v){return v==null?'':v};
   for(var i=0;i<n;i++){var x=items[i],e=x&&x.est||{};
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(x?' class="'+(x.lvl==='PE 30'?'q30':'q90')+'"'+ce(i,'lvl'):'')+'>'+(x?x.lvl:'')+'</td><td'+(x?ce(i,'last'):'')+'>'+(x&&x.last?fmt(x.last):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
@@ -8318,7 +8334,7 @@ window.PE={
   pwadd:function(v){var p=String(v).split('|'),f=pRow(p[0]);if(!f)return;var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]};w.items.push(pItem(f.r,p[1],sun));changed();},
   pwauto:function(){var sun=curSunP(),w=WP().weeks[sun]=WP().weeks[sun]||{items:[]},n=0;pgcCands(sun).forEach(function(c){if(c.must){w.items.push(pItem(c.r,c.lvl,sun));n++}});
     changed();toast(n+' PE added to week '+weekNo(sun)+' — adjust dates / locations, then 💾 Save',5000);},
-  pwset:function(i,k,val){var w=WP().weeks[curSunP()];if(!w||!w.items[i])return;w.items[i][k]=k==='rem'?String(val).toUpperCase():val;
+  pwset:function(i,k,val){var w=WP().weeks[curSunP()];if(!w||!w.items[i])return;if(k==='loc')w.items[i].locSet=1;w.items[i][k]=k==='rem'?String(val).toUpperCase():val;
     if(k==='plan')w.items.sort(function(a,b){return a.plan<b.plan?-1:a.plan>b.plan?1:0});changed();},
   pwdel:function(i){var sun=curSunP(),w=WP().weeks[sun];if(!w)return;w.items.splice(i,1);if(!w.items.length)delete WP().weeks[sun];changed();},
   pwprep:function(val){WP().prep=String(val).toUpperCase();changed();},
@@ -8331,7 +8347,7 @@ window.PE={
   wk:function(n){WK=n===0?0:WK+n;GSEL=null;render();},
   _gw:function(pgc){var sun=pgc?curSunP():curSun(),st=pgc?WP():W();return {sun:sun,st:st,w:st.weeks[sun]=st.weeks[sun]||{items:[]}}},
   _gsort:function(w){w.items.sort(function(a,b){return (a.plan||'~')<(b.plan||'~')?-1:(a.plan||'~')>(b.plan||'~')?1:0})},
-  gmove:function(pgc,i,day,loc){var g=PE._gw(pgc),x=g.w.items[i];GSEL=null;if(!x){render();return;}if(x.plan===day&&x.loc===loc){render();return;}
+  gmove:function(pgc,i,day,loc){if(offDay(loc,day)){toast('⛔ '+loc+' is off on '+offName(day)+' — no PE that day');GSEL=null;render();return;}var g=PE._gw(pgc),x=g.w.items[i];GSEL=null;if(!x){render();return;}if(x.plan===day&&x.loc===loc){render();return;}if(x.loc!==loc)x.locSet=1;
     x.plan=day;x.loc=loc;PE._gsort(g.w);changed();toast((pgc?x.id+' ('+x.lvl+')':x.id)+' → '+loc+' · '+fmt(day)+' — click 💾 Save to keep it',3500);},
   gdrag:function(e,pgc,i){if(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER){e.preventDefault();return;}e.dataTransfer.setData('text/plain',pgc+'|'+i);e.dataTransfer.effectAllowed='move';},
   gdrop:function(e,td){e.preventDefault();td.classList.remove('ov');var p=String(e.dataTransfer.getData('text/plain')).split('|');if(p.length!==2)return;
@@ -8411,7 +8427,7 @@ window.PE={
   wadd:function(id){var f=findRow(id);if(!f)return;var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]};w.items.push(wkItem(f.r,sun));changed();},
   wauto:function(){var sun=curSun(),w=W().weeks[sun]=W().weeks[sun]||{items:[]},n=0;wkCands(sun).forEach(function(c){if(c.must){w.items.push(wkItem(c.r,sun));n++}});
     changed();toast(n+' coach'+(n===1?'':'es')+' added to week '+weekNo(sun)+' — adjust the dates / locations, then 💾 Save',5000);},
-  wset:function(i,k,v){var w=W().weeks[curSun()];if(!w||!w.items[i])return;w.items[i][k]=k==='rem'?String(v).toUpperCase():v;
+  wset:function(i,k,v){var w=W().weeks[curSun()];if(!w||!w.items[i])return;if(k==='loc')w.items[i].locSet=1;w.items[i][k]=k==='rem'?String(v).toUpperCase():v;
     if(k==='plan')w.items.sort(function(a,b){return a.plan<b.plan?-1:a.plan>b.plan?1:0});changed();},
   wdel:function(i){var sun=curSun(),w=W().weeks[sun];if(!w)return;w.items.splice(i,1);if(!w.items.length)delete W().weeks[sun];changed();},
   wprep:function(v){W().prep=String(v).toUpperCase();changed();},
