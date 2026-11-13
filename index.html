@@ -7484,7 +7484,7 @@ html body .wd td,html body .wd th{background:#fff!important;color:#000!important
 html body .wd th{white-space:normal!important}html body .wd.n11 td{font-size:6.6px!important}html body .wd.n11 .wd-g td{font-size:6.4px!important}
 html body .wd th{background:#ff0!important}html body .wd .wd-t th.rm{background:#7a81ff!important}html body .wd .wd-g th.b{background:#0096ff!important}html body .wd .wd-g .g{background:#73fb79!important}
 html body .wd td.p90{background:#3f8efc!important}html body .wd td.p60{background:#96f28e!important}html body .wd td.q30{background:#00f5a0!important}html body .wd td.q90{background:#0096ff!important}
-html body .wd td.red{color:#e00!important}html body .wd tr:hover td{background:inherit}
+html body .wd td.red{color:#e00!important}html body .wd td.wrap{white-space:normal!important;overflow-wrap:anywhere;line-height:1.1!important}html body .wd tr:hover td{background:inherit}
 #pPE .wd-hint{font-size:.76rem;color:#f06aa8;font-weight:700;margin-bottom:8px}
 html body #pPE .wd [contenteditable]{cursor:text;outline:none}
 html body #pPE .wd [contenteditable]:hover{box-shadow:inset 0 0 0 2px #AF1763!important}
@@ -7810,7 +7810,7 @@ function forecastDoc(sun,ed){pruneDone();syncLoc(W());overFirst(W());fixOff(W())
   for(var i=0;i<n;i++){var x=items[i],f=x&&findRow(x.id),r=f&&f.r,k=r&&calc(r),over=k&&k.next!=='-'&&x.plan>k.next,lv=x?wLvl(x,r):'',la=x?wLast(x,r):'',st=x?wSt(x,r):'';if(lv==='-')lv='';
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(lv?' class="'+(lv==='PE 60'?'p60':'p90')+'"':'')+(x?ce(i,'lvl'):'')+'>'+lv+'</td><td'+(x?ce(i,'last'):'')+'>'+(la?fmt(la):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
       +'<td'+(x?ce(i,'cur'):'')+'>'+(x?esc(curOf(x)):'')+'</td><td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+esc(st)+'</td><td'+(over?' class="red"':'')+(x?ce(i,'est'):'')+'>'+(x?(x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):''):'')+'</td>'
-      +'<td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
+      +'<td class="red wrap"'+(x?ce(i,'rem'):'')+'>'+(x?(over?'OVERDUE':'')+(over&&x.rem?' · ':'')+esc(x.rem):'')+'</td>');}
   return sheetDoc({unit:'RSM COACH',title:'COACH PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),notes:NT(0,sun),prep:W().prep,label:function(x){return x.id},rows:rows,
     head:{cols:10,html:'<tr><th>NO.</th><th>COACHES NO.</th><th>PE LEVEL</th><th>LAST PE DATE</th><th>PE PLANNING DATE</th><th>CURRENT<br>LOCATION</th><th>PE PLANNING<br>LOCATION</th><th>STATUS</th><th>ESTIMATE DUE<br>DAYS</th><th>REMARKS</th></tr>'}});
 }
@@ -7905,7 +7905,7 @@ function weekSheet(sun){pruneDone();syncLoc(W());overFirst(W());fixOff(W());
     var ps=x&&serial(x.plan);c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};
     c['G'+r]={v:x?curOf(x):'',s:T};c['H'+r]={v:x?x.loc:'',s:T};c['I'+r]={v:st,s:T};
     c['J'+r]={v:x&&x.est!=null?x.est:k&&k.days!=='-'?Math.abs(k.days):'',s:over?{b:1,bd:1,sz:10,col:'FF0000'}:T};
-    c['K'+r]={v:x?((over?'OVERDUE':'')+(over&&x.rem?' · ':'')+(x.rem||'')):'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
+    c['K'+r]={v:x?((over?'OVERDUE':'')+(over&&x.rem?' · ':'')+(x.rem||'')):'',s:{b:1,bd:1,sz:10,col:'FF0000',wrap:1}};}
   var r0=7+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
   WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
@@ -8190,7 +8190,7 @@ function pgcWeekSheet(sun){syncLoc(WP(),1);overFirst(WP(),1);fixOff(WP());
   for(var i=0;i<n;i++){var r=8+i,x=items[i],e=x&&x.est||{};c['B'+r]={v:i+1,s:T};c['C'+r]={v:x?x.id:'',s:T};
     c['D'+r]={v:x?x.lvl:'',s:x?{b:1,bd:1,sz:10,fill:x.lvl==='PE 30'?'FF7E79':'D5FC79'}:T};var ls=x&&serial(x.last),ps=x&&serial(x.plan);
     c['E'+r]=ls?{v:ls,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['F'+r]=ps?{v:ps,s:{b:1,bd:1,sz:10,date:1}}:{v:'',s:T};c['G'+r]={v:x?curOf(x):'',s:T};c['H'+r]={v:x?x.loc:'',s:T};c['I'+r]={v:x?(x.st||'IN OPERATIONS'):'',s:T};
-    c['J'+r]={v:e.e1!=null?e.e1:'',s:T};c['K'+r]={v:e.d!=null?e.d:'',s:T};c['L'+r]={v:e.e2!=null?e.e2:'',s:T};c['M'+r]={v:x?x.rem:'',s:{b:1,bd:1,sz:10,col:'FF0000'}};}
+    c['J'+r]={v:e.e1!=null?e.e1:'',s:T};c['K'+r]={v:e.d!=null?e.d:'',s:T};c['L'+r]={v:e.e2!=null?e.e2:'',s:T};c['M'+r]={v:x?x.rem:'',s:{b:1,bd:1,sz:10,col:'FF0000',wrap:1}};}
   var r0=8+n+1;M.push('B'+r0+':B'+(r0+1));c['B'+r0]={v:'LOCATION',s:{b:1,bd:1,fill:'73FB79',sz:10}};c['B'+(r0+1)]={v:'',s:{bd:1,fill:'73FB79'}};
   WDN.forEach(function(d,j){var L=colL(3+j);c[L+r0]={v:d,s:{b:1,bd:1,fill:'FFFF00',sz:9}};c[L+(r0+1)]={v:serial(addDays(sun,j)),s:{b:1,bd:1,fill:'0096FF',sz:9,date:1}}});
   var locs=WLOCS.slice();items.forEach(function(x){if(x.loc&&locs.indexOf(x.loc)<0)locs.push(x.loc)});var rr=r0+2;
@@ -8205,7 +8205,7 @@ function pgcForecastDoc(sun,ed){syncLoc(WP(),1);overFirst(WP(),1);fixOff(WP());S
   var items=(WP().weeks[sun]||{items:[]}).items,n=Math.max(20,items.length),rows=[],nv=function(v){return v==null?'':v};
   for(var i=0;i<n;i++){var x=items[i],e=x&&x.est||{};
     rows.push('<td>'+(i+1)+'</td><td'+ce(i,'id')+'>'+(x?esc(x.id):'')+'</td><td'+(x?' class="'+(x.lvl==='PE 30'?'q30':'q90')+'"'+ce(i,'lvl'):'')+'>'+(x?x.lvl:'')+'</td><td'+(x?ce(i,'last'):'')+'>'+(x&&x.last?fmt(x.last):'')+'</td><td'+(x?ce(i,'plan'):'')+'>'+(x&&x.plan?fmt(x.plan):'')+'</td>'
-      +'<td'+(x?ce(i,'cur'):'')+'>'+(x?esc(curOf(x)):'')+'</td><td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td'+(x?ce(i,'e1'):'')+'>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+(x?ce(i,'d'):'')+'>'+nv(e.d)+'</td><td'+(x?ce(i,'e2'):'')+'>'+nv(e.e2)+'</td><td class="red"'+(x?ce(i,'rem'):'')+'>'+(x?esc(x.rem):'')+'</td>');}
+      +'<td'+(x?ce(i,'cur'):'')+'>'+(x?esc(curOf(x)):'')+'</td><td'+(x?ce(i,'loc'):'')+'>'+(x?esc(x.loc):'')+'</td><td'+(x?ce(i,'st'):'')+'>'+(x?esc(x.st||'IN OPERATIONS'):'')+'</td><td'+(x?ce(i,'e1'):'')+'>'+nv(e.e1)+'</td><td'+(e.d!=null&&e.d<0?' class="red"':'')+(x?ce(i,'d'):'')+'>'+nv(e.d)+'</td><td'+(x?ce(i,'e2'):'')+'>'+nv(e.e2)+'</td><td class="red wrap"'+(x?ce(i,'rem'):'')+'>'+(x?esc(x.rem):'')+'</td>');}
   return sheetDoc({unit:'RSM PGC',title:'PGC PERIODICAL EXAMINATION WEEKLY FORECAST',week:weekNo(sun),sun:sun,items:items,locs:wkLocs(items),notes:NT(1,sun),prep:WP().prep,label:function(x){return x.id+' ('+x.lvl+')'},rows:rows,
     head:{cols:12,html:'<tr><th rowspan="2">NO.</th><th rowspan="2">PGC NO.</th><th rowspan="2">PE LEVEL</th><th rowspan="2">LAST PE DATE</th><th rowspan="2">PLANNING DATE</th><th rowspan="2">CURRENT<br>LOCATION</th><th rowspan="2">PE PLANNING<br>LOCATION</th><th rowspan="2">STATUS</th><th colspan="3" class="es">ESTIMATE DUE DAYS / HOURS</th><th rowspan="2" class="rm">REMARKS</th></tr><tr><th class="sb">ENGINE 1</th><th class="sb">DAYS</th><th class="sb">ENGINE 2</th></tr>'}});
 }
