@@ -3420,16 +3420,19 @@ function chip(u,loc){var c=classOf(u.id),k=colr(c),sel=loc&&SEL.indexOf(loc.join
   return '<span class="fb-chip'+(u.note?' n':'')+(sel?' sel':'')+'" style="background:'+k[1]+';color:'+k[2]+'" title="'+esc(u.id+' · '+c+(u.note?' — '+u.note:'')+' · drag to move')+'"'
     +(loc?' draggable="true" data-loc="'+loc.join('|')+'" ondragstart="FLEET.dragStart(event)" ondragend="FLEET.dragEnd(event)" onclick="FLEET.tapChip(event,this)"':'')+'>'+esc(u.id)+'</span>';}
 function coaches(list){return list.filter(function(u){return classOf(u.id)!=='PGC'})}
+/* EMU sets (e.g. "EMU 25 - PGC") are shown on the board but are not coaches: left out of every count / summary */
+function isEmu(u){return /^\s*EMU\b/i.test(String(u&&u.id||''))}
+function counted(list){return coaches(list).filter(function(u){return !isEmu(u)})}
 function pgcs(list){return list.filter(function(u){return classOf(u.id)==='PGC'})}
 function allDet(b){var a=[];b.detained.forEach(function(g){g.cols.forEach(function(c){a=a.concat(c.units)})});return a}
 
 /* ---------------- counts ---------------- */
 function counts(b){
   var opC=0,spC=0,opP=0,spP=0;
-  b.service.forEach(function(c){opC+=coaches(c.units).length;opP+=(c.pgc||[]).length+pgcs(c.units).length});
-  b.spare.forEach(function(c){spC+=coaches(c.units).length;spP+=(c.pgc||[]).length+pgcs(c.units).length});
+  b.service.forEach(function(c){opC+=counted(c.units).length;opP+=(c.pgc||[]).length+pgcs(c.units).length});
+  b.spare.forEach(function(c){spC+=counted(c.units).length;spP+=(c.pgc||[]).length+pgcs(c.units).length});
   var det=allDet(b);
-  return {opC:opC,spC:spC,opP:opP,spP:spP,detC:coaches(det).length,detP:pgcs(det).length};
+  return {opC:opC,spC:spC,opP:opP,spP:spP,detC:counted(det).length,detP:pgcs(det).length};
 }
 function summary(b){
   var rows=[],grp=function(n){var g=b.detained.find(function(x){return x.name.toUpperCase().indexOf(n)>=0});
@@ -3437,7 +3440,7 @@ function summary(b){
   var flat=function(sec){var a=[],p=[];b[sec].forEach(function(c){a=a.concat(c.units);p=p.concat(c.pgc||[])});return {units:a,pgc:p}};
   [['A','REFURBISHMENT / OVERHAUL',grp('REFURB')],['B','MAJOR SERVICES',grp('MAJOR')],['C','MINOR SERVICES',grp('MINOR')],
    ['D','OPERATION; EXPRESS / SHUTTLE / SPECIAL',flat('service')],['E','SPARE STOCK; EXPRESS / SHUTTLE / SPECIAL',flat('spare')]].forEach(function(r){
-    var per=CLS.map(function(k){return r[2].units.filter(function(u){return classOf(u.id)===k[0]}).length});
+    var per=CLS.map(function(k){return r[2].units.filter(function(u){return !isEmu(u)&&classOf(u.id)===k[0]}).length});
     var tot=per.reduce(function(a,b){return a+b},0);
     var pg=pgcs(r[2].units).length+r[2].pgc.length;
     rows.push({code:r[0],name:r[1],per:per,tot:tot,pgc:pg});
@@ -3627,14 +3630,14 @@ function tallyPgc(list,B){var n=0,num=function(v){return String(v||'').replace(/
 function dailyFrom(b,base){
   var e=JSON.parse(JSON.stringify(base||{}));
   var order=['ASC','ADNS','AFC','ABC','ADNF','SPECIAL'];
-  var countBy=function(units){var m={};coaches(units).forEach(function(u){var c=classOf(u.id);if(c==='OTHER')c='SPECIAL';m[c]=(m[c]||0)+1});return m};
+  var countBy=function(units){var m={};counted(units).forEach(function(u){var c=classOf(u.id);if(c==='OTHER')c='SPECIAL';m[c]=(m[c]||0)+1});return m};
   var toItems=function(m,keep){var ts=order.filter(function(t){return m[t]||(keep||[]).indexOf(t)>=0});return ts.map(function(t){return {t:t,q:m[t]||0}})};
   var all=[];b.service.forEach(function(c){all=all.concat(c.units)});
   e.operation=toItems(countBy(all),['ASC','ADNS','AFC','ABC','SPECIAL']);
   /* broadcast order: KEMPAS BARU, TUMPAT, KL SENTRAL, then any other depot that has coaches */
   var dep={},dorder=['KEMPAS BARU','TUMPAT','KL SENTRAL'];
   b.spare.forEach(function(c){var d=depotOf(c.name);dep[d]=(dep[d]||[]).concat(c.units);if(dorder.indexOf(d)<0)dorder.push(d)});
-  e.spare=dorder.filter(function(d){return coaches(dep[d]||[]).length}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
+  e.spare=dorder.filter(function(d){return counted(dep[d]||[]).length}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
   /* PGC: only operating + spare rows that do not tally are brought in line; Minor/Major services stay as keyed */
   e.pgc=e.pgc||[];tallyPgc(e.pgc,pgcMap(b));
   e.fleetSync=Date.now();
@@ -3845,8 +3848,8 @@ function exportBoard(b,iso){
   b.service.forEach(function(c,ci){col(c,c0+ci)});b.spare.forEach(function(c,ci){col(c,c1+ci)});
   var n=counts(b),rOp=RE,rSp=RE+1,rTc=RE+2,rOpP=RE+3,rSpP=RE+4,rTp=RE+5,last=Math.max(2,c2-1);
   var pg=function(c){return (c.pgc||[]).concat(pgcs(c.units))};
-  put(rOp,0,'OPERATION COACH',3);b.service.forEach(function(c,ci){put(rOp,c0+ci,coaches(c.units).length,3)});
-  put(rSp,0,'SPARE COACH',3);b.spare.forEach(function(c,ci){put(rSp,c1+ci,coaches(c.units).length,3)});
+  put(rOp,0,'OPERATION COACH',3);b.service.forEach(function(c,ci){put(rOp,c0+ci,counted(c.units).length,3)});
+  put(rSp,0,'SPARE COACH',3);b.spare.forEach(function(c,ci){put(rSp,c1+ci,counted(c.units).length,3)});
   put(rTc,0,'TOTAL AVAILABLE COACH',3);merge(rTc,0,rTc,last-1);put(rTc,last,n.opC+n.spC,3);
   var prow=function(r,lab,list,start){put(r,0,lab,3);list.forEach(function(c,ci){var p=pg(c);put(r,start+ci,p.length===1?num(p[0].id):p.map(function(u){return u.id}).join(', '),p.length?SX.PGC:3,p.map(function(u){return u.note}).filter(Boolean).join(' / '))});};
   prow(rOpP,'OPERATION PGC',b.service,c0);prow(rSpP,'SPARE PGC',b.spare,c1);
@@ -3980,10 +3983,10 @@ function exportMonth(y,m){
       g._c0=dc;g._c1=dc+w-1;put(1,dc,g.name,S_G);mg(1,dc,2,dc+w-1);for(var j=0;j<w;j++)col(g.cols[j],dc+j,true);dc+=w;});
     if(dc>D0){put(0,D0,'DETAINED COACHES',S_T);mg(0,D0,0,dc-1);}
     /* coach totals */
-    var cnt=function(c){return c?coaches(c.units).length:0},n=counts(b);
-    put(rOp,0,'OPERATION\nCOACH',S_L);for(i=0;i<sC;i++)put(rOp,S0+i,cnt(b.service[i]),S_V,'COUNTA('+rg(S0+i,S0+i,U0,UE)+')');put(rOp,P0,'',S_V);mg(rOp,P0,rOp,T-1);
+    var cnt=function(c){return c?counted(c.units).length:0},n=counts(b);
+    put(rOp,0,'OPERATION\nCOACH',S_L);for(i=0;i<sC;i++)put(rOp,S0+i,cnt(b.service[i]),S_V,'COUNTA('+rg(S0+i,S0+i,U0,UE)+')-COUNTIF('+rg(S0+i,S0+i,U0,UE)+',"EMU*")');put(rOp,P0,'',S_V);mg(rOp,P0,rOp,T-1);
     put(rOp,T,n.opC,S_B,'SUM('+rg(S0,T-1,rOp,rOp)+')');
-    put(rSp,0,'SPARE\nCOACH',S_L);put(rSp,S0,'',S_V);mg(rSp,S0,rSp,P0-1);for(i=0;i<pC;i++)put(rSp,P0+i,cnt(b.spare[i]),S_V,'COUNTA('+rg(P0+i,P0+i,U0,UE)+')');
+    put(rSp,0,'SPARE\nCOACH',S_L);put(rSp,S0,'',S_V);mg(rSp,S0,rSp,P0-1);for(i=0;i<pC;i++)put(rSp,P0+i,cnt(b.spare[i]),S_V,'COUNTA('+rg(P0+i,P0+i,U0,UE)+')-COUNTIF('+rg(P0+i,P0+i,U0,UE)+',"EMU*")');
     put(rSp,T,n.spC,S_B,'SUM('+rg(S0,T-1,rSp,rSp)+')');
     put(rTc,0,'TOTAL AVAILABLE COACH',S_BR);mg(rTc,0,rTc,T-1);put(rTc,T,n.opC+n.spC,S_B,'SUM('+rg(T,T,rOp,rSp)+')');
     /* PGC */
@@ -4006,7 +4009,7 @@ function exportMonth(y,m){
     var sm=summary(b),tot=[0,0,0,0,0,0,0,0];
     sm.forEach(function(r,k){var yy=sh+2+2*k,a=area[k],cf=function(c,f){return a?f:null};
       put(yy,0,r.code,S_SL);mg(yy,0,yy+1,0);put(yy,1,r.name.replace('; ',';\n'),S_SL);mg(yy,1,yy+1,3);
-      KS.forEach(function(kk,j){var f=null;if(a)f=kk==='SPECIAL'?'COUNTIFS('+a.u+',"*")':'COUNTIFS('+a.u+',">'+LIM[kk][0]+'",'+a.u+',"<='+LIM[kk][1]+'")';
+      KS.forEach(function(kk,j){var f=null;if(a)f=kk==='SPECIAL'?'COUNTIFS('+a.u+',"*")-COUNTIFS('+a.u+',"EMU*")':'COUNTIFS('+a.u+',">'+LIM[kk][0]+'",'+a.u+',"<='+LIM[kk][1]+'")';
         put(yy,4+j,r.per[j],S_V,f);mg(yy,4+j,yy+1,4+j);tot[j]+=r.per[j];});
       put(yy,10,r.tot,S_V,'SUM('+rg(4,9,yy,yy+1)+')');mg(yy,10,yy+1,10);tot[6]+=r.tot;
       put(yy,11,r.pgc,S_V,a?'COUNTIFS('+a.p+',">=200",'+a.p+',"<300")':null);mg(yy,11,yy+1,11);tot[7]+=r.pgc;});
