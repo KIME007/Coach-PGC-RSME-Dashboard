@@ -3269,6 +3269,7 @@ window.PROJ.slides=function(p,H){
 .fb-col .h b{display:block;font-size:.82rem;color:#fff;line-height:1.15}
 .fb-col .h small{display:block;font-size:.6rem;color:var(--mut);font-weight:600;margin-top:2px;line-height:1.2}
 .fb-col .u{padding:7px;display:flex;flex-direction:column;gap:4px;flex:1}
+.fb-eng{position:absolute;left:4px;top:50%;transform:translateY(-50%);font-size:.66rem;line-height:1;background:rgba(0,0,0,.45);color:#fff;border-radius:5px;padding:3px 5px;cursor:pointer}.fb-eng:hover{background:#AF1763}
 .fb-chip{position:relative;display:block;text-align:center;font-weight:800;font-size:.8rem;padding:4px 2px;border-radius:6px;cursor:default}
 .fb-chip.n{cursor:help}.fb-chip.n::after{content:"";position:absolute;right:0;top:0;border-style:solid;border-width:0 7px 7px 0;border-color:transparent #ff3b3b transparent transparent;border-top-right-radius:6px}
 .fb-col .f{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-top:1px solid #2c2e33;font-size:.7rem;color:#a3a8c3;font-weight:700}
@@ -3418,7 +3419,10 @@ function changed(){var y=window.scrollY;if(typeof touched==='function')touched()
   if(autoSync()&&boards()[curDate()]){clearTimeout(_syncT);var d=curDate();_syncT=setTimeout(function(){syncDaily(d,true)},700);}}
 function chip(u,loc){var c=classOf(u.id),k=colr(c),sel=loc&&SEL.indexOf(loc.join('|'))>=0;
   return '<span class="fb-chip'+(u.note?' n':'')+(sel?' sel':'')+'" style="background:'+k[1]+';color:'+k[2]+'" title="'+esc(u.id+' · '+c+(u.note?' — '+u.note:'')+' · drag to move')+'"'
-    +(loc?' draggable="true" data-loc="'+loc.join('|')+'" ondragstart="FLEET.dragStart(event)" ondragend="FLEET.dragEnd(event)" onclick="FLEET.tapChip(event,this)"':'')+'>'+esc(u.id)+'</span>';}
+    +(loc?' draggable="true" data-loc="'+loc.join('|')+'" ondragstart="FLEET.dragStart(event)" ondragend="FLEET.dragEnd(event)" onclick="FLEET.tapChip(event,this)"':'')+'>'+esc(u.id)
+    +(c==='PGC'&&loc?'<b class="fb-eng" title="Engines: click to switch 1 ⇄ 2" onclick="event.stopPropagation();FLEET.eng(\''+loc.join('|')+'\')">⚙'+(engOf(u)||'?')+'</b>':'')+'</span>';}
+/* PGC engine count lives in the note as "ENGINE: n" */
+function engOf(u){var m=String(u&&u.note||'').match(/ENGINE\s*:\s*(\d+)/i);return m?+m[1]:0}
 function coaches(list){return list.filter(function(u){return classOf(u.id)!=='PGC'})}
 /* EMU sets (e.g. "EMU 25 - PGC") are shown on the board but are not coaches: left out of every count / summary */
 function isEmu(u){return /^\s*EMU\b/i.test(String(u&&u.id||''))}
@@ -3682,6 +3686,10 @@ window.FLEET={
     if(trash&&!confirm('Remove '+(many.length>1?many.length+' assets':unitAt(loc).id)+' from this day\'s board?')){render();return;}
     doMove(many,t,!!trash,at);},
   /* click = add / remove that box from the selection; Shift+click = select the range in that column */
+  eng:function(key){if(typeof RSD_VIEWER!=='undefined'&&RSD_VIEWER)return;var u=unitAt(key.split('|'));if(!u||u.id==='?')return;
+    var n=engOf(u)===1?2:1,t=String(u.note||'');
+    u.note=/ENGINE\s*:\s*\d+/i.test(t)?t.replace(/ENGINE\s*:\s*\d+/i,'ENGINE: '+n):(t?t+' · ':'')+'ENGINE: '+n;
+    toast('PGC '+u.id+' — '+n+' engine'+(n>1?'s':''));changed();},
   tapChip:function(e,el){e.stopPropagation();var key=el.getAttribute('data-loc'),loc=key.split('|'),k=SEL.indexOf(key);
     if(e.shiftKey&&SEL.length){var last=SEL[SEL.length-1].split('|');
       if(last[0]===loc[0]&&last[1]===loc[1]&&last[2]===loc[2]&&last[3]===loc[3]){var a=Math.min(+last[4],+loc[4]),b=Math.max(+last[4],+loc[4]);
