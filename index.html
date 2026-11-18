@@ -3499,12 +3499,12 @@ function render(){
   var avP=[];b.service.concat(b.spare).forEach(function(c){avP=avP.concat(c.pgc||[],pgcs(c.units))});
   var e2=avP.filter(function(u){return engOf(u)===2}).length,e1=avP.filter(function(u){return engOf(u)===1}).length;
   h+='<div class="fb-kgrp">'
-    +'<div class="fb-kbox"><div class="fb-kt">🚃 COACH</div><div class="fb-kpis">'
+    +'<div class="fb-kbox"><div class="fb-kt">COACH</div><div class="fb-kpis">'
     +'<div class="fb-k a"><div class="v">'+n.opC+'</div><div class="l">Operation</div></div>'
     +'<div class="fb-k b"><div class="v">'+n.spC+'</div><div class="l">Spare</div></div>'
     +'<div class="fb-k"><div class="v">'+(n.opC+n.spC)+'</div><div class="l">Total available</div></div>'
     +'<div class="fb-k c"><div class="v">'+n.detC+'</div><div class="l">Detained</div></div></div></div>'
-    +'<div class="fb-kbox"><div class="fb-kt">⚡ PGC</div><div class="fb-kpis">'
+    +'<div class="fb-kbox"><div class="fb-kt">PGC</div><div class="fb-kpis">'
     +'<div class="fb-k a"><div class="v">'+n.opP+'</div><div class="l">Operation</div></div>'
     +'<div class="fb-k b"><div class="v">'+n.spP+'</div><div class="l">Spare</div></div>'
     +'<div class="fb-k"><div class="v">'+(n.opP+n.spP)+'</div><div class="l">Total available</div><div class="l" style="margin-top:2px">⚙2: '+e2+' · ⚙1: '+e1+'</div></div>'
