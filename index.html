@@ -3672,6 +3672,10 @@ var AUTOK='rsd_fleet_daily_sync_v1',_syncT=null;
 function autoSync(){try{return localStorage.getItem(AUTOK)!=='0'}catch(x){return true}}
 function selLocs(){return SEL.map(function(k){return k.split('|')})}
 window.FLEET={
+  /* latest recorded board (today or before) — used by the Report */
+  snapshot:function(){var t=isoOf(new Date()),d=dates().filter(function(x){return x<=t}).pop()||dates().pop();if(!d)return null;var b=boards()[d],av=[];
+    b.service.concat(b.spare).forEach(function(c){av=av.concat(c.pgc||[],pgcs(c.units))});
+    return {date:d,label:labelOf(d),n:counts(b),e2:av.filter(function(u){return engOf(u)===2}).length,e1:av.filter(function(u){return engOf(u)===1}).length};},
   dragStart:function(e){var loc=e.target.getAttribute('data-loc');
     if(SEL.indexOf(loc)<0||SEL.length<2){SEL=[];}else loc=SEL.join(';');
     if(SEL.length>1){e.target.setAttribute('data-count',SEL.length);}
@@ -4401,193 +4405,92 @@ function rPill(v,thr){ // thr=[ok,warn] fractions
   const lb=v>=thr[0]?'ON TARGET':(v>=thr[1]?'WATCH':'BELOW');
   return '<span class="rpt-pill '+cls+'">'+lb+'</span>';
 }
+/* ===== simple report: PART 1 COACH · PART 2 PGC — every figure is read from the dashboard ===== */
+function rptLive(key){
+  const P=key==='pgc',o={};
+  try{if(window.FLEET&&FLEET.snapshot)o.fleet=FLEET.snapshot();}catch(e){}
+  try{if(window.PE&&PE.stats)o.pe=PE.stats()[P?'pgc':'coach'];}catch(e){}
+  return o;
+}
+function rptFleetRows(F){
+  const P=F.key==='pgc',L=rptLive(F.key),out={};
+  if(L.fleet){const n=L.fleet.n;out.fleet={date:L.fleet.label,
+    rows:[['Operation',P?n.opP:n.opC],['Spare',P?n.spP:n.spC],['Total available',P?n.opP+n.spP:n.opC+n.spC],['Detained',P?n.detP:n.detC]]
+      .concat(P?[['Available with 2 engines',L.fleet.e2],['Available with 1 engine',L.fleet.e1]]:[])};}
+  if(L.pe){const e=L.pe;out.pe=P
+    ?[['PGC in PE schedule',e.all],['PE 30 overdue',e.o30],['PE 30 plan for PE',e.p30],['PE 90 overdue',e.o90],['PE 90 plan for PE',e.p90]]
+    :[['Coaches in PE schedule',e.all],['Overdue',e.OVERDUE],['Plan for PE (≤15 days)',e['PLAN FOR PE']],['Okay',e.OKAY],['No PE date',e['-']]];}
+  return out;
+}
+function rptFleetIncs(F){return F.inc.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));}
+function rptFleetHtml(F,R,part){
+  const P=F.key==='pgc',nm=P?'PGC':'COACH',id=P?'P':'C',X=rptFleetRows(F);
+  let h='<div class="rpt-page">'+rSec('PART '+part,nm+(P?' — POWER GENERATOR CARS':' — PASSENGER COACHES'),R.periodLabel);
+  h+=rMrow([['System failures',rN(F.total),'red'],['Top failing system',F.top?tcase(F.top.system)+' ('+F.top.total+')':'—'],
+    ['Avg availability (% of target)',rPct(F.availAvg),'teal'],['PM completion',rPct(F.pe)+'<small style="display:block;font-size:.7em">'+F.peAsum+' / '+F.peTsum+'</small>'],
+    ['Incident reports',rN(F.inc.length)],['Closed / Open',F.closed+' / '+F.open,F.open?'gold':'ok']]);
+  if(X.fleet||X.pe){
+    h+='<div class="rpt-h4">'+part+'.1 · Current Status</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">';
+    if(X.fleet)h+='<div>'+rTbl(['Fleet Deployment — '+X.fleet.date,{t:nm}],X.fleet.rows.map(r=>[r[0],rC('<b>'+r[1]+'</b>')]))+'</div>';
+    if(X.pe)h+='<div>'+rTbl(['PE Schedule — today',{t:nm}],X.pe.map(r=>[r[0],rC('<b>'+r[1]+'</b>')]))+'</div>';
+    h+='</div>';
+  }
+  h+='<div class="rpt-h4">'+part+'.2 · Monthly Performance</div>';
+  h+=rTbl(['Month',{t:'Failures'},{t:'Avail. actual'},{t:'Avail. target'},{t:'Avail. %'},{t:'PM target'},{t:'PM done'},{t:'PM %'},{t:'Incidents'}],
+    R.months.map(m=>[MFULL_P[m],rC(F.monthTotals[m]),rC(rN(F.availM[m].act)),rC(rN(F.availM[m].tgt)),rC(rPct(F.availPct[m])),rC(nzp(F.pmT[m])),rC(nzp(F.pmA[m])),rC(rPct(F.peM[m])),rC(F.incByM[m])]),
+    ['Total / average',rC('<b>'+F.total+'</b>'),rC(F.fleetAvg!=null?Math.round(F.fleetAvg):'—'),rC('—'),rC(rPct(F.availAvg)),rC(F.peTsum),rC(F.peAsum),rC(rPct(F.pe)),rC(F.inc.length)]);
+  const sys=F.sysTotals.filter(x=>x.total>0);
+  h+='<div class="rpt-h4">'+part+'.3 · Failures by System</div>';
+  h+=rTbl([{t:'#'},'System',{t:'Failures'},{t:'Share'}],sys.map((x,i)=>[rC(i+1),tcase(x.system),rC('<b>'+x.total+'</b>'),rC(F.total?rPct(x.total/F.total):'—')]));
+  h+='<div class="rpt-h4">'+part+'.4 · Failures by '+(P?'PGC Type':'Coach Class')+'</div>';
+  h+=rTbl([P?'Type':'Class',{t:'Failures'},{t:'Share'}],F.classes.map(cl=>[cl,rC(F.classTotals[cl]),rC(F.total?rPct(F.classTotals[cl]/F.total):'—')]));
+  h+='<div class="rpt-h4">'+part+'.5 · Root Cause (4M)</div>';
+  h+=rTbl(['4M element',{t:'Cases'},{t:'Share'}],F.fmTotals.map(x=>[x.el,rC(x.sum),rC(F.fmSum?rPct(x.sum/F.fmSum):'—')]),['Total',rC(F.fmSum),rC(F.fmSum?'100%':'—')]);
+  h+='<div class="rpt-chgrid">'
+    +'<div class="rpt-chcard"><h5>'+nm+' — Monthly Failures &amp; Availability</h5><div class="rpt-chbox"><canvas id="rptCh'+id+'1"></canvas></div></div>'
+    +'<div class="rpt-chcard"><h5>'+nm+' — Failures by System</h5><div class="rpt-chbox"><canvas id="rptCh'+id+'2"></canvas></div></div></div>';
+  const inc=rptFleetIncs(F);
+  h+='<div class="rpt-h4">'+part+'.6 · Incident Reports ('+inc.length+')</div>';
+  h+=rTbl(['Date','Unit','System','Failure',{t:'Status'}],inc.map(i=>[rEsc(i.date||'—'),rEsc(i.unit||'—'),rEsc(i.system||'—'),rEsc(trunc(i.failure,140)),
+    rC(/^y/i.test(i.rectifiable)?'<span class="rpt-pill ok">Closed</span>':'<span class="rpt-pill bad">Open</span>')]));
+  return h+'</div>';
+}
 function rptDocHtml(R,G,doc){
-  const{c,p}=R;
-  const now=new Date();
+  const{c,p}=R,now=new Date();
   const genStamp=now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  const logoSvg='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="13" rx="3"/><path d="M4 10h16M8 19l-2 3M16 19l2 3M7.5 13.5h.01M16.5 13.5h.01"/></svg>';
-  /* ---- cover ---- */
-  let h='<div class="rpt-cover"><div class="rpt-cover-brand"><span class="lg">'+logoSvg+'</span><span class="nm">KTM BERHAD<small>ROLLING STOCK MAINTENANCE</small></span></div>'
-   +'<div class="rpt-kicker">MANAGEMENT REPORT</div>'
-   +'<h1>ROLLING STOCK PERFORMANCE<br>MANAGEMENT REPORT</h1>'
-   +'<div class="sub">Passenger Coaches (COACH) &amp; Power Generator Cars (PGC)</div>'
-   +'<div class="rpt-gold"></div>'
-   +'<div class="period">Reporting Period: '+R.periodLabel+'</div>'
-   +'<div class="gen">Auto-generated from live dashboard data · '+genStamp+'</div></div>'
-   +'<table class="rpt-covermeta"><tbody>'
-   +'<tr><td class="k">Unit Name</td><td colspan="3">KTM Rolling Stock Maintenance — Coach &amp; PGC</td></tr>'
-   +'<tr><td class="k">RS Type</td><td colspan="3">Passenger Coaches (ASC · ADNS · ABC · AFC) &amp; PGC (UMW · INKA)</td></tr>'
-   +'<tr><td class="k">Report Period</td><td>'+R.periodLabel+'</td><td class="k">Report Date</td><td>'+now.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})+'</td></tr>'
-   +'</tbody></table>';
-  /* ---- A · executive summary ---- */
-  h+='<div class="rpt-page">'+rSec('A','EXECUTIVE SUMMARY','auto-generated overview');
-  h+=rMrow([['Total Coach Cases',rN(c.total)],['Total PGC Cases',rN(p.total)],['Total Reported Cases',rN(R.totalCases),'red'],['Incident Reports',rN(R.incN)],['Open Cases',rN(R.open),'gold'],['Closed Cases',rN(R.closed),'ok']]);
-  h+=rMrow([['Critical Cases',rN(R.critical),'red'],['Completion Rate',rPct(R.completion),'teal'],['Avg Availability (C)',rPct(c.availAvg)],['Avg Availability (P)',rPct(p.availAvg)],['PM Completion',rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null)],['Overall Performance','<span class="rpt-pill '+R.grade.cls+'">'+R.grade.label+'</span>']]);
-  h+='<div class="rpt-h4">Monthly Performance Trend</div>';
-  h+='<p class="rpt-p">'+(R.prevM!=null
-      ?('Failure volume in <b>'+MFULL_P[R.lastM]+'</b> was <b>'+R.curM+'</b> cases against '+R.prevM+' in '+MFULL_P[R.lastM-1]+' ('+(R.curM>R.prevM?'▲ +':(R.curM<R.prevM?'▼ −':'±'))+Math.abs(R.curM-R.prevM)+' MoM). ')
-      :'')
-    +(R.peakM?('Peak month: <b>'+MFULL_P[R.peakM.m]+'</b> ('+R.peakM.total+' cases); best month: <b>'+(R.lowM?MFULL_P[R.lowM.m]:'—')+'</b> ('+(R.lowM?R.lowM.total:'—')+' cases). '):'')
-    +(R.halfDir?('Overall trajectory across the period is <b>'+R.halfDir.dir+'</b> ('+R.halfDir.h1+' cases in the first half vs '+R.halfDir.h2+' in the second half).'):'')+'</p>';
-  h+=rTbl(['Month',{t:'Coach'},{t:'PGC'},{t:'Total'},{t:'MoM Δ'},{t:'Incidents'}],
-    R.monthlySeries.map((x,i)=>{const prev=i>0?R.monthlySeries[i-1].total:null;const d=prev==null?'—':(x.total-prev===0?'±0':(x.total>prev?'▲ +'+(x.total-prev):'▼ −'+(prev-x.total)));
-      return [MFULL_P[x.m],rC(x.coach),rC(x.pgc),rC('<b>'+x.total+'</b>'),rC(d),rC(x.inc)];}),
-    ['Total',rC(c.total),rC(p.total),rC(R.totalCases),rC('—'),rC(R.incN)]);
+  let h='<div class="rpt-cover"><div class="rpt-cover-brand"><span class="nm">KTM BERHAD<small>ROLLING STOCK MAINTENANCE</small></span></div>'
+   +'<div class="rpt-kicker">PERFORMANCE REPORT</div><h1>COACH &amp; PGC<br>PERFORMANCE REPORT</h1>'
+   +'<div class="rpt-gold"></div><div class="period">Reporting Period: '+R.periodLabel+'</div>'
+   +'<div class="gen">From the dashboard data · '+genStamp+'</div></div>';
+  h+='<div class="rpt-page">'+rSec('SUMMARY','COACH AND PGC AT A GLANCE','');
+  h+=rTbl(['',{t:'COACH'},{t:'PGC'}],[
+    ['System failures',rC('<b>'+c.total+'</b>'),rC('<b>'+p.total+'</b>')],
+    ['Top failing system',rC(c.top?tcase(c.top.system):'—'),rC(p.top?tcase(p.top.system):'—')],
+    ['Average availability (% of target)',rC(rPct(c.availAvg)),rC(rPct(p.availAvg))],
+    ['PM completion',rC(rPct(c.pe)+' ('+c.peAsum+'/'+c.peTsum+')'),rC(rPct(p.pe)+' ('+p.peAsum+'/'+p.peTsum+')')],
+    ['Incident reports (closed / open)',rC(c.inc.length+' ('+c.closed+' / '+c.open+')'),rC(p.inc.length+' ('+p.closed+' / '+p.open+')')]]);
   h+='</div>';
-  /* ---- B · KPI summary ---- */
-  h+='<div class="rpt-page">'+rSec('B','KPI SUMMARY','targets vs actuals for the reporting period');
-  const kpiRows=[
-    ['Fleet Availability — COACH','% of target','100%',rC(rPct(c.availAvg)),rC(rPill(c.availAvg,[1,0.95]))],
-    ['Fleet Availability — PGC','% of target','100%',rC(rPct(p.availAvg)),rC(rPill(p.availAvg,[1,0.95]))],
-    ['PM Completion — COACH','jobs done / planned','≥95%',rC(rPct(c.pe)+' ('+c.peAsum+'/'+c.peTsum+')'),rC(rPill(c.pe,[0.95,0.85]))],
-    ['PM Completion — PGC','jobs done / planned','≥95%',rC(rPct(p.pe)+' ('+p.peAsum+'/'+p.peTsum+')'),rC(rPill(p.pe,[0.95,0.85]))],
-    ['Incident Case Closure','closed / reported','≥90%',rC(rPct(R.completion)+' ('+R.closed+'/'+R.incN+')'),rC(rPill(R.completion,[0.9,0.75]))],
-    ['Root-Cause Confirmation','confirmed / reported','≥80%',rC(rPct(R.rootRate)),rC(rPill(R.rootRate,[0.8,0.6]))],
-    ['Failure Trend (MoM)','latest vs prior month','No increase',rC(R.prevM==null?'—':(R.curM<=R.prevM?'▼ '+(R.prevM-R.curM)+' (improving)':'▲ +'+(R.curM-R.prevM))),rC(R.prevM==null?'<span class="rpt-pill na">n/a</span>':(R.curM<=R.prevM?'<span class="rpt-pill ok">ON TARGET</span>':'<span class="rpt-pill bad">RISING</span>'))]];
-  h+=rTbl(['KPI','Basis','Target',{t:'Actual'},{t:'Status'}],kpiRows)+'</div>';
-  /* ---- C · performance analysis ---- */
-  h+='<div class="rpt-page">'+rSec('C','PERFORMANCE ANALYSIS','fleet, system and category performance');
-  h+='<div class="rpt-h4">C1 · Coach Performance Summary</div>';
-  h+='<p class="rpt-p">The COACH fleet recorded <b>'+c.total+'</b> system failures across the period'+(c.top?', led by <b>'+tcase(c.top.system)+'</b> ('+c.top.total+' cases, '+(c.total?rPct(c.top.total/c.total):'—')+' of the total)':'')+'. Availability averaged <b>'+rPct(c.availAvg)+'</b> of target and preventive maintenance completion reached <b>'+rPct(c.pe)+'</b>. '+c.inc.length+' incident report'+(c.inc.length===1?' was':'s were')+' logged ('+c.closed+' closed, '+c.open+' open).</p>';
-  h+='<div class="rpt-h4">C2 · PGC Performance Summary</div>';
-  h+='<p class="rpt-p">The PGC fleet recorded <b>'+p.total+'</b> system failures'+(p.top?', led by <b>'+tcase(p.top.system)+'</b> ('+p.top.total+' cases, '+(p.total?rPct(p.top.total/p.total):'—')+' of the total)':'')+'. Availability averaged <b>'+rPct(p.availAvg)+'</b> of target and PM completion reached <b>'+rPct(p.pe)+'</b>. '+p.inc.length+' incident report'+(p.inc.length===1?' was':'s were')+' logged ('+p.closed+' closed, '+p.open+' open).</p>';
-  h+='<div class="rpt-h4">C3 · Monthly Performance Comparison — Performance by Month</div>';
-  h+=rTbl(['Month',{t:'Coach Fail'},{t:'PGC Fail'},{t:'Total'},{t:'Coach Avail %'},{t:'PGC Avail %'},{t:'Coach PM %'},{t:'PGC PM %'}],
-    R.months.map(m=>[MFULL_P[m],rC(c.monthTotals[m]),rC(p.monthTotals[m]),rC('<b>'+(c.monthTotals[m]+p.monthTotals[m])+'</b>'),rC(rPct(c.availPct[m])),rC(rPct(p.availPct[m])),rC(rPct(c.peM[m])),rC(rPct(p.peM[m]))]));
-  h+='<div class="rpt-h4">C4 · Coach vs PGC Comparison</div>';
-  h+=rTbl(['Metric',{t:'COACH'},{t:'PGC'},{t:'Fleet Total / Remark'}],[
-    ['System failure cases',rC('<b>'+c.total+'</b>'),rC('<b>'+p.total+'</b>'),rC(R.totalCases+' total')],
-    ['Share of fleet failures',rC(R.totalCases?rPct(c.total/R.totalCases):'—'),rC(R.totalCases?rPct(p.total/R.totalCases):'—'),rC('—')],
-    ['Top failing system',rC(c.top?tcase(c.top.system):'—'),rC(p.top?tcase(p.top.system):'—'),rC('see C5')],
-    ['Avg availability vs target',rC(rPct(c.availAvg)),rC(rPct(p.availAvg)),rC('target = 100%')],
-    ['PM completion',rC(rPct(c.pe)),rC(rPct(p.pe)),rC((c.peAsum+p.peAsum)+' / '+(c.peTsum+p.peTsum)+' jobs')],
-    ['Incident reports',rC(c.inc.length),rC(p.inc.length),rC(R.incN+' total')],
-    ['Case closure',rC(c.inc.length?rPct(c.closed/c.inc.length):'—'),rC(p.inc.length?rPct(p.closed/p.inc.length):'—'),rC(rPct(R.completion)+' overall')],
-    ['Dominant 4M cause',rC(c.fmTop?c.fmTop.el:'—'),rC(p.fmTop?p.fmTop.el:'—'),rC(R.fm[0]&&R.fm[0].total?R.fm[0].el+' overall':'—')]]);
-  h+='<div class="rpt-h4">C5 · System Type Analysis</div>';
-  h+=rTbl(['System',{t:'Coach'},{t:'PGC'},{t:'Total'},{t:'Share'},{t:'Trend'}],
-    R.systems.filter(s=>s.total>0).map(s=>[tcase(s.system),rC(s.coach||''),rC(s.pgc||''),rC('<b>'+s.total+'</b>'),rC(R.totalCases?rPct(s.total/R.totalCases):'—'),rC(R.sysTrend[s.system]||'→')]));
-  h+='<div class="rpt-h4">C6 · Coach Type Analysis — Performance by Category</div>';
-  h+=rTbl(['Fleet','Class / Category',{t:'Failures'},{t:'Share of fleet'}],
-    c.classes.map(cl=>['COACH',cl,rC(c.classTotals[cl]),rC(c.total?rPct(c.classTotals[cl]/c.total):'—')])
-    .concat(p.classes.map(cl=>['PGC',cl,rC(p.classTotals[cl]),rC(p.total?rPct(p.classTotals[cl]/p.total):'—')])));
-  h+='<div class="rpt-h4">C7 · Failure Trend Analysis</div>';
-  h+='<p class="rpt-p">'+(R.halfDir?('Total failures moved from <b>'+R.halfDir.h1+'</b> in the first half of the period to <b>'+R.halfDir.h2+'</b> in the second half — a '+R.halfDir.dir+' trend. '):'')
-    +(R.peakM?('The heaviest month was <b>'+MFULL_P[R.peakM.m]+'</b> with '+R.peakM.total+' cases'+(R.lowM&&R.lowM.m!==R.peakM.m?', while <b>'+MFULL_P[R.lowM.m]+'</b> recorded the fewest ('+R.lowM.total+')':'')+'. '):'')
-    +(G.trends.length>3?G.trends[3].replace(/<\/?b>/g,m=>m)+' ':'')
-    +'Refer to Section E for the visual trend.</p>';
-  h+='<div class="rpt-h4">C8 · Top 10 Repeated Failures</div>';
-  h+=rTbl([{t:'#'},'System / Failure Mode',{t:'Coach'},{t:'PGC'},{t:'Total'},{t:'Share'},{t:'Trend'}],
-    R.systems.filter(s=>s.total>0).slice(0,10).map((s,i)=>[rC(i+1),tcase(s.system),rC(s.coach||''),rC(s.pgc||''),rC('<b>'+s.total+'</b>'),rC(R.totalCases?rPct(s.total/R.totalCases):'—'),rC(R.sysTrend[s.system]||'→')]));
-  h+='</div>';
-  /* ---- D · maintenance analysis ---- */
-  const pmBacklogC=Math.max(0,c.peTsum-c.peAsum),pmBacklogP=Math.max(0,p.peTsum-p.peAsum);
-  h+='<div class="rpt-page">'+rSec('D','MAINTENANCE ANALYSIS','preventive, corrective and reliability view');
-  h+=rMrow([['PM Planned',rN(c.peTsum+p.peTsum)],['PM Completed',rN(c.peAsum+p.peAsum),'ok'],['PM Completion',rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null),'teal'],['Corrective Cases',rN(R.incN)],['Pending Cases',rN(R.open),'gold'],['Completed Cases',rN(R.closed),'ok']]);
-  h+='<div class="rpt-h4">D1 · Preventive Maintenance Summary</div>';
-  h+=rTbl(['Month',{t:'Coach Target'},{t:'Coach Actual'},{t:'Coach %'},{t:'PGC Target'},{t:'PGC Actual'},{t:'PGC %'}],
-    R.months.map(m=>[MFULL_P[m],rC(nzp(c.pmT[m])),rC(nzp(c.pmA[m])),rC(rPct(c.peM[m])),rC(nzp(p.pmT[m])),rC(nzp(p.pmA[m])),rC(rPct(p.peM[m]))]),
-    ['Total',rC(c.peTsum),rC(c.peAsum),rC(rPct(c.pe)),rC(p.peTsum),rC(p.peAsum),rC(rPct(p.pe))]);
-  if(pmBacklogC+pmBacklogP>0)h+='<p class="rpt-p">Outstanding PM backlog: <b>'+(pmBacklogC+pmBacklogP)+'</b> jobs (COACH '+pmBacklogC+', PGC '+pmBacklogP+').</p>';
-  h+='<div class="rpt-h4">D2 · Corrective Maintenance Summary</div>';
-  h+='<p class="rpt-p">Corrective work in the period comprises <b>'+R.incN+'</b> reported incident cases — <b>'+R.closed+'</b> completed/rectified and <b>'+R.open+'</b> pending, of which <b>'+R.critical+'</b> are critical. Root cause is confirmed for '+rPct(R.rootRate)+' of cases.</p>';
-  h+=rTbl(['Fleet',{t:'Reported'},{t:'Completed (rectified)'},{t:'Pending'},{t:'Critical'},{t:'Closure %'}],[
-    ['COACH',rC(c.inc.length),rC(c.closed),rC(c.open),rC(c.critical),rC(c.inc.length?rPct(c.closed/c.inc.length):'—')],
-    ['PGC',rC(p.inc.length),rC(p.closed),rC(p.open),rC(p.critical),rC(p.inc.length?rPct(p.closed/p.inc.length):'—')]],
-    ['Fleet Total',rC(R.incN),rC(R.closed),rC(R.open),rC(R.critical),rC(rPct(R.completion))]);
-  h+='<div class="rpt-h4">D3 · Reliability Metrics — MTTR &amp; MTBF</div>';
-  h+=rTbl(['Metric',{t:'COACH'},{t:'PGC'},'Basis / Remark'],[
-    ['MTBF — fleet-days between failures',rC(rF1(c.mtbfFleet)),rC(rF1(p.mtbfFleet)),'Calendar days in period ÷ failure cases'],
-    ['MTBF — unit-operating-days between failures',rC(rF1(c.mtbfUnit)),rC(rF1(p.mtbfUnit)),'Period days × avg available units ÷ failure cases'],
-    ['Average Repair Time',rC('<span class="rpt-pill na">n/a</span>'),rC('<span class="rpt-pill na">n/a</span>'),'Repair start/completion timestamps not captured in the current dataset'],
-    ['MTTR — Mean Time To Repair',rC('<span class="rpt-pill na">n/a</span>'),rC('<span class="rpt-pill na">n/a</span>'),'Recommend capturing repair durations in the incident log']]);
-  h+='<div class="rpt-h4">D4 · Root Cause Analysis (4M)</div>';
-  h+=rTbl(['4M Element',{t:'Coach'},{t:'PGC'},{t:'Total'},{t:'Share'}],
-    R.fm.map(x=>[x.el,rC(x.coach||''),rC(x.pgc||''),rC('<b>'+x.total+'</b>'),rC(R.fmSum?rPct(x.total/R.fmSum):'—')]),
-    ['Total',rC(c.fmTotals.reduce((t,x)=>t+x.sum,0)),rC(p.fmTotals.reduce((t,x)=>t+x.sum,0)),rC(R.fmSum),rC('100%')]);
-  if(R.incElements.length)h+='<p class="rpt-p">Incident-level causal elements: '+R.incElements.map(e=>'<b>'+rEsc(e[0])+'</b> ('+e[1]+')').join(' · ')+'.</p>';
-  h+='<div class="rpt-h4">D5 · Most Frequent Defects</div>';
-  h+=rTbl([{t:'#'},'Defect / System (incident register)',{t:'Reports'},'Most affected unit'],
-    R.incSystems.slice(0,8).map((s,i)=>{
-      const u=R.inc.filter(x=>x.system===s[0]).reduce((acc,x)=>{if(x.unit)acc[x.unit]=(acc[x.unit]||0)+1;return acc;},{});
-      const tu=Object.entries(u).sort((a,b)=>b[1]-a[1])[0];
-      return [rC(i+1),rEsc(s[0]),rC(s[1]),tu?rEsc(tu[0])+' ('+tu[1]+')':'—'];}));
-  if(R.repeatUnits.length){h+='<p class="rpt-p">Repeat-failure units: '+R.repeatUnits.slice(0,6).map(u=>'<b>'+rEsc(u.unit)+'</b> ('+u.sec+', '+u.n+' reports)').join(' · ')+'.</p>';}
-  h+='<div class="rpt-h4">D6 · Maintenance Effectiveness</div>';
-  const halfC=R.halves.c,halfP=R.halves.p;
-  h+='<p class="rpt-p">Preventive-maintenance completion of <b>'+rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null)+'</b> against plan '
-    +((c.pe==null&&p.pe==null)?'':((Math.min(c.pe??1,p.pe??1)>=0.95)?'indicates strong schedule discipline. ':'leaves room to strengthen schedule discipline. '))
-    +(R.halfDir?('With the failure trend '+R.halfDir.dir+' across the period ('+R.halfDir.h1+' → '+R.halfDir.h2+'), '+(R.halfDir.dir==='improving'?'current maintenance actions are holding failures down — maintain the programme.':(R.halfDir.dir==='rising'?'maintenance effectiveness requires attention: prioritise the corrective actions in Section F.':'performance is stable; focus on the top failing systems to drive improvement.'))):'')
-    +' Case closure stands at '+rPct(R.completion)+' against a ≥90% expectation.</p>';
-  h+='</div>';
-  /* ---- E · charts ---- */
-  h+='<div class="rpt-page">'+rSec('E','CHARTS &amp; VISUALISATIONS','rendered live from current dashboard data');
-  const chDefs=[['rptChTrend','Monthly Failure Trend','Coach vs PGC system failures per month'],
-    ['rptChSys','System Type Distribution','Share of failures by system (fleet combined)'],
-    ['rptChClass','Coach Type Distribution','Failures by class / category'],
-    ['rptChRoot','Root Cause Distribution (4M)','Classified failure causes, both fleets'],
-    ['rptChFail','Failure Trend & Cumulative','Monthly total with cumulative trajectory'],
-    ['rptChTop','Top Defective Systems','Top 10 systems by failures (fleet combined)'],
-    ['rptChCmp','Coach vs PGC Performance','Monthly failure comparison by fleet'],
-    ['rptChKpi','Monthly KPI Achievement','Availability & PM completion vs 100% target']];
-  h+='<div class="rpt-chgrid">'+chDefs.map(d=>'<div class="rpt-chcard"><h5>'+d[1]+'</h5><div class="hint">'+d[2]+'</div><div class="rpt-chbox"><canvas id="'+d[0]+'"></canvas></div></div>').join('')+'</div></div>';
-  /* ---- G · appendix ---- */
-  h+='<div class="rpt-page">'+rSec('G','APPENDIX','incident register');
-  h+='<div class="rpt-h4">G1 · Incident Register ('+R.incN+' records)</div>';
-  h+=rTbl(['Date',{t:'Fleet'},'Unit','System','Failure Description',{t:'Root Cause'},{t:'Status'}],
-    R.inc.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).map(i=>[
-      rEsc(i.date||'—'),rC(i._sec),rEsc(i.unit||'—'),rEsc(i.system||'—'),rEsc(trunc(i.failure,140)),
-      rC(/^y/i.test(i.root)?'<span class="rpt-pill ok">Confirmed</span>':'<span class="rpt-pill warn">Pending</span>'),
-      rC(/^y/i.test(i.rectifiable)?'<span class="rpt-pill ok">Closed</span>':'<span class="rpt-pill bad">Open</span>')]));
-  /* ---- footer ---- */
-  h+='<div class="rpt-footer"><span>KTM Rolling Stock Maintenance — Coach &amp; PGC · '+R.periodLabel+'</span><span>Generated '+genStamp+'</span></div></div>';
+  h+=rptFleetHtml(c,R,1)+rptFleetHtml(p,R,2);
+  h+='<div class="rpt-footer"><span>KTM Rolling Stock Maintenance — Coach &amp; PGC · '+R.periodLabel+'</span><span>Generated '+genStamp+'</span></div>';
   return h;
 }
 RPT.rptDocHtml=rptDocHtml;
 
 /* ---------------- charts ---------------- */
 function rptRenderCharts(R){
-  const{c,p}=R,labels=R.months.map(m=>MONTHS_P[m]);
-  const base={responsive:true,maintainAspectRatio:false};
-  rptCharts=['rptChTrend','rptChSys','rptChClass','rptChRoot','rptChFail','rptChTop','rptChCmp','rptChKpi'];
-  mkChart('rptChTrend',{type:'line',data:{labels,datasets:[
-    {label:'COACH',data:R.months.map(m=>c.monthTotals[m]),borderColor:RCOL.navy,backgroundColor:'rgba(11,42,91,.08)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:RCOL.navy},
-    {label:'PGC',data:R.months.map(m=>p.monthTotals[m]),borderColor:RCOL.gold,backgroundColor:'rgba(244,169,31,.10)',fill:true,tension:.3,pointRadius:4,pointBackgroundColor:RCOL.gold}]},
-    options:{...base,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
-  const sysTop=R.systems.filter(s=>s.total>0);
-  const sys8=sysTop.slice(0,8),others=sysTop.slice(8).reduce((t,s)=>t+s.total,0);
-  mkChart('rptChSys',{type:'doughnut',data:{labels:sys8.map(s=>tcase(s.system)).concat(others?['Others']:[]),
-    datasets:[{data:sys8.map(s=>s.total).concat(others?[others]:[]),backgroundColor:RPAL,borderWidth:2,borderColor:'#fff'}]},
-    options:{...base,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}}},cutout:'55%'}});
-  const clsLabels=c.classes.map(x=>'COACH · '+x).concat(p.classes.map(x=>'PGC · '+x));
-  const clsData=c.classes.map(x=>c.classTotals[x]).concat(p.classes.map(x=>p.classTotals[x]));
-  mkChart('rptChClass',{type:'bar',data:{labels:clsLabels,datasets:[{data:clsData,
-    backgroundColor:c.classes.map(()=>RCOL.navy).concat(p.classes.map(()=>RCOL.gold)),borderRadius:5}]},
-    options:{...base,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
-  mkChart('rptChRoot',{type:'doughnut',data:{labels:R.fm.map(x=>x.el),datasets:[{data:R.fm.map(x=>x.total),backgroundColor:[RCOL.navy,RCOL.red,RCOL.gold,RCOL.teal,'#8c3fa8'],borderWidth:2,borderColor:'#fff'}]},
-    options:{...base,plugins:{legend:{position:'bottom'}},cutout:'55%'}});
-  let cum=0;const cumData=R.months.map(m=>cum+=c.monthTotals[m]+p.monthTotals[m]);
-  mkChart('rptChFail',{data:{labels,datasets:[
-    {type:'bar',label:'Failures',data:R.months.map(m=>c.monthTotals[m]+p.monthTotals[m]),backgroundColor:RCOL.red,borderRadius:4},
-    {type:'line',label:'Cumulative',data:cumData,borderColor:RCOL.navy,tension:.25,pointRadius:3,yAxisID:'y1'}]},
-    options:{...base,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{precision:0}}}}});
-  const top10=sysTop.slice(0,10);
-  mkChart('rptChTop',{type:'bar',data:{labels:top10.map(s=>tcase(s.system)),datasets:[{data:top10.map(s=>s.total),
-    backgroundColor:top10.map((_,i)=>i===0?RCOL.red:RCOL.navy),borderRadius:5}]},
-    options:{...base,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
-  mkChart('rptChCmp',{type:'bar',data:{labels,datasets:[
-    {label:'COACH',data:R.months.map(m=>c.monthTotals[m]),backgroundColor:RCOL.navy,borderRadius:4},
-    {label:'PGC',data:R.months.map(m=>p.monthTotals[m]),backgroundColor:RCOL.gold,borderRadius:4}]},
-    options:{...base,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
-  mkChart('rptChKpi',{type:'line',data:{labels,datasets:[
-    {label:'Coach Avail %',data:R.months.map(m=>c.availPct[m]!=null?c.availPct[m]*100:null),borderColor:RCOL.navy,tension:.3,pointRadius:3},
-    {label:'PGC Avail %',data:R.months.map(m=>p.availPct[m]!=null?p.availPct[m]*100:null),borderColor:RCOL.teal,tension:.3,pointRadius:3},
-    {label:'Coach PM %',data:R.months.map(m=>c.peM[m]!=null?c.peM[m]*100:null),borderColor:RCOL.red,borderDash:[5,3],tension:.3,pointRadius:3},
-    {label:'PGC PM %',data:R.months.map(m=>p.peM[m]!=null?p.peM[m]*100:null),borderColor:RCOL.gold,borderDash:[5,3],tension:.3,pointRadius:3},
-    {label:'Target 100%',data:R.months.map(()=>100),borderColor:'#9aa7bd',borderDash:[2,3],pointRadius:0,borderWidth:1.5}]},
-    options:{...base,plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:10}}}},scales:{y:{ticks:{callback:v=>v+'%'}}}}});
+  const labels=R.months.map(m=>MONTHS_P[m]),base={responsive:true,maintainAspectRatio:false};
+  rptCharts=[];
+  [[R.c,'C',RCOL.navy],[R.p,'P',RCOL.gold]].forEach(function(z){const F=z[0],id=z[1],col=z[2];
+    rptCharts.push('rptCh'+id+'1','rptCh'+id+'2');
+    mkChart('rptCh'+id+'1',{data:{labels,datasets:[
+      {type:'bar',label:'Failures',data:R.months.map(m=>F.monthTotals[m]),backgroundColor:col,borderRadius:4},
+      {type:'line',label:'Availability % of target',data:R.months.map(m=>F.availPct[m]!=null?+(F.availPct[m]*100).toFixed(1):null),borderColor:RCOL.teal,tension:.3,pointRadius:3,yAxisID:'y1'}]},
+      options:{...base,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+    const top=F.sysTotals.filter(x=>x.total>0).slice(0,8);
+    mkChart('rptCh'+id+'2',{type:'bar',data:{labels:top.map(x=>tcase(x.system)),datasets:[{data:top.map(x=>x.total),backgroundColor:top.map((_,i)=>i===0?RCOL.red:col),borderRadius:5}]},
+      options:{...base,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
+  });
 }
-
 /* ---------------- render & navigation ---------------- */
 function rptVisible(){const el=document.getElementById('pReport');return el&&el.style.display!=='none';}
 function rptDefaultRange(){
@@ -4645,80 +4548,29 @@ window.rptPrint=function(){
 window.rptExportExcel=function(){
   try{
     if(!RPT._last)rptRender();
-    const{R,G}=RPT._last,{c,p}=R;
-    const doc=rptDocInfo(false,R.periodKey);
-    const now=new Date();
-    const wb=XLSX.utils.book_new();
-    const st=v=>rStrip(v);
-    /* summary */
-    const sum=[["KTM ROLLING STOCK MAINTENANCE — ROLLING STOCK PERFORMANCE MANAGEMENT REPORT"],
-      ["Fleet","Passenger Coaches (COACH) & Power Generator Cars (PGC)"],
-      ["Report Period",R.periodLabel],
-      ["Report Date",now.toISOString().slice(0,10)],[],
-      ["EXECUTIVE SUMMARY"],
-      ["Total Coach Cases",c.total],["Total PGC Cases",p.total],["Total Reported Cases",R.totalCases],
-      ["Incident Reports",R.incN],["Open Cases",R.open],["Closed Cases",R.closed],["Critical Cases",R.critical],
-      ["Completion Rate",R.completion!=null?(R.completion*100).toFixed(1)+"%":"n/a"],
-      ["Overall Performance",R.grade.label+(R.score!=null?" ("+(R.score*100).toFixed(1)+"%)":"")],[],
-      ["KPI SUMMARY"],["KPI","Target","Actual","Status"],
-      ["Fleet Availability — COACH","100%",c.availAvg!=null?(c.availAvg*100).toFixed(1)+"%":"n/a",c.availAvg==null?"n/a":(c.availAvg>=1?"ON TARGET":"BELOW")],
-      ["Fleet Availability — PGC","100%",p.availAvg!=null?(p.availAvg*100).toFixed(1)+"%":"n/a",p.availAvg==null?"n/a":(p.availAvg>=1?"ON TARGET":"BELOW")],
-      ["PM Completion — COACH","≥95%",c.pe!=null?(c.pe*100).toFixed(1)+"%":"n/a",c.pe==null?"n/a":(c.pe>=0.95?"ON TARGET":(c.pe>=0.85?"WATCH":"BELOW"))],
-      ["PM Completion — PGC","≥95%",p.pe!=null?(p.pe*100).toFixed(1)+"%":"n/a",p.pe==null?"n/a":(p.pe>=0.95?"ON TARGET":(p.pe>=0.85?"WATCH":"BELOW"))],
-      ["Incident Case Closure","≥90%",R.completion!=null?(R.completion*100).toFixed(1)+"%":"n/a",R.completion==null?"n/a":(R.completion>=0.9?"ON TARGET":(R.completion>=0.75?"WATCH":"BELOW"))],
-      ["Root-Cause Confirmation","≥80%",R.rootRate!=null?(R.rootRate*100).toFixed(1)+"%":"n/a",R.rootRate==null?"n/a":(R.rootRate>=0.8?"ON TARGET":"BELOW")]];
-    const ws1=XLSX.utils.aoa_to_sheet(sum);ws1['!cols']=[{wch:34},{wch:22},{wch:18},{wch:14}];
-    XLSX.utils.book_append_sheet(wb,ws1,"Report Summary");
-    /* monthly */
-    const mon=[["Month","Coach Failures","PGC Failures","Total","Coach Avail %","PGC Avail %","Coach PM %","PGC PM %","Incidents"]];
-    R.months.forEach(m=>mon.push([MFULL_P[m],c.monthTotals[m],p.monthTotals[m],c.monthTotals[m]+p.monthTotals[m],
-      c.availPct[m]!=null?+(c.availPct[m]*100).toFixed(1):"",p.availPct[m]!=null?+(p.availPct[m]*100).toFixed(1):"",
-      c.peM[m]!=null?+(c.peM[m]*100).toFixed(1):"",p.peM[m]!=null?+(p.peM[m]*100).toFixed(1):"",c.incByM[m]+p.incByM[m]]));
-    mon.push(["TOTAL",c.total,p.total,R.totalCases,"","","","",R.incN]);
-    const ws2=XLSX.utils.aoa_to_sheet(mon);ws2['!cols']=[{wch:12}];
-    XLSX.utils.book_append_sheet(wb,ws2,"Monthly Performance");
-    /* systems */
-    const sys=[["Rank","System","Coach","PGC","Total","Share %","Trend (H2 vs H1)"]];
-    R.systems.filter(s=>s.total>0).forEach((s,i)=>sys.push([i+1,tcase(s.system),s.coach,s.pgc,s.total,R.totalCases?+(s.total/R.totalCases*100).toFixed(1):"",R.sysTrend[s.system]==='▲'?'UP':(R.sysTrend[s.system]==='▼'?'DOWN':'FLAT')]));
-    const ws3=XLSX.utils.aoa_to_sheet(sys);ws3['!cols']=[{wch:6},{wch:34}];
-    XLSX.utils.book_append_sheet(wb,ws3,"System Analysis");
-    /* categories */
-    const cat=[["Fleet","Class / Category","Failures","Share of fleet %"]];
-    c.classes.forEach(cl=>cat.push(["COACH",cl,c.classTotals[cl],c.total?+(c.classTotals[cl]/c.total*100).toFixed(1):""]));
-    p.classes.forEach(cl=>cat.push(["PGC",cl,p.classTotals[cl],p.total?+(p.classTotals[cl]/p.total*100).toFixed(1):""]));
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cat),"Category Analysis");
-    /* maintenance */
-    const mt=[["PREVENTIVE MAINTENANCE"],["Month","Coach Target","Coach Actual","Coach %","PGC Target","PGC Actual","PGC %"]];
-    R.months.forEach(m=>mt.push([MFULL_P[m],nzp(c.pmT[m]),nzp(c.pmA[m]),c.peM[m]!=null?+(c.peM[m]*100).toFixed(1):"",nzp(p.pmT[m]),nzp(p.pmA[m]),p.peM[m]!=null?+(p.peM[m]*100).toFixed(1):""]));
-    mt.push(["TOTAL",c.peTsum,c.peAsum,c.pe!=null?+(c.pe*100).toFixed(1):"",p.peTsum,p.peAsum,p.pe!=null?+(p.pe*100).toFixed(1):""]);
-    mt.push([],["CORRECTIVE MAINTENANCE"],["Fleet","Reported","Completed","Pending","Critical","Closure %"],
-      ["COACH",c.inc.length,c.closed,c.open,c.critical,c.inc.length?+(c.closed/c.inc.length*100).toFixed(1):""],
-      ["PGC",p.inc.length,p.closed,p.open,p.critical,p.inc.length?+(p.closed/p.inc.length*100).toFixed(1):""],
-      ["TOTAL",R.incN,R.closed,R.open,R.critical,R.completion!=null?+(R.completion*100).toFixed(1):""]);
-    mt.push([],["RELIABILITY"],["Metric","COACH","PGC","Note"],
-      ["MTBF (fleet-days between failures)",c.mtbfFleet!=null?+c.mtbfFleet.toFixed(1):"n/a",p.mtbfFleet!=null?+p.mtbfFleet.toFixed(1):"n/a","Period days ÷ failures"],
-      ["MTBF (unit-operating-days)",c.mtbfUnit!=null?+c.mtbfUnit.toFixed(1):"n/a",p.mtbfUnit!=null?+p.mtbfUnit.toFixed(1):"n/a","Period days × avg fleet ÷ failures"],
-      ["MTTR / Avg Repair Time","n/a","n/a","Repair durations not captured in dataset"]);
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(mt),"Maintenance");
-    /* root cause */
-    const rc=[["4M ROOT CAUSE ANALYSIS"],["Element","Coach","PGC","Total","Share %"]];
-    R.fm.forEach(x=>rc.push([x.el,x.coach,x.pgc,x.total,R.fmSum?+(x.total/R.fmSum*100).toFixed(1):""]));
-    rc.push([],["INCIDENT CAUSAL ELEMENTS"],["Element","Reports"]);
-    R.incElements.forEach(e=>rc.push([e[0],e[1]]));
-    rc.push([],["MOST FREQUENT DEFECTS (incident register)"],["System","Reports"]);
-    R.incSystems.forEach(s=>rc.push([s[0],s[1]]));
-    rc.push([],["REPEAT-FAILURE UNITS"],["Unit","Fleet","Reports"]);
-    R.repeatUnits.forEach(u=>rc.push([u.unit,u.sec,u.n]));
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rc),"Root Cause & Defects");
-    /* incidents */
-    const ir=[["Date","Fleet","Unit","System","Failure","Causes","Action Taken","Root Cause Confirmed","Status"]];
-    R.inc.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).forEach(i=>ir.push([
-      i.date||"",i._sec,i.unit||"",i.system||"",String(i.failure||"").replace(/\n/g,' '),String(i.causes||"").replace(/\n/g,' '),
-      String(i.action||"").replace(/\n/g,' '),/^y/i.test(i.root)?"Yes":"No",/^y/i.test(i.rectifiable)?"Closed":"Open"]));
-    const ws8=XLSX.utils.aoa_to_sheet(ir);ws8['!cols']=[{wch:11},{wch:7},{wch:11},{wch:18},{wch:50},{wch:50},{wch:50},{wch:10},{wch:8}];
-    XLSX.utils.book_append_sheet(wb,ws8,"Incident Register");
-    XLSX.writeFile(wb,"KTM_RSM_Management_Report_"+MONTHS_P[R.m0]+"-"+MONTHS_P[R.m1]+"_"+YEAR+".xlsx");
-    if(typeof toast==='function')toast("Management report Excel downloaded ✔");
+    const{R}=RPT._last,{c,p}=R,wb=XLSX.utils.book_new(),pc=v=>v!=null&&isFinite(v)?+(v*100).toFixed(1):'';
+    const sum=[["COACH & PGC PERFORMANCE REPORT"],["Report Period",R.periodLabel],["Report Date",new Date().toISOString().slice(0,10)],[],
+      ["","COACH","PGC"],["System failures",c.total,p.total],["Top failing system",c.top?tcase(c.top.system):"",p.top?tcase(p.top.system):""],
+      ["Average availability (% of target)",pc(c.availAvg),pc(p.availAvg)],["PM completion %",pc(c.pe),pc(p.pe)],
+      ["PM done / planned",c.peAsum+" / "+c.peTsum,p.peAsum+" / "+p.peTsum],["Incident reports",c.inc.length,p.inc.length],["Closed",c.closed,p.closed],["Open",c.open,p.open]];
+    const w0=XLSX.utils.aoa_to_sheet(sum);w0['!cols']=[{wch:36},{wch:22},{wch:22}];XLSX.utils.book_append_sheet(wb,w0,"Summary");
+    [[c,'COACH'],[p,'PGC']].forEach(function(z){const F=z[0],nm=z[1],X=rptFleetRows(F),a=[[nm+" — "+R.periodLabel],[]];
+      if(X.fleet){a.push(["CURRENT STATUS — Fleet Deployment "+X.fleet.date]);X.fleet.rows.forEach(r=>a.push(r));a.push([]);}
+      if(X.pe){a.push(["PE SCHEDULE — today"]);X.pe.forEach(r=>a.push(r));a.push([]);}
+      a.push(["MONTHLY PERFORMANCE"],["Month","Failures","Avail. actual","Avail. target","Avail. %","PM target","PM done","PM %","Incidents"]);
+      R.months.forEach(m=>a.push([MFULL_P[m],F.monthTotals[m],F.availM[m].act??"",F.availM[m].tgt??"",pc(F.availPct[m]),nzp(F.pmT[m]),nzp(F.pmA[m]),pc(F.peM[m]),F.incByM[m]]));
+      a.push(["TOTAL / AVERAGE",F.total,F.fleetAvg!=null?Math.round(F.fleetAvg):"","",pc(F.availAvg),F.peTsum,F.peAsum,pc(F.pe),F.inc.length],[]);
+      a.push(["FAILURES BY SYSTEM"],["#","System","Failures","Share %"]);
+      F.sysTotals.filter(x=>x.total>0).forEach((x,i)=>a.push([i+1,tcase(x.system),x.total,F.total?+(x.total/F.total*100).toFixed(1):""]));
+      a.push([],["FAILURES BY "+(nm==='PGC'?"TYPE":"CLASS")],[nm==='PGC'?"Type":"Class","Failures","Share %"]);
+      F.classes.forEach(cl=>a.push([cl,F.classTotals[cl],F.total?+(F.classTotals[cl]/F.total*100).toFixed(1):""]));
+      a.push([],["ROOT CAUSE (4M)"],["Element","Cases","Share %"]);F.fmTotals.forEach(x=>a.push([x.el,x.sum,F.fmSum?+(x.sum/F.fmSum*100).toFixed(1):""]));
+      const ws=XLSX.utils.aoa_to_sheet(a);ws['!cols']=[{wch:30},{wch:26},{wch:13},{wch:13},{wch:10},{wch:10},{wch:10},{wch:8},{wch:10}];XLSX.utils.book_append_sheet(wb,ws,nm);
+      const ir=[["Date","Unit","System","Failure","Causes","Action Taken","Status"]];
+      rptFleetIncs(F).forEach(i=>ir.push([i.date||"",i.unit||"",i.system||"",String(i.failure||"").replace(/\n/g,' '),String(i.causes||"").replace(/\n/g,' '),String(i.action||"").replace(/\n/g,' '),/^y/i.test(i.rectifiable)?"Closed":"Open"]));
+      const wi=XLSX.utils.aoa_to_sheet(ir);wi['!cols']=[{wch:11},{wch:11},{wch:20},{wch:50},{wch:45},{wch:45},{wch:8}];XLSX.utils.book_append_sheet(wb,wi,nm+" Incidents");});
+    XLSX.writeFile(wb,"COACH & PGC PERFORMANCE REPORT "+MONTHS_P[R.m0]+"-"+MONTHS_P[R.m1]+" "+YEAR+".xlsx");
+    if(typeof toast==='function')toast("Report Excel downloaded ✔");
   }catch(e){console.error(e);if(typeof toast==='function')toast("Excel export failed: "+e.message);}
 };
 window.rptExportPdf=function(btn){
@@ -4729,159 +4581,61 @@ window.rptExportPdf=function(btn){
   .catch(()=>{done();if(typeof toast==='function')toast('PDF library needs an internet connection — use 🖨 Print Report and choose “Save as PDF” instead.');});
 };
 function rptGenPdf(){
-  const{R,G}=RPT._last,{c,p}=R;
-  const doc0=rptDocInfo(false,R.periodKey);
-  const{jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const{R}=RPT._last,{c,p}=R,{jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'});
   const W=210,M=12,CW=W-2*M;let y=16;
   const NAVY=[11,42,91],NAVY2=[18,60,124],RED=[215,38,61],GOLD=[244,169,31],LINE=[200,205,214],MUT=[110,118,132],INK=[21,35,60];
-  const now=new Date();
-  const dateStr=now.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
-  /* ---- cover page ---- */
-  doc.setFillColor(...NAVY);doc.rect(0,0,210,297,'F');
-  doc.setFillColor(...NAVY2);doc.circle(200,18,38,'F');doc.circle(6,275,30,'F');
-  doc.setFillColor(...RED);doc.roundedRect(W/2-9,52,18,18,4,4,'F');
-  doc.setFontSize(13);doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.text('KTM',W/2,63.5,{align:'center'});
-  doc.setFontSize(9);doc.setTextColor(...GOLD);doc.text('M A N A G E M E N T   R E P O R T',W/2,86,{align:'center'});
-  doc.setFontSize(23);doc.setTextColor(255,255,255);
-  doc.text('ROLLING STOCK PERFORMANCE',W/2,102,{align:'center'});
-  doc.text('MANAGEMENT REPORT',W/2,112,{align:'center'});
-  doc.setDrawColor(...GOLD);doc.setLineWidth(1.1);doc.line(W/2-24,120,W/2+24,120);
-  doc.setFontSize(11.5);doc.setFont('helvetica','normal');doc.setTextColor(210,220,240);
-  doc.text('Passenger Coaches (COACH)  &  Power Generator Cars (PGC)',W/2,130,{align:'center'});
-  doc.setFont('helvetica','bold');doc.setFontSize(12.5);doc.setTextColor(255,255,255);
-  doc.text('Reporting Period: '+R.periodLabel,W/2,142,{align:'center'});
-  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(190,200,220);
-  const meta=[['Report Date',dateStr]];
-  let my=210;meta.forEach(mv=>{doc.setFont('helvetica','bold');doc.text(mv[0]+':',W/2-42,my);doc.setFont('helvetica','normal');doc.text(String(mv[1]),W/2-8,my);my+=7;});
-  doc.setFontSize(8);doc.setTextColor(150,165,195);
-  doc.text('KTM ROLLING STOCK MAINTENANCE  ·  AUTO-GENERATED FROM LIVE DASHBOARD DATA',W/2,286,{align:'center'});
-  /* ---- helpers ---- */
+  const P_=v=>rStrip(rPct(v)),dateStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  doc.setFillColor(...NAVY);doc.rect(0,0,210,297,'F');doc.setFillColor(...NAVY2);doc.circle(200,18,38,'F');doc.circle(6,275,30,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(...GOLD);doc.text('P E R F O R M A N C E   R E P O R T',W/2,86,{align:'center'});
+  doc.setFontSize(24);doc.setTextColor(255,255,255);doc.text('COACH & PGC',W/2,102,{align:'center'});doc.text('PERFORMANCE REPORT',W/2,113,{align:'center'});
+  doc.setDrawColor(...GOLD);doc.setLineWidth(1.1);doc.line(W/2-24,121,W/2+24,121);
+  doc.setFontSize(12.5);doc.text('Reporting Period: '+R.periodLabel,W/2,134,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(190,200,220);doc.text('Report Date: '+dateStr,W/2,144,{align:'center'});
+  doc.setFontSize(8);doc.setTextColor(150,165,195);doc.text('KTM ROLLING STOCK MAINTENANCE  ·  FROM THE DASHBOARD DATA',W/2,286,{align:'center'});
   const ensure=h=>{if(y+h>281){doc.addPage();y=16;}};
   const sect=t=>{ensure(14);doc.setFillColor(...NAVY);doc.rect(M,y,CW,7.4,'F');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(255,255,255);doc.text(t,M+2.6,y+5);y+=11;doc.setTextColor(...INK);};
   const sub=t=>{ensure(10);doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(...NAVY);doc.text(t,M,y);y+=4.5;doc.setTextColor(...INK);};
-  const para=t=>{doc.setFont('helvetica','normal');doc.setFontSize(8.6);doc.setTextColor(...INK);
-    const lines=doc.splitTextToSize(rStrip(t),CW);ensure(lines.length*3.9+3);doc.text(lines,M,y);y+=lines.length*3.9+2.5;};
-  const bullets=arr=>{doc.setFont('helvetica','normal');doc.setFontSize(8.4);doc.setTextColor(...INK);
-    arr.forEach(x=>{const lines=doc.splitTextToSize(rStrip(x),CW-5);ensure(lines.length*3.8+2.2);
-      doc.setFillColor(...RED);doc.circle(M+1.4,y-1.1,0.8,'F');doc.text(lines,M+4.6,y);y+=lines.length*3.8+1.6;});y+=1.5;};
-  const metrics=items=>{ensure(20);doc.autoTable({startY:y,margin:{left:M,right:M},theme:'grid',
-    styles:{halign:'center',fontSize:8,cellPadding:2,lineColor:LINE,fillColor:[238,241,246]},
+  const metrics=items=>{ensure(20);doc.autoTable({startY:y,margin:{left:M,right:M},theme:'grid',styles:{halign:'center',fontSize:8,cellPadding:2,lineColor:LINE,fillColor:[238,241,246]},
     body:[items.map(i=>String(i[1])),items.map(i=>i[0])],
-    didParseCell:d=>{if(d.row.index===0){d.cell.styles.fontStyle='bold';d.cell.styles.fontSize=11.5;d.cell.styles.textColor=NAVY;}else{d.cell.styles.fontSize=6.6;d.cell.styles.textColor=MUT;}}});
-    y=doc.lastAutoTable.finalY+5;};
-  const table=(h,r,fs)=>{ensure(18);doc.autoTable({startY:y,margin:{left:M,right:M},theme:'grid',head:[h],body:r.length?r:[h.map(()=>'—')],
-    headStyles:{fillColor:NAVY2,textColor:255,fontSize:fs||7.6,fontStyle:'bold'},
-    styles:{font:'helvetica',fontSize:fs||7.4,cellPadding:1.6,lineColor:LINE,textColor:[20,25,35]},
-    alternateRowStyles:{fillColor:[247,249,253]}});
-    y=doc.lastAutoTable.finalY+5;};
-  /* ---- A executive summary ---- */
-  doc.addPage();y=16;
-  sect('A · EXECUTIVE SUMMARY');
-  metrics([['Total Coach Cases',c.total],['Total PGC Cases',p.total],['Total Reported',R.totalCases],['Incident Reports',R.incN],['Open',R.open],['Closed',R.closed]]);
-  metrics([['Critical Cases',R.critical],['Completion Rate',rStrip(rPct(R.completion))],['Avail (Coach)',rStrip(rPct(c.availAvg))],['Avail (PGC)',rStrip(rPct(p.availAvg))],['PM Completion',rStrip(rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null))],['Overall',R.grade.label]]);
-  sub('Monthly Performance Trend');
-  para((R.prevM!=null?('Failure volume in '+MFULL_P[R.lastM]+' was '+R.curM+' cases against '+R.prevM+' in '+MFULL_P[R.lastM-1]+' ('+(R.curM>R.prevM?'+':(R.curM<R.prevM?'-':'±'))+Math.abs(R.curM-R.prevM)+' MoM). '):'')
-    +(R.peakM?('Peak month: '+MFULL_P[R.peakM.m]+' ('+R.peakM.total+' cases); best month: '+(R.lowM?MFULL_P[R.lowM.m]+' ('+R.lowM.total+' cases)':'—')+'. '):'')
-    +(R.halfDir?('Trajectory across the period is '+R.halfDir.dir+' ('+R.halfDir.h1+' → '+R.halfDir.h2+').'):''));
-  table(['Month','Coach','PGC','Total','Incidents'],R.monthlySeries.map(x=>[MFULL_P[x.m],x.coach,x.pgc,x.total,x.inc]).concat([['TOTAL',c.total,p.total,R.totalCases,R.incN]]));
-  /* ---- B KPI ---- */
-  sect('B · KPI SUMMARY');
-  table(['KPI','Target','Actual','Status'],[
-    ['Fleet Availability — COACH','100%',rStrip(rPct(c.availAvg)),c.availAvg==null?'n/a':(c.availAvg>=1?'ON TARGET':'BELOW')],
-    ['Fleet Availability — PGC','100%',rStrip(rPct(p.availAvg)),p.availAvg==null?'n/a':(p.availAvg>=1?'ON TARGET':'BELOW')],
-    ['PM Completion — COACH','≥95%',rStrip(rPct(c.pe))+' ('+c.peAsum+'/'+c.peTsum+')',c.pe==null?'n/a':(c.pe>=0.95?'ON TARGET':(c.pe>=0.85?'WATCH':'BELOW'))],
-    ['PM Completion — PGC','≥95%',rStrip(rPct(p.pe))+' ('+p.peAsum+'/'+p.peTsum+')',p.pe==null?'n/a':(p.pe>=0.95?'ON TARGET':(p.pe>=0.85?'WATCH':'BELOW'))],
-    ['Incident Case Closure','≥90%',rStrip(rPct(R.completion))+' ('+R.closed+'/'+R.incN+')',R.completion==null?'n/a':(R.completion>=0.9?'ON TARGET':(R.completion>=0.75?'WATCH':'BELOW'))],
-    ['Root-Cause Confirmation','≥80%',rStrip(rPct(R.rootRate)),R.rootRate==null?'n/a':(R.rootRate>=0.8?'ON TARGET':'BELOW')],
-    ['Failure Trend (MoM)','No increase',R.prevM==null?'—':(R.prevM+' → '+R.curM),R.prevM==null?'n/a':(R.curM<=R.prevM?'ON TARGET':'RISING')]]);
-  /* ---- C performance ---- */
-  sect('C · PERFORMANCE ANALYSIS');
-  sub('C1 · Coach Performance Summary');
-  para('The COACH fleet recorded '+c.total+' system failures'+(c.top?', led by '+tcase(c.top.system)+' ('+c.top.total+' cases, '+rStrip(c.total?rPct(c.top.total/c.total):'—')+')':'')+'. Availability averaged '+rStrip(rPct(c.availAvg))+' of target; PM completion '+rStrip(rPct(c.pe))+'. '+c.inc.length+' incident reports ('+c.closed+' closed, '+c.open+' open).');
-  sub('C2 · PGC Performance Summary');
-  para('The PGC fleet recorded '+p.total+' system failures'+(p.top?', led by '+tcase(p.top.system)+' ('+p.top.total+' cases, '+rStrip(p.total?rPct(p.top.total/p.total):'—')+')':'')+'. Availability averaged '+rStrip(rPct(p.availAvg))+' of target; PM completion '+rStrip(rPct(p.pe))+'. '+p.inc.length+' incident reports ('+p.closed+' closed, '+p.open+' open).');
-  sub('C3 · Monthly Performance Comparison — Performance by Month');
-  table(['Month','Coach','PGC','Total','C Avail%','P Avail%','C PM%','P PM%'],
-    R.months.map(m=>[MFULL_P[m],c.monthTotals[m],p.monthTotals[m],c.monthTotals[m]+p.monthTotals[m],rStrip(rPct(c.availPct[m])),rStrip(rPct(p.availPct[m])),rStrip(rPct(c.peM[m])),rStrip(rPct(p.peM[m]))]));
-  sub('C4 · Coach vs PGC Comparison');
-  table(['Metric','COACH','PGC','Fleet'],[
-    ['System failure cases',c.total,p.total,R.totalCases],
-    ['Top failing system',c.top?tcase(c.top.system):'—',p.top?tcase(p.top.system):'—','—'],
-    ['Avg availability vs target',rStrip(rPct(c.availAvg)),rStrip(rPct(p.availAvg)),'target 100%'],
-    ['PM completion',rStrip(rPct(c.pe)),rStrip(rPct(p.pe)),rStrip(rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null))],
-    ['Incident reports',c.inc.length,p.inc.length,R.incN],
-    ['Case closure',c.inc.length?rStrip(rPct(c.closed/c.inc.length)):'—',p.inc.length?rStrip(rPct(p.closed/p.inc.length)):'—',rStrip(rPct(R.completion))],
-    ['Dominant 4M cause',c.fmTop?c.fmTop.el:'—',p.fmTop?p.fmTop.el:'—',R.fm[0]&&R.fm[0].total?R.fm[0].el:'—']]);
-  sub('C5 · System Type Analysis  &  C8 · Top 10 Repeated Failures');
-  table(['#','System','Coach','PGC','Total','Share','Trend'],
-    R.systems.filter(s=>s.total>0).slice(0,10).map((s,i)=>[i+1,tcase(s.system),s.coach||'',s.pgc||'',s.total,rStrip(R.totalCases?rPct(s.total/R.totalCases):'—'),R.sysTrend[s.system]==='▲'?'UP':(R.sysTrend[s.system]==='▼'?'DOWN':'FLAT')]));
-  sub('C6 · Coach Type Analysis — Performance by Category');
-  table(['Fleet','Class','Failures','Share'],
-    c.classes.map(cl=>['COACH',cl,c.classTotals[cl],rStrip(c.total?rPct(c.classTotals[cl]/c.total):'—')])
-    .concat(p.classes.map(cl=>['PGC',cl,p.classTotals[cl],rStrip(p.total?rPct(p.classTotals[cl]/p.total):'—')])));
-  sub('C7 · Failure Trend Analysis');
-  para((R.halfDir?('Total failures moved from '+R.halfDir.h1+' in the first half to '+R.halfDir.h2+' in the second half — a '+R.halfDir.dir+' trend. '):'')
-    +(R.peakM?('Heaviest month: '+MFULL_P[R.peakM.m]+' ('+R.peakM.total+'). '):'')+'See charts section for detail.');
-  /* ---- D maintenance ---- */
-  sect('D · MAINTENANCE ANALYSIS');
-  metrics([['PM Planned',c.peTsum+p.peTsum],['PM Completed',c.peAsum+p.peAsum],['PM %',rStrip(rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null))],['Corrective',R.incN],['Pending',R.open],['Completed',R.closed]]);
-  sub('D1 · Preventive Maintenance Summary');
-  table(['Month','C Target','C Actual','C %','P Target','P Actual','P %'],
-    R.months.map(m=>[MFULL_P[m],nzp(c.pmT[m]),nzp(c.pmA[m]),rStrip(rPct(c.peM[m])),nzp(p.pmT[m]),nzp(p.pmA[m]),rStrip(rPct(p.peM[m]))])
-    .concat([['TOTAL',c.peTsum,c.peAsum,rStrip(rPct(c.pe)),p.peTsum,p.peAsum,rStrip(rPct(p.pe))]]));
-  sub('D2 · Corrective Maintenance Summary');
-  table(['Fleet','Reported','Completed','Pending','Critical','Closure %'],[
-    ['COACH',c.inc.length,c.closed,c.open,c.critical,c.inc.length?rStrip(rPct(c.closed/c.inc.length)):'—'],
-    ['PGC',p.inc.length,p.closed,p.open,p.critical,p.inc.length?rStrip(rPct(p.closed/p.inc.length)):'—'],
-    ['TOTAL',R.incN,R.closed,R.open,R.critical,rStrip(rPct(R.completion))]]);
-  sub('D3 · Reliability — MTTR & MTBF');
-  table(['Metric','COACH','PGC','Basis / Remark'],[
-    ['MTBF — fleet-days between failures',rStrip(rF1(c.mtbfFleet)),rStrip(rF1(p.mtbfFleet)),'Calendar days in period ÷ failures'],
-    ['MTBF — unit-operating-days',rStrip(rF1(c.mtbfUnit)),rStrip(rF1(p.mtbfUnit)),'Period days × avg available units ÷ failures'],
-    ['Average Repair Time','n/a','n/a','Repair timestamps not captured in dataset'],
-    ['MTTR — Mean Time To Repair','n/a','n/a','Recommend capturing repair durations']]);
-  sub('D4 · Root Cause Analysis (4M)');
-  table(['Element','Coach','PGC','Total','Share'],R.fm.map(x=>[x.el,x.coach||'',x.pgc||'',x.total,rStrip(R.fmSum?rPct(x.total/R.fmSum):'—')]));
-  sub('D5 · Most Frequent Defects');
-  table(['#','System (incident register)','Reports'],R.incSystems.slice(0,8).map((s,i)=>[i+1,s[0],s[1]]));
-  if(R.repeatUnits.length)para('Repeat-failure units: '+R.repeatUnits.slice(0,6).map(u=>u.unit+' ('+u.sec+', '+u.n+' reports)').join(' · ')+'.');
-  sub('D6 · Maintenance Effectiveness');
-  para('PM completion of '+rStrip(rPct((c.peTsum+p.peTsum)?(c.peAsum+p.peAsum)/(c.peTsum+p.peTsum):null))+' against plan. '
-    +(R.halfDir?('Failure trend across the period is '+R.halfDir.dir+' ('+R.halfDir.h1+' → '+R.halfDir.h2+'). '):'')
-    +'Case closure stands at '+rStrip(rPct(R.completion))+' against a ≥90% expectation.');
-  /* ---- E charts ---- */
-  doc.addPage();y=16;
-  sect('E · CHARTS & VISUALISATIONS');
-  const chList=[['rptChTrend','Monthly Failure Trend'],['rptChSys','System Type Distribution'],['rptChClass','Coach Type Distribution'],
-    ['rptChRoot','Root Cause Distribution (4M)'],['rptChFail','Failure Trend & Cumulative'],['rptChTop','Top Defective Systems'],
-    ['rptChCmp','Coach vs PGC Performance'],['rptChKpi','Monthly KPI Achievement']];
-  const IW=(CW-6)/2;
-  for(let i=0;i<chList.length;i+=2){
-    const im1=rptChartImg(chList[i][0]),im2=chList[i+1]?rptChartImg(chList[i+1][0]):null;
-    const h1=im1?IW*im1.h/im1.w:0,h2=im2?IW*im2.h/im2.w:0,rowH=Math.max(h1,h2)+9;
-    ensure(rowH);
+    didParseCell:d=>{if(d.row.index===0){d.cell.styles.fontStyle='bold';d.cell.styles.fontSize=10.5;d.cell.styles.textColor=NAVY;}else{d.cell.styles.fontSize=6.6;d.cell.styles.textColor=MUT;}}});y=doc.lastAutoTable.finalY+5;};
+  const table=(h,r,fs,opt)=>{ensure(18);doc.autoTable(Object.assign({startY:y,margin:{left:M,right:M},theme:'grid',head:[h],body:r.length?r:[h.map(()=>'—')],
+    headStyles:{fillColor:NAVY2,textColor:255,fontSize:fs||7.6,fontStyle:'bold'},styles:{font:'helvetica',fontSize:fs||7.4,cellPadding:1.6,lineColor:LINE,textColor:[20,25,35]},
+    alternateRowStyles:{fillColor:[247,249,253]}},opt||{}));y=doc.lastAutoTable.finalY+5;};
+  const charts=(a,b)=>{const IW=(CW-6)/2,i1=rptChartImg(a[0]),i2=rptChartImg(b[0]);const h1=i1?IW*i1.h/i1.w:0,h2=i2?IW*i2.h/i2.w:0;ensure(Math.max(h1,h2)+9);
     doc.setFont('helvetica','bold');doc.setFontSize(8.2);doc.setTextColor(...NAVY);
-    if(im1){doc.text(chList[i][1],M,y);doc.addImage(im1.url,'PNG',M,y+2,IW,h1);}
-    if(im2){doc.text(chList[i+1][1],M+IW+6,y);doc.addImage(im2.url,'PNG',M+IW+6,y+2,IW,h2);}
-    y+=rowH;
-  }
-  /* ---- G appendix ---- */
-  sect('G · APPENDIX — INCIDENT REGISTER ('+R.incN+' RECORDS)');
-  table(['Date','Fleet','Unit','System','Failure Description','Root','Status'],
-    R.inc.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).map(i=>[
-      i.date||'—',i._sec,i.unit||'—',i.system||'—',String(i.failure||'').replace(/\n/g,' ').slice(0,110),
-      /^y/i.test(i.root)?'Yes':'No',/^y/i.test(i.rectifiable)?'Closed':'Open']),6.8);
-  /* ---- headers/footers ---- */
+    if(i1){doc.text(a[1],M,y);doc.addImage(i1.url,'PNG',M,y+2,IW,h1);}if(i2){doc.text(b[1],M+IW+6,y);doc.addImage(i2.url,'PNG',M+IW+6,y+2,IW,h2);}y+=Math.max(h1,h2)+9;};
+  doc.addPage();y=16;
+  sect('SUMMARY · COACH AND PGC AT A GLANCE');
+  table(['','COACH','PGC'],[['System failures',c.total,p.total],['Top failing system',c.top?tcase(c.top.system):'—',p.top?tcase(p.top.system):'—'],
+    ['Average availability (% of target)',P_(c.availAvg),P_(p.availAvg)],['PM completion',P_(c.pe)+' ('+c.peAsum+'/'+c.peTsum+')',P_(p.pe)+' ('+p.peAsum+'/'+p.peTsum+')'],
+    ['Incident reports (closed / open)',c.inc.length+' ('+c.closed+' / '+c.open+')',p.inc.length+' ('+p.closed+' / '+p.open+')']],8.2);
+  [[c,1,'C'],[p,2,'P']].forEach(function(z){const F=z[0],part=z[1],id=z[2],P=F.key==='pgc',nm=P?'PGC':'COACH',X=rptFleetRows(F);
+    doc.addPage();y=16;
+    sect('PART '+part+' · '+nm+(P?' — POWER GENERATOR CARS':' — PASSENGER COACHES'));
+    metrics([['System failures',F.total],['Top system',F.top?tcase(F.top.system):'—'],['Avg availability',P_(F.availAvg)],['PM completion',P_(F.pe)],['Incidents',F.inc.length],['Closed / Open',F.closed+' / '+F.open]]);
+    if(X.fleet){sub(part+'.1 · Current Status — Fleet Deployment '+X.fleet.date);table(['Item',nm],X.fleet.rows.map(r=>[r[0],r[1]]),7.6);}
+    if(X.pe){sub((X.fleet?'':part+'.1 · ')+'PE Schedule — today');table(['Item',nm],X.pe.map(r=>[r[0],r[1]]),7.6);}
+    sub(part+'.2 · Monthly Performance');
+    table(['Month','Failures','Avail. act','Avail. tgt','Avail. %','PM tgt','PM done','PM %','Incidents'],
+      R.months.map(m=>[MFULL_P[m],F.monthTotals[m],rN(F.availM[m].act),rN(F.availM[m].tgt),P_(F.availPct[m]),nzp(F.pmT[m]),nzp(F.pmA[m]),P_(F.peM[m]),F.incByM[m]])
+      .concat([['TOTAL / AVG',F.total,F.fleetAvg!=null?Math.round(F.fleetAvg):'—','—',P_(F.availAvg),F.peTsum,F.peAsum,P_(F.pe),F.inc.length]]));
+    sub(part+'.3 · Failures by System');
+    table(['#','System','Failures','Share'],F.sysTotals.filter(x=>x.total>0).map((x,i)=>[i+1,tcase(x.system),x.total,F.total?P_(x.total/F.total):'—']));
+    sub(part+'.4 · Failures by '+(P?'PGC Type':'Coach Class'));
+    table([P?'Type':'Class','Failures','Share'],F.classes.map(cl=>[cl,F.classTotals[cl],F.total?P_(F.classTotals[cl]/F.total):'—']));
+    sub(part+'.5 · Root Cause (4M)');
+    table(['4M element','Cases','Share'],F.fmTotals.map(x=>[x.el,x.sum,F.fmSum?P_(x.sum/F.fmSum):'—']));
+    charts(['rptCh'+id+'1',nm+' — Monthly Failures & Availability'],['rptCh'+id+'2',nm+' — Failures by System']);
+    const inc=rptFleetIncs(F);
+    sub(part+'.6 · Incident Reports ('+inc.length+')');
+    table(['Date','Unit','System','Failure','Status'],inc.map(i=>[i.date||'—',i.unit||'—',i.system||'—',String(i.failure||'').replace(/\n/g,' ').slice(0,120),/^y/i.test(i.rectifiable)?'Closed':'Open']),6.8);
+  });
   const pc=doc.internal.getNumberOfPages();
-  for(let i=2;i<=pc;i++){doc.setPage(i);
-    doc.setFont('helvetica','normal');doc.setFontSize(7.4);doc.setTextColor(...MUT);
-    doc.text('Rolling Stock Performance Management Report — '+R.periodLabel,M,8);
-    doc.setDrawColor(...LINE);doc.setLineWidth(.25);doc.line(M,10,W-M,10);
-    doc.text('KTM Rolling Stock Maintenance · Internal — Management',M,291);
-    doc.text('Page '+i+' of '+pc,W-M,291,{align:'right'});}
-  doc.save('KTM_RSM_Management_Report_'+MONTHS_P[R.m0]+'-'+MONTHS_P[R.m1]+'_'+YEAR+'.pdf');
-  if(typeof toast==='function')toast('Management report PDF downloaded ✔');
+  for(let i=2;i<=pc;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7.4);doc.setTextColor(...MUT);
+    doc.text('Coach & PGC Performance Report — '+R.periodLabel,M,8);doc.setDrawColor(...LINE);doc.setLineWidth(.25);doc.line(M,10,W-M,10);
+    doc.text('KTM Rolling Stock Maintenance',M,291);doc.text('Page '+i+' of '+pc,W-M,291,{align:'right'});}
+  doc.save('COACH & PGC PERFORMANCE REPORT '+MONTHS_P[R.m0]+'-'+MONTHS_P[R.m1]+' '+YEAR+'.pdf');
+  if(typeof toast==='function')toast('Report PDF downloaded ✔');
 }
 
 /* ---------------- mount (adds tab + panel without touching existing markup) ---------------- */
@@ -8347,6 +8101,10 @@ function mount(){
   window.addEventListener('rsd-backup-applied',function(){if(visible())setTimeout(render,0)});
 }
 window.PE={
+  /* PE status counts for the Report */
+  stats:function(){var cc=counts(),rows=P().rows,pg={all:rows.length,o30:0,p30:0,o90:0,p90:0};
+    rows.forEach(function(r){var k=pgcCalc(r);if(k.ps30==='OVERDUE')pg.o30++;else if(k.ps30==='PLAN FOR PE')pg.p30++;if(k.ps90==='OVERDUE')pg.o90++;else if(k.ps90==='PLAN FOR PE')pg.p90++;});
+    return {coach:{all:cc.all,OVERDUE:cc.OVERDUE,'PLAN FOR PE':cc['PLAN FOR PE'],OKAY:cc.OKAY,'-':cc['-']},pgc:pg};},
   open:function(){
     document.querySelectorAll('nav.tabs .tab').forEach(function(t){t.classList.remove('on')});
     document.querySelectorAll('main > section.panel').forEach(function(p){if(p.id!=='pPE')p.style.display='none'});
