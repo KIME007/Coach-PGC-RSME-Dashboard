@@ -5043,7 +5043,7 @@ pre.dly-wa{background:#0f1b28;color:#d9f7e4;padding:14px;border-radius:11px;font
 #dlySheet table{border-collapse:collapse;width:100%;font-size:.76rem;margin-bottom:12px}
 #dlySheet th{background:#eef3f9;text-align:left;padding:6px 8px;border:1px solid #c9d6e5;font-size:.66rem;letter-spacing:.6px;text-transform:uppercase;color:#3f597c}
 #dlySheet td{padding:5px 8px;border:1px solid #dbe4ee}
-#dlySheet .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
+#dlySheet .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px}
 #dlySheet .k{border:1px solid #c9d6e5;border-radius:8px;padding:8px 10px;border-left:4px solid var(--navy3)}
 #dlySheet .k .l{font-size:.6rem;letter-spacing:.6px;text-transform:uppercase;color:#6b7d94;font-weight:800}
 #dlySheet .k .v{font-size:1.15rem;font-weight:800;color:var(--navy);line-height:1.2}
@@ -5250,6 +5250,7 @@ function metrics(d){
     pgcTot:pt, pgcOk:po,
     pgcServ: pt? po/pt : null,
     twinShare: po? twin/po : null,                   // redundancy: 2-engine share of serviceable
+    eng2: twin, eng1: (d.pgc||[]).filter(function(p){return p.ok&&num(p.eng)===1}).length,
     engines: engines,
     dutyCover: num(d.duty)? po/num(d.duty) : null    // serviceable units per duty train
   };
@@ -5353,6 +5354,9 @@ function panelHtml(){return ''
           +'<div><label class="dly-lab">Serviceable (auto)</label><input class="dly-in" id="dlyPgcAv" readonly></div>'
           +'<div><label class="dly-lab">Duty Train</label><input class="dly-in" id="dlyDuty" type="number"></div>'
           +'<div><label class="dly-lab">Total Units (auto)</label><input class="dly-in" id="dlyPgcTot" readonly></div></div>'
+        +'<div class="dly-r3" style="margin-bottom:10px">'
+          +'<div><label class="dly-lab">⚙ 2 Engines (auto)</label><input class="dly-in" id="dlyPgc2E" readonly></div>'
+          +'<div><label class="dly-lab">⚙ 1 Engine (auto)</label><input class="dly-in" id="dlyPgc1E" readonly></div><div></div></div>'
         +'<div class="dly-mini" style="margin-bottom:6px">Unit · Engines · Assignment · Serviceable (click ✅ / ❌ to toggle)</div>'
         +'<div id="dlyPgcList"></div><button class="dly-btn s" onclick="dlyAddPGC()">+ Add unit</button>'
         +'<div id="dlyPgcTally" class="dly-tally"></div></div></div>'
@@ -5547,7 +5551,9 @@ function waPGC(){
   var sp=D.pgc.filter(function(p){return p.ok&&isSpare(p)});
   var s='🚉 PGC STATUS\n';
   s+='📅 '+waDate(D.date)+'\n';
-  s+='🔹 AVAILABILITY : '+pgcOK()+'/'+D.pgc.length+'\n\n';
+  var mm=metrics(D);
+  s+='🔹 AVAILABILITY : '+pgcOK()+'/'+D.pgc.length+'\n';
+  s+='⚙️ 2 ENGINES : '+mm.eng2+' | 1 ENGINE : '+mm.eng1+'\n\n';
 
   s+='🟢 OPERATING : '+op.length+'\n';
   s+=(op.length?op.map(pgcLine).join('\n'):'• NIL')+'\n\n';
@@ -5585,7 +5591,7 @@ function renderKpis(){
     +kCard('','Coach Availability',m.avail,'declared availability figure',delta(m.avail,pm&&pm.avail))
     +kCard('teal','In Traffic / Spare',m.op+' / '+m.spare,'utilisation '+pct(m.utilisation,0)+' · spare cover '+pct(m.spareRatio,0),'')
     +kCard(m.pgcServ>=0.9?'ok':'red','PGC Serviceability',m.pgcOk+'/'+m.pgcTot,
-        pct(m.pgcServ,1)+' serviceable · '+pct(m.twinShare,0)+' twin-engine',delta(m.pgcServ,pm&&pm.pgcServ,false,'pct'))
+        pct(m.pgcServ,1)+' serviceable · '+m.eng2+' × 2 engines · '+m.eng1+' × 1 engine',delta(m.pgcServ,pm&&pm.pgcServ,false,'pct'))
     +kCard(m.dutyCover>=1.4?'ok':m.dutyCover>=1.2?'gold':'red','Duty Cover Ratio',m.dutyCover!=null?m.dutyCover.toFixed(2)+'×':'—',
         m.pgcOk+' serviceable vs '+m.duty+' duty trains','')
     +kCard(m.um+m.ump>0?'red':'ok','UM Backlog',(m.um+m.ump),
@@ -5739,7 +5745,7 @@ function sheetHtml(){
     +k('','In Operation',m.op)
     +k('','Total Spare',m.spare)
     +k(m.readiness>=0.9?'ok':'cr','Fleet Readiness',pct(m.readiness,1))
-    +k('gd','PGC Serviceable',m.pgcOk+'/'+m.pgcTot)
+    +k('gd','PGC Serviceable',m.pgcOk+'/'+m.pgcTot)+k('','PGC 2E / 1E',m.eng2+' / '+m.eng1)
     +k(down.length?'cr':'ok','Duty Train',D.duty)
     +'</div>';
 
@@ -5839,7 +5845,7 @@ function render(keepFocus){
     ? 'Availability typed in by hand. Auto count would be <b>'+m.availAuto+'</b> ('+m.op+' in operation + '+m.spare+' spare) — click the <b>MANUAL</b> tag to go back to auto.'
     : 'Availability auto-counted: <b>'+m.op+'</b> in operation + <b>'+m.spare+'</b> spare = <b>'+m.availAuto+'</b>. Click the <b>AUTO</b> tag to type a figure instead.';
   $('#dlyOpTot').value=m.op; $('#dlySpTot').value=m.spare;
-  $('#dlyPgcAv').value=m.pgcOk+'/'+m.pgcTot; $('#dlyPgcTot').value=m.pgcTot;
+  $('#dlyPgcAv').value=m.pgcOk+'/'+m.pgcTot; $('#dlyPgcTot').value=m.pgcTot;if($('#dlyPgc2E')){$('#dlyPgc2E').value=m.eng2;$('#dlyPgc1E').value=m.eng1;}
   liveCounts();
   if(!keepFocus){ sortTypes(); buildInputs(); }
   $('#dlyWa').textContent=waText();
