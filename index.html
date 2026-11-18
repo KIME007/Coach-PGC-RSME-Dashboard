@@ -3457,7 +3457,7 @@ function colCard(sec,gi,ci,c){
   var cc=coaches(c.units),pp=(c.pgc||[]).concat(pgcs(c.units)),empty=!c.units.length&&!pp.length;
   var hid=empty&&!SHOW_EMPTY&&!SEL.length;
   var at=function(list,i){return [sec,gi,ci,list,i]};
-  var uChips=c.units.map(function(u,i){return (classOf(u.id)==='PGC'&&sec!=='detained')?'':chip(u,at('units',i))}).join('');
+  var uChips=c.units.map(function(u,i){return classOf(u.id)==='PGC'?'':chip(u,at('units',i))}).join('');
   var pChips=(c.pgc||[]).map(function(u,i){return chip(u,at('pgc',i))}).join('')+c.units.map(function(u,i){return classOf(u.id)==='PGC'?chip(u,at('units',i)):''}).join('');
   return '<div class="fb-col'+(empty?' fb-emp':'')+(hid?' hid':'')+'" data-drop="'+[sec,gi,ci].join('|')+'" ondragover="FLEET.over(event)" ondragleave="FLEET.leave(event)" ondrop="FLEET.drop(event)" onclick="FLEET.tapCol(event,this)">'
     +(empty?'':'<button class="fb-all" title="Select all in this column" onclick="event.stopPropagation();FLEET.selCol(\''+[sec,gi,ci].join('|')+'\')">'+(colAllSel([sec,gi,ci].join('|'))?'☑':'☐')+'</button>')
@@ -3465,7 +3465,7 @@ function colCard(sec,gi,ci,c){
     +'<div class="h" onclick="event.stopPropagation();FLEET.edit(\''+sec+'\','+gi+','+ci+')" title="Click to edit this column">'
     +'<b>'+esc(c.name||'—')+'</b>'+(c.note?'<small>'+esc(c.note)+'</small>':'')+'</div>'
     +'<div class="u">'+uChips+'</div>'
-    +(sec!=='detained'&&(pp.length||sec==='service')?'<div class="p"><i>'+(sec==='service'?'PGC ON TRAIN':'SPARE PGC')+'</i>'+(pp.length?pChips:'<i style="color:#4a4f63">—</i>')+'</div>':'')
+    +((pp.length||sec==='service')?'<div class="p"><i>'+(sec==='service'?'PGC ON TRAIN':sec==='spare'?'SPARE PGC':'DETAINED PGC')+'</i>'+(pp.length?pChips:'<i style="color:#4a4f63">—</i>')+'</div>':'')
     +'<div class="f"><span>'+(sec==='service'?'Operation':sec==='spare'?'Spare':'Detained')+'</span><b>'+(sec==='detained'&&!cc.length&&pp.length?pp.length+' PGC':cc.length+(sec==='detained'&&pp.length?' + '+pp.length+' PGC':''))+'</b></div></div>';
 }
 var PENDING=false;
