@@ -3651,6 +3651,8 @@ function dailyFrom(b,base){
   e.spare=dorder.filter(function(d){return counted(dep[d]||[]).length}).map(function(d){return {depot:d,items:toItems(countBy(dep[d]),['ASC','ADNS','AFC','ABC'])}});
   /* PGC: only operating + spare rows that do not tally are brought in line; Minor/Major services stay as keyed */
   e.pgc=e.pgc||[];tallyPgc(e.pgc,pgcMap(b));
+  /* Unscheduled Maintenance (coach + PGC) is updated by hand only — never changed by the sync */
+  e.um=JSON.parse(JSON.stringify((base&&base.um)||[]));e.ump=JSON.parse(JSON.stringify((base&&base.ump)||[]));
   e.fleetSync=Date.now();
   return e;
 }
@@ -3658,7 +3660,8 @@ function syncDaily(iso,quiet){
   var b=boards()[iso];if(!b||typeof DAILY_RKEY==='undefined')return false;
   var recs={},live=null;try{recs=JSON.parse(localStorage.getItem(DAILY_RKEY)||'{}')||{}}catch(x){}
   try{live=JSON.parse(localStorage.getItem(DAILY_EKEY)||'null')}catch(x){}
-  var base=recs[iso]&&recs[iso].data?recs[iso].data:(live&&live.date===iso?live:null);
+  /* the entry on screen (if it is this day) wins over the stored record, so manual edits are kept */
+  var base=live&&live.date===iso?live:(recs[iso]&&recs[iso].data?recs[iso].data:null);
   if(!base){var prev=Object.keys(recs).filter(function(d){return d<iso}).sort().pop();base=prev?recs[prev].data:(live||{});base=JSON.parse(JSON.stringify(base));base.date=iso;}
   var e=dailyFrom(b,base);e.date=iso;
   recs[iso]={data:e,ts:Date.now()};
