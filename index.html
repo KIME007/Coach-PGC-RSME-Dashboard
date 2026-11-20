@@ -7489,10 +7489,12 @@ function wLast(x,r){return x.last||(r&&r.last!=='-'&&r.last<=x.plan?r.last:'')}
 function wSt(x,r){return x.st||(r?r.st:'')}
 function wLvl(x,r){return x.lvl||wkLevel(r)}
 /* coaches worth planning: can run, have a PE date, due by Saturday of next week; soonest first */
-function wkCands(sun){var sat=addDays(sun,6),lim=addDays(sat,7),items=(W().weeks[sun]||{items:[]}).items,have={},out=[];
+/* PE planning window: anything due within 15 days of today (same as PLAN FOR PE) or by Saturday of the week */
+var PLAN_DAYS=15;
+function wkCands(sun){var sat=addDays(sun,6),win=addDays(isoOf(today()),PLAN_DAYS),lim=addDays(sat,7)>win?addDays(sat,7):win,items=(W().weeks[sun]||{items:[]}).items,have={},out=[];
   items.forEach(function(x){have[keyOf(x.id)]=1});
   data().groups.forEach(function(g){g.rows.forEach(function(r){var k=calc(r);if(have[keyOf(r.id)]||k.next==='-'||r.st!=='IN OPERATIONS')return;   /* weekly planning: IN OPERATIONS only */
-    if(k.next<=lim)out.push({r:r,k:k,must:k.next<=sat});})});
+    if(k.next<=lim)out.push({r:r,k:k,must:k.next<=sat||k.next<=win});})});
   return out.sort(function(a,b){return a.k.days-b.k.days})}
 function wkLevel(r){return r?'PE '+(r.iv||defIv(r.id)):'-'}
 /* follows the schedule: a coach whose Last PE date (schedule) is newer than the one it was planned with has had its PE.
@@ -7518,7 +7520,7 @@ function forecastHtml(){
     +'<button class="fb-btn'+(WSHEET?' p':'')+'" onclick="PE.wsheet()">'+(WSHEET?'✏️ Edit view':'📄 Sheet view')+'</button><button class="fb-btn" onclick="PE.wprint()" title="Save as PDF / print — same page as the PDF sent to the team">⬇ PDF / Print</button><button class="fb-btn" onclick="PE.xlsW()" title="All weeks, one sheet per week">⬇ Weekly Excel</button></span></h3>';
   if(WSHEET)return h+'<div class="wd-hint">✏️ Click any cell on the page to change it · type a coach number in an empty row to add it · clear the number to remove it · Enter = done</div><div class="wd-wrap" data-kind="coach" onfocusout="PE.cell(event)" onkeydown="PE.cellKey(event)">'+forecastDoc(sun,1)+'</div></div>';
   if(!items.length)h+='<div class="wk-empty">No plan for week '+wn+' yet. '
-    +(must.length?'<button class="fb-btn p" onclick="PE.wauto()">✨ Fill with the '+must.length+' coach'+(must.length===1?'':'es')+' due by '+fmt(sat)+'</button>':'Nothing is due by '+fmt(sat)+'.')
+    +(must.length?'<button class="fb-btn p" onclick="PE.wauto()">✨ Fill with the '+must.length+' coach'+(must.length===1?'':'es')+' due within 15 days / by '+fmt(sat)+'</button>':'Nothing is due within 15 days.')
     +' <span>You can also add coaches one by one below.</span></div>';
   else{
     h+='<div class="pe-tw"><table class="pe wkt"><thead><tr><th>No.</th><th>Coaches no.</th><th>PE level</th><th>Last PE date</th><th>PE planning date</th><th>Current location</th><th>PE planning location</th><th>Status</th><th>Estimate due days</th><th>Remarks</th><th></th></tr></thead><tbody>';
@@ -7538,7 +7540,7 @@ function forecastHtml(){
   h+='<div class="wk-add"><select onchange="if(this.value)PE.wadd(this.value)"><option value="">＋ Add coach to week '+wn+'…</option>'
     +(cands.length?'<optgroup label="Due by '+fmt(addDays(sat,7))+' (soonest first)">'+cands.map(function(c){return '<option value="'+esc(c.r.id)+'">'+esc(c.r.id)+' — next PE '+fmt(c.k.next)+' ('+(c.k.days<0?'overdue '+(-c.k.days):c.k.days)+' d)</option>'}).join('')+'</optgroup>':'')
     +'<optgroup label="All IN OPERATIONS coaches">'+data().groups.map(function(g){return g.rows.filter(function(r){return r.st==='IN OPERATIONS'&&!items.some(function(x){return keyOf(x.id)===keyOf(r.id)})}).map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.id)+'</option>'}).join('')}).join('')+'</optgroup></select>'
-    +(items.length&&must.length?'<button class="fb-btn" onclick="PE.wauto()">✨ Add the '+must.length+' still due by '+fmt(sat)+'</button>':'')
+    +(items.length&&must.length?'<button class="fb-btn" onclick="PE.wauto()">✨ Add the '+must.length+' still due within 15 days</button>':'')
     +'<label>Prepared by <input value="'+esc(W().prep)+'" placeholder="Name / position" onchange="PE.wprep(this.value)"></label></div>';
   return h+'</div>';
 }
